@@ -35,14 +35,69 @@
 ### 渲染引擎 (WebGL)
 - 所有风格共享同一个 vertex shader
 - 每种风格对应一个 GLSL fragment shader
-- 参数通过 uniform 传入，变更实时重渲染
-- 统一 uniform 接口：
+- 参数通过具名 uniform 传入，变更实时重渲染
+- Fragment shader 统一声明 `precision highp float;`（确保移动端兼容）
+- WebGL 上下文创建时启用 `preserveDrawingBuffer: true`（确保 `toBlob()` 下载正常）
+
+**单 pass vs 多 pass**：
+- 大部分风格为单 pass 渲染
+- 光影风格需要高斯模糊光晕，采用 FBO ping-pong 两 pass 方案（水平模糊 + 垂直模糊），ShaderRenderer 内部管理 FBO 生命周期
+- 扩散风格基于 Bayer 矩阵有序抖动，单 pass 即可完成
+
+**各风格 uniform 声明**：
 
 ```glsl
-uniform sampler2D uImage;   // 原图纹理
-uniform vec2 uResolution;   // 画布尺寸
-uniform float uTime;        // 时间（动画用）
-uniform float uParams[N];   // 各风格自定义参数
+// 网点 Halftone
+uniform sampler2D uImage;
+uniform vec2 uResolution;
+uniform float uCellSize;    // 2-20, step 1
+uniform float uDotScale;    // 0.1-2.0, step 0.01
+uniform float uColorMode;   // 0/1/2
+uniform float uAngle;       // 0-360, step 1
+
+// 扩散 Diffusion
+uniform sampler2D uImage;
+uniform vec2 uResolution;
+uniform float uLevels;      // 2-32, step 1
+uniform float uSpread;      // 0.0-2.0, step 0.01
+uniform float uPixelSize;   // 1-8, step 1
+uniform float uNoiseType;   // 0/1/2
+
+// 波普 Pop Art
+uniform sampler2D uImage;
+uniform vec2 uResolution;
+uniform float uLevels;      // 2-8, step 1
+uniform float uSaturation;  // 0.5-3.0, step 0.01
+uniform float uContrast;    // 0.5-3.0, step 0.01
+uniform float uPalette;     // 0-4, step 1
+uniform float uBenDay;      // 0/1
+
+// 光影 Light & Shadow
+uniform sampler2D uImage;
+uniform vec2 uResolution;
+uniform float uContrast;    // 0.5-3.0, step 0.01
+uniform float uThreshold;   // 0.1-0.9, step 0.01
+uniform float uGlowRadius;  // 0-20, step 0.1
+uniform float uLightDir;    // 0-360, step 1
+
+// 底稿 Sketch
+uniform sampler2D uImage;
+uniform vec2 uResolution;
+uniform float uEdgeWidth;   // 0.5-5.0, step 0.1
+uniform float uSensitivity; // 0.01-0.5, step 0.01
+uniform float uDetail;      // 0.0-1.0, step 0.01
+uniform float uHatching;    // 0/1
+uniform float uBgColor;     // 0/1
+
+// 圆点 Pointillism
+uniform sampler2D uImage;
+uniform vec2 uResolution;
+uniform float uDotSize;     // 2-30, step 1
+uniform float uDensity;     // 0.3-3.0, step 0.01
+uniform float uRandomness;  // 0.0-1.0, step 0.01
+uniform float uBgR;         // 0.0-1.0 背景R分量
+uniform float uBgG;         // 0.0-1.0 背景G分量
+uniform float uBgB;         // 0.0-1.0 背景B分量
 ```
 
 ---
@@ -99,7 +154,7 @@ grid(uv, cellSize) → avgBrightness(uv, cellSize) → circle(uv, center, radius
 
 ### 02 扩散 Diffusion
 
-**算法**：多 pass 处理。先量化颜色，再基于 Bayer 矩阵或蓝噪声纹理做有序抖动，模拟误差扩散的颗粒质感。
+**算法**：单 pass 有序抖动。基于 Bayer 矩阵或蓝噪声纹理做有序抖动，先量化颜色再叠加噪声阈值，模拟误差扩散的颗粒质感。
 
 **伪代码**：
 ```
@@ -131,8 +186,15 @@ posterize(color, levels) → mapToPalette(color, palette) → optional: benDayDo
 | levels | 色调分离级数 | 2-8 | 4 |
 | saturation | 饱和度 | 0.5-3.0 | 2.0 |
 | contrast | 对比度 | 0.5-3.0 | 1.5 |
-| palette | 色板预设 | 0-4 | 0 |
+| palette | 色板预设 (见下) | 0-4 | 0 |
 | benDay | 叠加圆点开关 | 0/1 | 0 |
+
+**波普色板预设**：
+- Palette 0 (默认): `#FF0055`(玫红) `#FFCC00`(黄) `#00CCFF`(青) `#FF6600`(橙) `#000000`(黑) `#FFFFFF`(白)
+- Palette 1: `#FF00FF`(品红) `#00FF00`(绿) `#FFFF00`(黄) `#00FFFF`(青) `#000000`(黑) `#FFFFFF`(白)
+- Palette 2: `#FF0000`(红) `#0000FF`(蓝) `#FFFF00`(黄) `#FF8000`(橙) `#000000`(黑) `#FFFFFF`(白)
+- Palette 3: `#E91E63`(粉) `#9C27B0`(紫) `#3F51B5`(靛蓝) `#00BCD4`(青) `#000000`(黑) `#FFFFFF`(白)
+- Palette 4: `#FF3D00`(深橙) `#76FF03`(亮绿) `#FFEA00`(亮黄) `#D500F9`(紫) `#000000`(黑) `#FFFFFF`(白)
 
 ---
 
@@ -190,7 +252,7 @@ jitteredGrid(uv, size, randomness) → sampleColor(center) → circle(uv, center
 | dotSize | 圆点大小 | 2-30 | 8 |
 | density | 密度 | 0.3-3.0 | 1.0 |
 | randomness | 随机抖动 | 0.0-1.0 | 0.3 |
-| bgFill | 背景填充色 | 色值 | #FFFFFF |
+| bgFill | 背景填充色 | R/G/B 各 0.0-1.0 | 1.0/1.0/1.0 |
 
 ---
 
@@ -249,7 +311,24 @@ web_pic_design_ai/
 - 6 种风格 + 参数实时调整
 - 滑动对比预览
 - 下载效果图
-- 暗色/极简风格 UI（极简硬朗风格，浅色背景、黑边框直角、黑底白字选中态）
+- 极简硬朗风格 UI（浅色背景、黑边框直角、黑底白字选中态）
+
+---
+
+## 错误处理 & 约束
+
+### WebGL 兼容性
+- 应用启动时检测 WebGL 支持，不支持时显示明确提示（需支持 WebGL 的浏览器）
+- Shader 编译失败时捕获错误信息，在 UI 上显示风格不可用
+
+### 图片尺寸限制
+- 预览渲染最大尺寸：2048×2048（超过自动等比缩小）
+- 检测设备 `MAX_TEXTURE_SIZE`，上传图片超过此限制时提示用户
+- 下载时以预览分辨率输出（即最大 2048×2048）
+
+### 组件关系
+- `CompareSlider` 包裹 `CanvasPreview`，通过 toggle 状态切换"普通预览"和"对比模式"
+- 对比模式下，左半 Canvas 渲染原图，右半渲染效果图，拖拽分割线调整比例
 
 ## 后续可能扩展（不在当前范围）
 
