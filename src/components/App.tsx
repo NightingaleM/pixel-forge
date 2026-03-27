@@ -6,7 +6,7 @@ import ImageUploader from './ImageUploader'
 import StyleSelector from './StyleSelector'
 import ParamPanel from './ParamPanel'
 import ActionBar from './ActionBar'
-import CanvasPreview from './CanvasPreview'
+import { CompareSlider } from './CompareSlider'
 
 function initParams(styleId: StyleId): Record<string, number> {
   const styleDef = getStyle(styleId)
@@ -28,6 +28,7 @@ function App() {
   const [image, setImage] = useState<HTMLImageElement | null>(null)
   const [activeStyle, setActiveStyle] = useState<StyleId>('halftone')
   const [params, setParams] = useState<Record<string, number>>(() => initParams('halftone'))
+  const [compareMode, setCompareMode] = useState(false)
   const [imageInfo, setImageInfo] = useState<{ width: number; height: number; size: string } | null>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const rendererRef = useRef<ShaderRenderer | null>(null)
@@ -190,7 +191,12 @@ function App() {
       <div className="center-area">
         {image ? (
           <>
-            <CanvasPreview canvasRef={canvasRef} />
+            <CompareSlider
+              canvasRef={canvasRef}
+              originalImage={image}
+              compareMode={compareMode}
+              onToggleCompare={() => setCompareMode((prev) => !prev)}
+            />
             {currentStyle && (
               <ParamPanel
                 params={currentStyle.params}
