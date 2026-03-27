@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { ShaderRenderer } from '../lib/ShaderRenderer'
 import { styles, getStyle } from '../lib/StyleRegistry'
-import { StyleId } from '../types'
+import type { StyleId } from '../types'
 import ImageUploader from './ImageUploader'
 import StyleSelector from './StyleSelector'
 import ParamPanel from './ParamPanel'
