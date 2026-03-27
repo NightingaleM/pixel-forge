@@ -1,0 +1,316 @@
+/* ============================================================
+   Global Styles — Minimalist, Hard-Edged Design
+   No shadows, no gradients, no rounded corners.
+   ============================================================ */
+
+/* --- Base Reset --- */
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: #F5F5F0;
+  color: #000;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* --- App Container — Three-Column Layout --- */
+
+.app-container {
+  display: flex;
+  min-height: 100vh;
+  background: #F5F5F0;
+}
+
+/* --- Left Sidebar — Style List --- */
+
+.style-list {
+  width: 180px;
+  min-width: 180px;
+  background: #FFF;
+  border-right: 1px solid #000;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* --- Style List Items --- */
+
+.style-item {
+  padding: 10px 16px;
+  border-bottom: 1px solid #000;
+  cursor: pointer;
+  font-size: 13px;
+  color: #000;
+  background: #FFF;
+  user-select: none;
+  transition: background-color 0.1s ease;
+}
+
+.style-item:hover {
+  background: #F0F0F0;
+}
+
+.style-item.active {
+  background: #000;
+  color: #FFF;
+}
+
+/* --- Center — Preview Area --- */
+
+.preview-area {
+  flex: 1;
+  background: #FFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+/* --- Right Sidebar — Action Bar --- */
+
+.action-bar {
+  width: 160px;
+  min-width: 160px;
+  background: #FFF;
+  border-left: 1px solid #000;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* --- Action Buttons --- */
+
+.action-btn {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #000;
+  border-radius: 0;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: center;
+  transition: background-color 0.1s ease;
+  user-select: none;
+  font-family: inherit;
+}
+
+/* Primary button — black background, white text */
+.action-btn--primary {
+  background: #000;
+  color: #FFF;
+  border: 1px solid #000;
+}
+
+.action-btn--primary:hover {
+  background: #333;
+  color: #FFF;
+}
+
+/* Secondary button — white background, black text */
+.action-btn--secondary {
+  background: #FFF;
+  color: #000;
+  border: 1px solid #000;
+}
+
+.action-btn--secondary:hover {
+  background: #F0F0F0;
+  color: #000;
+}
+
+/* Disabled state */
+.action-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* --- Bottom Parameter Panel --- */
+
+.param-panel {
+  background: #FFF;
+  border-top: 1px solid #000;
+  padding: 16px 20px;
+}
+
+/* --- Parameter Row --- */
+
+.param-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.param-row:last-child {
+  margin-bottom: 0;
+}
+
+/* --- Parameter Label --- */
+
+.param-label {
+  min-width: 100px;
+  font-size: 12px;
+  color: #333;
+  flex-shrink: 0;
+}
+
+/* --- Parameter Value --- */
+
+.param-value {
+  min-width: 48px;
+  text-align: right;
+  font-size: 12px;
+  color: #999;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Custom Slider --- */
+
+.param-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: 1;
+  height: 2px;
+  background: #000;
+  border-radius: 0;
+  outline: none;
+  cursor: pointer;
+}
+
+/* Square thumb — WebKit */
+.param-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  background: #000;
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+}
+
+/* Square thumb — Firefox */
+.param-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  background: #000;
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+}
+
+/* Track — Firefox */
+.param-slider::-moz-range-track {
+  height: 2px;
+  background: #000;
+  border-radius: 0;
+}
+
+/* --- Upload Zone --- */
+
+.upload-zone {
+  border: 2px dashed #000;
+  padding: 40px 20px;
+  text-align: center;
+  cursor: pointer;
+  color: #999;
+  font-size: 13px;
+  background: #FFF;
+  transition: background-color 0.1s ease;
+}
+
+.upload-zone:hover {
+  background: #F0F0F0;
+}
+
+.upload-zone.dragover {
+  background: #F0F0F0;
+  border-color: #000;
+  border-style: solid;
+  color: #000;
+}
+
+/* --- Image Info --- */
+
+.image-info {
+  font-size: 12px;
+  color: #999;
+  padding: 8px 0;
+}
+
+.image-info span {
+  color: #333;
+}
+
+/* --- Compare Container --- */
+
+.compare-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* --- Compare Divider --- */
+
+.compare-divider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #000;
+  cursor: col-resize;
+  z-index: 10;
+}
+
+.compare-divider::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 20px;
+  height: 20px;
+  background: #000;
+  border: 1px solid #000;
+  border-radius: 0;
+}
+
+/* --- Compare Toggle Button --- */
+
+.compare-toggle {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  padding: 6px 12px;
+  background: #FFF;
+  color: #000;
+  border: 1px solid #000;
+  border-radius: 0;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  z-index: 20;
+  font-family: inherit;
+  transition: background-color 0.1s ease;
+}
+
+.compare-toggle:hover {
+  background: #F0F0F0;
+}
+
+.compare-toggle.active {
+  background: #000;
+  color: #FFF;
+}
