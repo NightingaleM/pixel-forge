@@ -187,24 +187,24 @@ function App() {
 
   return (
     <div className="app-container">
-      <StyleSelector styles={styles} activeId={activeStyle} onSelect={handleStyleChange} />
+      <div className="left-sidebar">
+        <StyleSelector styles={styles} activeId={activeStyle} onSelect={handleStyleChange} />
+        {image && currentStyle && (
+          <ParamPanel
+            params={currentStyle.params}
+            values={params}
+            onChange={handleParamChange}
+          />
+        )}
+      </div>
       <div className="center-area">
         {image ? (
-          <>
-            <CompareSlider
-              canvasRef={canvasRef}
-              originalImage={image}
-              compareMode={compareMode}
-              onToggleCompare={() => setCompareMode((prev) => !prev)}
-            />
-            {currentStyle && (
-              <ParamPanel
-                params={currentStyle.params}
-                values={params}
-                onChange={handleParamChange}
-              />
-            )}
-          </>
+          <CompareSlider
+            canvasRef={canvasRef}
+            originalImage={image}
+            compareMode={compareMode}
+            onToggleCompare={() => setCompareMode((prev) => !prev)}
+          />
         ) : (
           <ImageUploader onImageLoad={handleImageLoad} />
         )}
