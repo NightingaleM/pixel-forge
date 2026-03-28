@@ -1,6 +1,7 @@
-export type StyleId = 'halftone' | 'diffusion' | 'popart' | 'lightshadow' | 'sketch' | 'pointillism'
+export type StyleId = 'halftone' | 'diffusion' | 'popart' | 'lightshadow' | 'sketch' | 'pointillism' | 'kaleidoscope' | 'crosshatch' | 'animelight' | 'textraster'
 
-export interface ParamDef {
+export interface NumberParamDef {
+  type?: 'number'
   name: string       // UI 显示名
   uniform: string    // GLSL uniform 名
   min: number
@@ -9,6 +10,16 @@ export interface ParamDef {
   default: number
   description?: string  // 参数详细描述
 }
+
+export interface TextParamDef {
+  type: 'text'
+  name: string
+  uniform: string
+  textDefault: string
+  description?: string
+}
+
+export type ParamDef = NumberParamDef | TextParamDef
 
 export interface ShaderPass {
   fragSource: string
