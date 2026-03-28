@@ -136,6 +136,25 @@ export const styles: StyleDefinition[] = [
       { name: '色相偏移', uniform: 'uHueShift',  min: 0,   max: 360, step: 1,    default: 0,   description: '整体色相偏移' },
     ],
   },
+
+  // ---------------------------------------------------------------------------
+  // Crosshatch (Screen-tone Draft)
+  // ---------------------------------------------------------------------------
+  {
+    id: 'crosshatch',
+    label: 'Crosshatch',
+    description: '网纹底稿风格，黑白线稿 + 可旋转纹理网点 + 纸张噪声，模拟漫画网纸/网点纸的印刷质感。',
+    shaderImports: [() => import('../shaders/crosshatch.frag?raw').then(m => m.default)],
+    params: [
+      { name: '网点大小',     uniform: 'uDotSize',          min: 2,    max: 30,  step: 1,    default: 8,    description: '纹理网点的基础大小' },
+      { name: '网点旋转角度', uniform: 'uScreenAngle',      min: 0,    max: 360, step: 1,    default: 45,   description: '网点纹理的旋转角度' },
+      { name: '边缘灵敏度',   uniform: 'uEdgeSensitivity',  min: 0.01, max: 1.0, step: 0.01, default: 0.15, description: '边缘检测的灵敏度阈值' },
+      { name: '线条粗细',     uniform: 'uLineWidth',        min: 0.5,  max: 5.0, step: 0.1,  default: 1.5,  description: '底稿轮廓线的粗细' },
+      { name: '纸张噪声',     uniform: 'uPaperNoise',       min: 0.0,  max: 0.3, step: 0.01, default: 0.05, description: '纸张纹理噪声的强度' },
+      { name: '网点浓度',     uniform: 'uScreenDensity',    min: 0.1,  max: 3.0, step: 0.01, default: 1.0,  description: '网点覆盖的浓度/对比度' },
+      { name: '反转模式',     uniform: 'uInvert',           min: 0,    max: 1,   step: 1,    default: 0,    description: '0=白底黑线  1=黑底白线' },
+    ],
+  },
 ]
 
 /**
