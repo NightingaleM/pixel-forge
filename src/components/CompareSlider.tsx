@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect, type RefObject } from 'react'
 
 interface CompareSliderProps {
-  canvasRef: RefObject<HTMLCanvasElement>
+  canvasRef: RefObject<HTMLCanvasElement | null>
   originalImage: HTMLImageElement | null
   compareMode: boolean
   onToggleCompare: () => void
