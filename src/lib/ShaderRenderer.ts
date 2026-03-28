@@ -294,6 +294,16 @@ export class ShaderRenderer {
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, currentInput);
 
+        // Bind original image to TEXTURE1 for composite passes
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, this.texture);
+
+        // Set sampler uniforms for texture units
+        const uImageLoc = gl.getUniformLocation(this.program!, 'uImage');
+        if (uImageLoc) gl.uniform1i(uImageLoc, 0);
+        const uOriginalLoc = gl.getUniformLocation(this.program!, 'uOriginal');
+        if (uOriginalLoc) gl.uniform1i(uOriginalLoc, 1);
+
         for (const [name, value] of Object.entries(pass.uniforms)) {
           this.setUniform(name, value);
         }
@@ -311,6 +321,16 @@ export class ShaderRenderer {
 
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, currentInput);
+
+        // Bind original image to TEXTURE1 for composite passes
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, this.texture);
+
+        // Set sampler uniforms for texture units
+        const uImageLoc2 = gl.getUniformLocation(this.program!, 'uImage');
+        if (uImageLoc2) gl.uniform1i(uImageLoc2, 0);
+        const uOriginalLoc2 = gl.getUniformLocation(this.program!, 'uOriginal');
+        if (uOriginalLoc2) gl.uniform1i(uOriginalLoc2, 1);
 
         for (const [name, value] of Object.entries(pass.uniforms)) {
           this.setUniform(name, value);

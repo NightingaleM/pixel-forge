@@ -155,6 +155,30 @@ export const styles: StyleDefinition[] = [
       { name: '反转模式',     uniform: 'uInvert',           min: 0,    max: 1,   step: 1,    default: 0,    description: '0=白底黑线  1=黑底白线' },
     ],
   },
+
+  // ---------------------------------------------------------------------------
+  // Anime Light (multi-pass: edge_blur -> composite)
+  // ---------------------------------------------------------------------------
+  {
+    id: 'animelight',
+    label: 'Anime Light',
+    description: '动画光影风格，高饱和气氛光、描边加神光束，呈现日系动画美术感的画面效果。',
+    shaderImports: [
+      () => import('../shaders/animelight_edge_blur.frag?raw').then(m => m.default),
+      () => import('../shaders/animelight_composite.frag?raw').then(m => m.default),
+    ],
+    isMultiPass: true,
+    params: [
+      { name: '饱和度',   uniform: 'uSaturation',     min: 0.5, max: 4.0, step: 0.01, default: 1.8, description: '色彩饱和度增强' },
+      { name: '描边宽度', uniform: 'uEdgeWidth',      min: 0.5, max: 5.0, step: 0.1,  default: 1.5, description: '动画面描边的线条粗细' },
+      { name: '描边阈值', uniform: 'uEdgeThreshold',  min: 0.01, max: 0.5, step: 0.01, default: 0.1, description: '边缘检测灵敏度' },
+      { name: '神光强度', uniform: 'uGodRayStrength', min: 0.0, max: 3.0, step: 0.01, default: 1.0, description: '神光束的亮度强度' },
+      { name: '神光方向', uniform: 'uGodRayAngle',    min: 0,   max: 360, step: 1,    default: 135, description: '神光束的发射方向角度' },
+      { name: '光晕半径', uniform: 'uGlowRadius',     min: 1,   max: 50,  step: 0.1,  default: 10,  description: '光晕扩散的模糊半径' },
+      { name: '色相偏移', uniform: 'uHueShift',       min: 0,   max: 360, step: 1,    default: 0,   description: '整体色相偏移' },
+      { name: '对比度',   uniform: 'uContrast',        min: 0.5, max: 3.0, step: 0.01, default: 1.3, description: '画面对比度' },
+    ],
+  },
 ]
 
 /**
