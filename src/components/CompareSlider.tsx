@@ -5,6 +5,7 @@ interface CompareSliderProps {
   originalImage: HTMLImageElement | null
   compareMode: boolean
   onToggleCompare: () => void
+  onClose: () => void
 }
 
 function CompareSlider({
@@ -12,6 +13,7 @@ function CompareSlider({
   originalImage,
   compareMode,
   onToggleCompare,
+  onClose,
 }: CompareSliderProps) {
   const [sliderPosition, setSliderPosition] = useState(0.5)
   const dragging = useRef(false)
@@ -80,8 +82,21 @@ function CompareSlider({
 
   const clipInsetPercent = (1 - sliderPosition) * 100
 
+  const handleClose = () => {
+    if (window.confirm('确定要退出当前编辑吗？未保存的修改将丢失。')) {
+      onClose()
+    }
+  }
+
   return (
     <div className="compare-container">
+      <button
+        className="close-btn"
+        onClick={handleClose}
+        title="关闭图片"
+      >
+        x
+      </button>
       <div
         className="canvas-wrapper"
         ref={containerRef}

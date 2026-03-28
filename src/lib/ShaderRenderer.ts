@@ -83,6 +83,24 @@ export class ShaderRenderer {
       height = Math.floor(height * scale);
     }
 
+    // Fit canvas to container — keep aspect ratio, never upscale
+    const container = this.canvas.closest('.compare-container') as HTMLElement | null;
+    if (container) {
+      const maxW = container.clientWidth;
+      const maxH = container.clientHeight;
+      if (maxW > 0 && maxH > 0) {
+        const scaleX = maxW / width;
+        const scaleY = maxH / height;
+        const fitScale = Math.min(scaleX, scaleY, 1);
+        width = Math.floor(width * fitScale);
+        height = Math.floor(height * fitScale);
+      }
+    }
+
+    // Ensure at least 1x1
+    width = Math.max(1, width);
+    height = Math.max(1, height);
+
     this.imageWidth = width;
     this.imageHeight = height;
 

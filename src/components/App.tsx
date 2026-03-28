@@ -224,6 +224,30 @@ function App() {
     }, 'image/png')
   }, [activeStyle])
 
+  const handleClose = useCallback(() => {
+    setImage(null)
+    setImageInfo(null)
+    setCompareMode(false)
+  }, [])
+
+  const handleTestImageClick = useCallback(
+    (src: string) => {
+      const img = new Image()
+      img.crossOrigin = 'anonymous'
+      img.onload = () => {
+        handleImageLoad(img)
+      }
+      img.src = src
+    },
+    [handleImageLoad],
+  )
+
+  const testImages = [
+    { src: '/local_test_pic/cake.jpg', label: 'cake' },
+    { src: '/local_test_pic/car.jpg', label: 'car' },
+    { src: '/local_test_pic/car2.jpg', label: 'car2' },
+  ]
+
   // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
@@ -253,10 +277,22 @@ function App() {
             originalImage={image}
             compareMode={compareMode}
             onToggleCompare={() => setCompareMode((prev) => !prev)}
+            onClose={handleClose}
           />
         ) : (
           <ImageUploader onImageLoad={handleImageLoad} />
         )}
+        <div className="test-images-bar">
+          {testImages.map((t) => (
+            <img
+              key={t.label}
+              className="test-image-thumb"
+              src={t.src}
+              alt={t.label}
+              onClick={() => handleTestImageClick(t.src)}
+            />
+          ))}
+        </div>
       </div>
       <ActionBar
         onDownload={handleDownload}

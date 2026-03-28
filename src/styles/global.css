@@ -24,7 +24,7 @@ body {
 
 .app-container {
   display: flex;
-  min-height: 100vh;
+  height: 100vh;
   background: #F5F5F0;
 }
 
@@ -90,6 +90,7 @@ body {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  max-height: 100vh;
   overflow: hidden;
 }
 
@@ -333,6 +334,7 @@ body {
 /* --- Upload Zone --- */
 
 .upload-zone {
+  flex: 1;
   border: 2px dashed #000;
   padding: 40px 20px;
   text-align: center;
@@ -341,6 +343,9 @@ body {
   font-size: 13px;
   background: #FFF;
   transition: background-color 0.1s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .upload-zone:hover {
@@ -370,8 +375,9 @@ body {
 
 .compare-container {
   position: relative;
+  flex: 1;
   width: 100%;
-  height: 100%;
+  min-height: 0;
   overflow: hidden;
   display: flex;
   align-items: center;
@@ -383,6 +389,7 @@ body {
   max-width: 100%;
   max-height: 100%;
   line-height: 0;
+  overflow: hidden;
 }
 
 .canvas-wrapper canvas {
@@ -459,4 +466,57 @@ body {
 }
 .param-text-input:focus {
   border-width: 2px;
+}
+
+/* --- Close Button --- */
+
+.close-btn {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: #FFF;
+  color: #000;
+  border: 1px solid #000;
+  border-radius: 0;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  z-index: 20;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.1s ease;
+}
+
+.close-btn:hover {
+  background: #000;
+  color: #FFF;
+}
+
+/* --- Test Images Bar --- */
+
+.test-images-bar {
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  border-top: 1px solid #000;
+  background: #FFF;
+  flex-shrink: 0;
+}
+
+.test-image-thumb {
+  width: 80px;
+  height: 56px;
+  object-fit: cover;
+  border: 1px solid #CCC;
+  cursor: pointer;
+  transition: border-color 0.1s ease;
+}
+
+.test-image-thumb:hover {
+  border-color: #000;
 }
