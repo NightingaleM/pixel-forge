@@ -1,3 +1,4 @@
+import { useRef, useState, useCallback, useEffect } from 'react'
 import type { ParamDef } from '../types'
 
 interface ParamPanelProps {
@@ -8,19 +9,55 @@ interface ParamPanelProps {
   textValues: Record<string, string>
   onChange: (uniform: string, value: number) => void
   onTextChange: (uniform: string, value: string) => void
+  onClose?: () => void
 }
 
 function formatValue(value: number): string {
   return Number.isInteger(value) ? value.toString() : value.toFixed(2)
 }
 
-function ParamPanel({ styleLabel, styleDescription, params, values, textValues, onChange, onTextChange }: ParamPanelProps) {
+function ParamPanel({ styleLabel, styleDescription, params, values, textValues, onChange, onTextChange, onClose }: ParamPanelProps) {
+  const panelRef = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState({ x: 16, y: 60 })
+  const dragging = useRef(false)
+  const offset = useRef({ x: 0, y: 0 })
+
+  const onMouseDown = useCallback((e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest('.param-panel-body')) return
+    dragging.current = true
+    const rect = panelRef.current!.getBoundingClientRect()
+    offset.current = { x: e.clientX - rect.left, y: e.clientY - rect.top }
+    e.preventDefault()
+  }, [])
+
+  useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => {
+      if (!dragging.current) return
+      const x = Math.max(0, Math.min(window.innerWidth - 100, e.clientX - offset.current.x))
+      const y = Math.max(0, Math.min(window.innerHeight - 40, e.clientY - offset.current.y))
+      setPos({ x, y })
+    }
+    const onMouseUp = () => { dragging.current = false }
+    window.addEventListener('mousemove', onMouseMove)
+    window.addEventListener('mouseup', onMouseUp)
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('mouseup', onMouseUp)
+    }
+  }, [])
+
   return (
-    <div className="param-panel">
-      <div className="param-panel-header">
-        <div className="param-panel-title">{styleLabel}</div>
+    <div className="param-panel" ref={panelRef} style={{ left: pos.x, top: pos.y }}>
+      <div className="param-panel-header" onMouseDown={onMouseDown}>
+        <div className="param-panel-title-row">
+          <div className="param-panel-title">{styleLabel}</div>
+          {onClose && (
+            <button className="param-panel-close" onClick={onClose}>x</button>
+          )}
+        </div>
         <div className="param-panel-desc">{styleDescription}</div>
       </div>
+      <div className="param-panel-body">
       {params.map((param) => {
         if (param.type === 'text') {
           return (
@@ -76,6 +113,7 @@ function ParamPanel({ styleLabel, styleDescription, params, values, textValues, 
           </div>
         )
       })}
+      </div>
     </div>
   )
 }

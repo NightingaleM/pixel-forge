@@ -7,6 +7,7 @@ import StyleSelector from './StyleSelector'
 import ParamPanel from './ParamPanel'
 import ActionBar from './ActionBar'
 import { CompareSlider } from './CompareSlider'
+import ConfirmDialog from './ConfirmDialog'
 
 function initParams(styleId: StyleId): Record<string, number> {
   const styleDef = getStyle(styleId)
@@ -44,6 +45,7 @@ function App() {
   const [textParams, setTextParams] = useState<Record<string, string>>(() => initTextParams('halftone'))
   const [compareMode, setCompareMode] = useState(false)
   const [imageInfo, setImageInfo] = useState<{ width: number; height: number; size: string } | null>(null)
+  const [showCloseDialog, setShowCloseDialog] = useState(false)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const rendererRef = useRef<ShaderRenderer | null>(null)
 
@@ -245,6 +247,7 @@ function App() {
     setImage(null)
     setImageInfo(null)
     setCompareMode(false)
+    setShowCloseDialog(false)
     if (rendererRef.current) {
       rendererRef.current.destroy()
       rendererRef.current = null
@@ -279,17 +282,6 @@ function App() {
     <div className="app-container">
       <div className="left-sidebar">
         <StyleSelector styles={styles} activeId={activeStyle} onSelect={handleStyleChange} />
-        {image && currentStyle && (
-          <ParamPanel
-            styleLabel={currentStyle.label}
-            styleDescription={currentStyle.description}
-            params={currentStyle.params}
-            values={params}
-            textValues={textParams}
-            onChange={handleParamChange}
-            onTextChange={handleTextChange}
-          />
-        )}
       </div>
       <div className="center-area">
         {image ? (
@@ -298,7 +290,7 @@ function App() {
             originalImage={image}
             compareMode={compareMode}
             onToggleCompare={() => setCompareMode((prev) => !prev)}
-            onClose={handleClose}
+            onClose={() => setShowCloseDialog(true)}
           />
         ) : (
           <ImageUploader onImageLoad={handleImageLoad} />
@@ -321,6 +313,24 @@ function App() {
         onRandom={handleRandom}
         imageInfo={imageInfo}
       />
+      {image && currentStyle && (
+        <ParamPanel
+          styleLabel={currentStyle.label}
+          styleDescription={currentStyle.description}
+          params={currentStyle.params}
+          values={params}
+          textValues={textParams}
+          onChange={handleParamChange}
+          onTextChange={handleTextChange}
+        />
+      )}
+      {showCloseDialog && (
+        <ConfirmDialog
+          message="确定要退出当前编辑吗？未保存的修改将丢失。"
+          onConfirm={handleClose}
+          onCancel={() => setShowCloseDialog(false)}
+        />
+      )}
     </div>
   )
 }

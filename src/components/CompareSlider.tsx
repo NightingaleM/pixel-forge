@@ -83,9 +83,7 @@ function CompareSlider({
   const clipInsetPercent = (1 - sliderPosition) * 100
 
   const handleClose = () => {
-    if (window.confirm('确定要退出当前编辑吗？未保存的修改将丢失。')) {
-      onClose()
-    }
+    onClose()
   }
 
   return (
