@@ -117,6 +117,25 @@ export const styles: StyleDefinition[] = [
       { name: '形状模式', uniform: 'uShape',          min: 0,   max: 2,   step: 1,    default: 0,   description: '0=圆形  1=方形  2=椭圆' },
     ],
   },
+
+  // ---------------------------------------------------------------------------
+  // Kaleidoscope
+  // ---------------------------------------------------------------------------
+  {
+    id: 'kaleidoscope',
+    label: 'Kaleidoscope',
+    description: '万花筒镜像效果，将画面以中心为原点分割为多个扇区并镜像翻转，产生对称图案。适合制作故障拼贴、错位人像和实验感画面。',
+    shaderImports: [() => import('../shaders/kaleidoscope.frag?raw').then(m => m.default)],
+    params: [
+      { name: '扇区数',   uniform: 'uSegments', min: 2,   max: 24,  step: 1,    default: 6,   description: '万花筒的镜像分割数量' },
+      { name: '旋转角度', uniform: 'uRotation',  min: 0,   max: 360, step: 1,    default: 0,   description: '整体旋转角度' },
+      { name: '缩放',     uniform: 'uZoom',      min: 0.1, max: 5.0, step: 0.01, default: 1.0, description: '画面缩放倍率' },
+      { name: '中心X偏移', uniform: 'uCenterX',   min: -1.0, max: 1.0, step: 0.01, default: 0.0, description: '中心点水平偏移' },
+      { name: '中心Y偏移', uniform: 'uCenterY',   min: -1.0, max: 1.0, step: 0.01, default: 0.0, description: '中心点垂直偏移' },
+      { name: '边缘发光', uniform: 'uEdgeGlow',  min: 0.0, max: 2.0, step: 0.01, default: 0.0, description: '扇区边缘的发光强度' },
+      { name: '色相偏移', uniform: 'uHueShift',  min: 0,   max: 360, step: 1,    default: 0,   description: '整体色相偏移' },
+    ],
+  },
 ]
 
 /**
