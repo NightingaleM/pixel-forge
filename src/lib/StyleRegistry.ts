@@ -179,6 +179,24 @@ export const styles: StyleDefinition[] = [
       { name: '对比度',   uniform: 'uContrast',        min: 0.5, max: 3.0, step: 0.01, default: 1.3, description: '画面对比度' },
     ],
   },
+
+  // ---------------------------------------------------------------------------
+  // Text Raster
+  // ---------------------------------------------------------------------------
+  {
+    id: 'textraster',
+    label: 'Text Raster',
+    description: '文字栅格风格，将图片重构为文字栅格画面，每个网格单元以字符密度映射亮度。适合制作文本海报、信息屏和实验排版效果。',
+    shaderImports: [() => import('../shaders/textraster.frag?raw').then(m => m.default)],
+    params: [
+      { name: '字符大小',     uniform: 'uCellSize',       min: 4,   max: 40,  step: 1,    default: 12,  description: '每个字符单元的像素大小' },
+      { name: '文本内容',     uniform: 'uTextContent',    type: 'text' as const, textDefault: '01', description: '用户输入的文字内容' },
+      { name: '字体大小',     uniform: 'uFontSize',       min: 8,   max: 72,  step: 1,    default: 24,  description: '文字纹理中的字体大小' },
+      { name: '背景亮度',     uniform: 'uBgBrightness',   min: 0.0, max: 1.0, step: 0.01, default: 0.0, description: '背景色亮度，0=纯黑' },
+      { name: '颜色强度',     uniform: 'uColorStrength',  min: 0.0, max: 2.0, step: 0.01, default: 1.0, description: '字符前景色的强度' },
+      { name: '网格旋转角度', uniform: 'uAngle',          min: 0,   max: 360, step: 1,    default: 0,   description: '网格整体旋转角度' },
+    ],
+  },
 ]
 
 /**
