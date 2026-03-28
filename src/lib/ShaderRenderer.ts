@@ -352,6 +352,58 @@ export class ShaderRenderer {
   }
 
   /**
+   * Generate a text atlas texture from the given string.
+   */
+  loadTextTexture(text: string, fontSize: number): WebGLTexture {
+    const charCount = text.length || 1
+    const actualText = text.length > 0 ? text : ' '
+    const cellSize = fontSize
+
+    const canvas = document.createElement('canvas')
+    canvas.width = cellSize * charCount
+    canvas.height = cellSize
+
+    const ctx = canvas.getContext('2d')!
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    ctx.font = `bold ${fontSize}px monospace`
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillStyle = '#ffffff'
+
+    for (let i = 0; i < actualText.length; i++) {
+      ctx.fillText(actualText[i], i * cellSize + cellSize / 2, cellSize / 2)
+    }
+
+    const gl = this.gl
+    const texture = gl.createTexture()!
+    gl.bindTexture(gl.TEXTURE_2D, texture)
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true)
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+
+    return texture
+  }
+
+  /**
+   * Bind a texture to a specific texture unit.
+   */
+  bindTexture(texture: WebGLTexture, unit: number): void {
+    const gl = this.gl
+    gl.activeTexture(gl.TEXTURE0 + unit)
+    gl.bindTexture(gl.TEXTURE_2D, texture)
+  }
+
+  /**
+   * Return the underlying WebGL rendering context.
+   */
+  getGl(): WebGLRenderingContext {
+    return this.gl
+  }
+
+  /**
    * Release all GPU resources held by this renderer.
    */
   destroy(): void {

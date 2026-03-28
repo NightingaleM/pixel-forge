@@ -13,7 +13,20 @@ function initParams(styleId: StyleId): Record<string, number> {
   if (!styleDef) return {}
   const result: Record<string, number> = {}
   for (const p of styleDef.params) {
+    if (p.type === 'text') continue
     result[p.uniform] = p.default
+  }
+  return result
+}
+
+function initTextParams(styleId: StyleId): Record<string, string> {
+  const styleDef = getStyle(styleId)
+  if (!styleDef) return {}
+  const result: Record<string, string> = {}
+  for (const p of styleDef.params) {
+    if (p.type === 'text') {
+      result[p.uniform] = p.textDefault
+    }
   }
   return result
 }
@@ -28,6 +41,7 @@ function App() {
   const [image, setImage] = useState<HTMLImageElement | null>(null)
   const [activeStyle, setActiveStyle] = useState<StyleId>('halftone')
   const [params, setParams] = useState<Record<string, number>>(() => initParams('halftone'))
+  const [textParams, setTextParams] = useState<Record<string, string>>(() => initTextParams('halftone'))
   const [compareMode, setCompareMode] = useState(false)
   const [imageInfo, setImageInfo] = useState<{ width: number; height: number; size: string } | null>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -45,7 +59,7 @@ function App() {
   // ---------------------------------------------------------------------------
 
   const renderWithStyle = useCallback(
-    async (styleId: StyleId, currentParams: Record<string, number>) => {
+    async (styleId: StyleId, currentParams: Record<string, number>, currentTextParams: Record<string, string>) => {
       const canvas = canvasRef.current
       const renderer = rendererRef.current
       if (!canvas || !renderer) return
@@ -53,23 +67,47 @@ function App() {
       const styleDef = getStyle(styleId)
       if (!styleDef) return
 
+      // Handle text params: generate text textures
+      const textTextures: WebGLTexture[] = []
+      const textParamDefs = styleDef.params.filter((p): p is typeof p & { type: 'text' } => p.type === 'text')
+      let atlasCount = 0
+
+      for (const tp of textParamDefs) {
+        const text = currentTextParams[tp.uniform] || tp.textDefault
+        const fontSize = currentParams['uFontSize'] || 24
+        const texture = renderer.loadTextTexture(text, fontSize)
+        textTextures.push(texture)
+        atlasCount = text.length || 1
+      }
+
+      // Merge atlas count into params
+      const mergedParams = { ...currentParams }
+      if (textTextures.length > 0) {
+        renderer.bindTexture(textTextures[0], 2)
+        mergedParams['uAtlasCount'] = atlasCount
+      }
+
       const shaderSources = await Promise.all(styleDef.shaderImports.map((fn) => fn()))
 
       if (styleDef.isMultiPass && shaderSources.length > 1) {
-        // Multi-pass: each pass gets its own shader + params
         const passes = shaderSources.map((src) => ({
           fragSource: src,
-          uniforms: { ...currentParams },
+          uniforms: { ...mergedParams },
         }))
         renderer.renderMultiPass(passes)
       } else {
-        // Single pass
         renderer.useShader(shaderSources[0])
         renderer.setUniform('uResolution', [canvas.width, canvas.height])
-        for (const [key, val] of Object.entries(currentParams)) {
+        for (const [key, val] of Object.entries(mergedParams)) {
           renderer.setUniform(key, val)
         }
         renderer.render()
+      }
+
+      // Clean up text textures
+      for (const tex of textTextures) {
+        const gl = renderer.getGl()
+        if (gl) gl.deleteTexture(tex)
       }
     },
     [],
@@ -114,8 +152,8 @@ function App() {
   const handleStyleChange = useCallback(
     (id: StyleId) => {
       setActiveStyle(id)
-      const newParams = initParams(id)
-      setParams(newParams)
+      setParams(initParams(id))
+      setTextParams(initTextParams(id))
     },
     [],
   )
@@ -126,8 +164,8 @@ function App() {
 
   useEffect(() => {
     if (!image || !rendererRef.current) return
-    renderWithStyle(activeStyle, params)
-  }, [image, activeStyle, params, renderWithStyle])
+    renderWithStyle(activeStyle, params, textParams)
+  }, [image, activeStyle, params, textParams, renderWithStyle])
 
   // ---------------------------------------------------------------------------
   // Cleanup
@@ -150,6 +188,10 @@ function App() {
     setParams((prev) => ({ ...prev, [uniform]: value }))
   }, [])
 
+  const handleTextChange = useCallback((uniform: string, value: string) => {
+    setTextParams((prev) => ({ ...prev, [uniform]: value }))
+  }, [])
+
   const handleReset = useCallback(() => {
     setParams(initParams(activeStyle))
   }, [activeStyle])
@@ -159,6 +201,7 @@ function App() {
     if (!styleDef) return
     const randomParams: Record<string, number> = {}
     for (const p of styleDef.params) {
+      if (p.type === 'text') continue
       const range = p.max - p.min
       // Snap to step
       const raw = p.min + Math.random() * range
@@ -197,7 +240,9 @@ function App() {
             styleDescription={currentStyle.description}
             params={currentStyle.params}
             values={params}
+            textValues={textParams}
             onChange={handleParamChange}
+            onTextChange={handleTextChange}
           />
         )}
       </div>
