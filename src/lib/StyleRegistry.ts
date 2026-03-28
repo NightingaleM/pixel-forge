@@ -13,7 +13,7 @@ export const styles: StyleDefinition[] = [
       { name: '网格大小',    uniform: 'uCellSize',  min: 2,   max: 50,  step: 1,    default: 6,   description: '控制半色调网格的单元格大小，值越大圆点越稀疏' },
       { name: '圆点缩放',    uniform: 'uDotScale',  min: 0.1, max: 3.0, step: 0.01, default: 1.0, description: '圆点相对于单元格的大小比例' },
       { name: '颜色模式',    uniform: 'uColorMode', min: 0,   max: 2,   step: 1,    default: 2,   description: '0=彩色  1=灰度  2=CMYK' },
-      { name: '网格旋转角度', uniform: 'uAngle',     min: 0,   max: 360, step: 1,    default: 45,  description: '网格整体旋转的角度' },
+      { name: '网格旋转角度', uniform: 'uAngle',     min: 0,   max: 360, step: 1,    default: 0,   description: '网格整体旋转的角度' },
       { name: '形状模式',    uniform: 'uShape',     min: 0,   max: 2,   step: 1,    default: 0,   description: '0=圆形  1=方形  2=菱形' },
       { name: '色相偏移',    uniform: 'uHueShift',  min: 0,   max: 360, step: 1,    default: 0,   description: '整体色相的偏移量' },
     ],

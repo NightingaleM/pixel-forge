@@ -152,8 +152,23 @@ function App() {
   const handleStyleChange = useCallback(
     (id: StyleId) => {
       setActiveStyle(id)
-      setParams(initParams(id))
       setTextParams(initTextParams(id))
+      // 随机参数，但固定中心偏移和旋转角度为 0
+      const styleDef = getStyle(id)
+      if (!styleDef) { setParams(initParams(id)); return }
+      const skipRandomNames = ['中心X偏移', '中心Y偏移', '旋转角度', '网格旋转角度']
+      const randomParams: Record<string, number> = {}
+      for (const p of styleDef.params) {
+        if (p.type === 'text') continue
+        if (skipRandomNames.includes(p.name)) {
+          randomParams[p.uniform] = 0
+          continue
+        }
+        const range = p.max - p.min
+        const raw = p.min + Math.random() * range
+        randomParams[p.uniform] = Math.round(raw / p.step) * p.step
+      }
+      setParams(randomParams)
     },
     [],
   )
@@ -200,8 +215,10 @@ function App() {
     const styleDef = getStyle(activeStyle)
     if (!styleDef) return
     const randomParams: Record<string, number> = {}
+    const skipRandomNames = ['中心X偏移', '中心Y偏移', '旋转角度', '网格旋转角度']
     for (const p of styleDef.params) {
       if (p.type === 'text') continue
+      if (skipRandomNames.includes(p.name)) continue
       const range = p.max - p.min
       // Snap to step
       const raw = p.min + Math.random() * range
@@ -228,6 +245,10 @@ function App() {
     setImage(null)
     setImageInfo(null)
     setCompareMode(false)
+    if (rendererRef.current) {
+      rendererRef.current.destroy()
+      rendererRef.current = null
+    }
   }, [])
 
   const handleTestImageClick = useCallback(
