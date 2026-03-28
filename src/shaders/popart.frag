@@ -9,6 +9,28 @@ uniform float uSaturation;
 uniform float uContrast;
 uniform float uPalette;
 uniform float uBenDay;
+uniform float uHueShift;
+uniform float uDotSize;
+
+vec3 rgb2hsv(vec3 c) {
+    float mx = max(c.r, max(c.g, c.b));
+    float mn = min(c.r, min(c.g, c.b));
+    float d = mx - mn;
+    float h = 0.0;
+    if (d > 0.001) {
+        if (mx == c.r) h = (c.g - c.b) / d;
+        else if (mx == c.g) h = 2.0 + (c.b - c.r) / d;
+        else h = 4.0 + (c.r - c.g) / d;
+        h = fract(h / 6.0);
+    }
+    float s = mx > 0.001 ? d / mx : 0.0;
+    return vec3(h, s, mx);
+}
+
+vec3 hsv2rgb(vec3 c) {
+    vec3 rgb = abs(fract(vec3(c.x) + vec3(0.0, 2.0/3.0, 1.0/3.0)) * 6.0 - 3.0) - 1.0;
+    return c.z * mix(vec3(1.0), clamp(rgb, 0.0, 1.0), c.y);
+}
 
 vec3 posterize(vec3 color, float levels) {
     return floor(color * levels + 0.5) / levels;
@@ -104,9 +126,16 @@ void main() {
     // Step 4: Map to nearest palette color
     c = nearestPaletteColor(c, uPalette);
 
+    // Step 4.5: Apply hue shift
+    if (uHueShift > 0.5) {
+        vec3 hsv = rgb2hsv(c);
+        hsv.x = fract(hsv.x + uHueShift / 360.0);
+        c = hsv2rgb(hsv);
+    }
+
     // Step 5: Optional Ben-Day dots
     if (uBenDay > 0.5) {
-        float cellSize = 6.0;
+        float cellSize = max(uDotSize, 2.0);
         vec2 cell = floor(gl_FragCoord.xy / cellSize);
         vec2 cellCenter = (cell + 0.5) * cellSize;
         vec2 offset = gl_FragCoord.xy - cellCenter;

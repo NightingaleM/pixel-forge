@@ -32,6 +32,7 @@ function CompareSlider({
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
       if (!compareMode) return
+      e.preventDefault()
       dragging.current = true
       setSliderPosition(getPositionFromEvent(e.clientX))
     },
@@ -80,38 +81,40 @@ function CompareSlider({
   const clipInsetPercent = (1 - sliderPosition) * 100
 
   return (
-    <div
-      className="compare-container"
-      ref={containerRef}
-      onMouseDown={handleMouseDown}
-      onTouchStart={handleTouchStart}
-    >
-      <canvas ref={canvasRef} />
+    <div className="compare-container">
+      <div
+        className="canvas-wrapper"
+        ref={containerRef}
+        onMouseDown={handleMouseDown}
+        onTouchStart={handleTouchStart}
+      >
+        <canvas ref={canvasRef} />
 
-      {compareMode && originalImage && (
-        <img
-          src={originalImage.src}
-          alt="Original"
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            pointerEvents: 'none',
-            clipPath: `inset(0 ${clipInsetPercent}% 0 0)`,
-          }}
-        />
-      )}
+        {compareMode && originalImage && (
+          <img
+            src={originalImage.src}
+            alt="Original"
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              pointerEvents: 'none',
+              clipPath: `inset(0 ${clipInsetPercent}% 0 0)`,
+            }}
+          />
+        )}
 
-      {compareMode && (
-        <div
-          className="compare-divider"
-          style={{
-            left: `${sliderPosition * 100}%`,
-          }}
-        />
-      )}
+        {compareMode && (
+          <div
+            className="compare-divider"
+            style={{
+              left: `${sliderPosition * 100}%`,
+            }}
+          />
+        )}
+      </div>
 
       <button
         className={`compare-toggle${compareMode ? ' active' : ''}`}

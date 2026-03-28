@@ -1,6 +1,8 @@
 import type { ParamDef } from '../types'
 
 interface ParamPanelProps {
+  styleLabel: string
+  styleDescription: string
   params: ParamDef[]
   values: Record<string, number>
   onChange: (uniform: string, value: number) => void
@@ -10,13 +12,27 @@ function formatValue(value: number): string {
   return Number.isInteger(value) ? value.toString() : value.toFixed(2)
 }
 
-function ParamPanel({ params, values, onChange }: ParamPanelProps) {
+function ParamPanel({ styleLabel, styleDescription, params, values, onChange }: ParamPanelProps) {
   return (
     <div className="param-panel">
+      <div className="param-panel-header">
+        <div className="param-panel-title">{styleLabel}</div>
+        <div className="param-panel-desc">{styleDescription}</div>
+      </div>
       {params.map((param) => (
         <div key={param.uniform} className="param-row">
-          <span className="param-label">{param.name}</span>
-          <span className="param-value">{formatValue(values[param.uniform] ?? param.default)}</span>
+          <div className="param-header">
+            <span className="param-label">
+              {param.name}
+              {param.description && (
+                <span className="param-tooltip-wrap">
+                  <span className="param-tooltip-icon">?</span>
+                  <span className="param-tooltip-text">{param.description}</span>
+                </span>
+              )}
+            </span>
+            <span className="param-value">{formatValue(values[param.uniform] ?? param.default)}</span>
+          </div>
           <input
             type="range"
             className="param-slider"

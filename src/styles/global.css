@@ -54,11 +54,24 @@ body {
   padding: 10px 16px;
   border-bottom: 1px solid #000;
   cursor: pointer;
-  font-size: 13px;
   color: #000;
   background: #FFF;
   user-select: none;
   transition: background-color 0.1s ease;
+}
+
+.style-item-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.style-item-desc {
+  display: block;
+  font-size: 11px;
+  color: #999;
+  margin-top: 2px;
+  line-height: 1.4;
 }
 
 .style-item:hover {
@@ -165,36 +178,113 @@ body {
   overflow-y: auto;
 }
 
+/* --- Param Panel Header --- */
+
+.param-panel-header {
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #E0E0E0;
+}
+
+.param-panel-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #000;
+}
+
+.param-panel-desc {
+  font-size: 11px;
+  color: #999;
+  margin-top: 4px;
+  line-height: 1.5;
+}
+
 /* --- Parameter Row --- */
 
 .param-row {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 8px;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
 }
 
 .param-row:last-child {
   margin-bottom: 0;
 }
 
+/* --- Parameter Header (label + value on one line) --- */
+
+.param-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
 /* --- Parameter Label --- */
 
 .param-label {
-  min-width: 100px;
   font-size: 12px;
   color: #333;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* --- Parameter Tooltip --- */
+
+.param-tooltip-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.param-tooltip-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  color: #999;
+  border: 1px solid #CCC;
+  border-radius: 50%;
+  cursor: help;
   flex-shrink: 0;
+}
+
+.param-tooltip-icon:hover {
+  color: #000;
+  border-color: #000;
+}
+
+.param-tooltip-text {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: -10px;
+  width: 224px;
+  background: #000;
+  color: #FFF;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.4;
+  padding: 6px 10px;
+  white-space: normal;
+  z-index: 100;
+  pointer-events: none;
+}
+
+.param-tooltip-wrap:hover .param-tooltip-text {
+  display: block;
 }
 
 /* --- Parameter Value --- */
 
 .param-value {
-  min-width: 48px;
-  text-align: right;
   font-size: 12px;
   color: #999;
-  flex-shrink: 0;
   font-variant-numeric: tabular-nums;
 }
 
@@ -217,8 +307,8 @@ body {
   appearance: none;
   width: 12px;
   height: 12px;
-  background: #000;
-  border: none;
+  background: #FFF;
+  border: 2px solid #000;
   border-radius: 0;
   cursor: pointer;
 }
@@ -227,8 +317,8 @@ body {
 .param-slider::-moz-range-thumb {
   width: 12px;
   height: 12px;
-  background: #000;
-  border: none;
+  background: #FFF;
+  border: 2px solid #000;
   border-radius: 0;
   cursor: pointer;
 }
@@ -283,6 +373,22 @@ body {
   width: 100%;
   height: 100%;
   overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.canvas-wrapper {
+  position: relative;
+  max-width: 100%;
+  max-height: 100%;
+  line-height: 0;
+}
+
+.canvas-wrapper canvas {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
 }
 
 /* --- Compare Divider --- */

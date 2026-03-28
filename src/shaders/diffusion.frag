@@ -8,37 +8,24 @@ uniform float uLevels;
 uniform float uSpread;
 uniform float uPixelSize;
 uniform float uNoiseType;
+uniform float uDitherStrength; // 0.0-1.0, controls how much noise to mix
+uniform float uGrayscale;      // 0/1, convert to grayscale before dithering
 
-// 4x4 Bayer matrix
-const float bayer4x4[16] = float[16](
-   0.0 / 16.0,  8.0 / 16.0,  2.0 / 16.0, 10.0 / 16.0,
-  12.0 / 16.0,  4.0 / 16.0, 14.0 / 16.0,  6.0 / 16.0,
-   3.0 / 16.0, 11.0 / 16.0,  1.0 / 16.0,  9.0 / 16.0,
-  15.0 / 16.0,  7.0 / 16.0, 13.0 / 16.0,  5.0 / 16.0
-);
-
-// 8x8 Bayer matrix
-const float bayer8x8[64] = float[64](
-   0.0 / 64.0, 32.0 / 64.0,  8.0 / 64.0, 40.0 / 64.0,  2.0 / 64.0, 34.0 / 64.0, 10.0 / 64.0, 42.0 / 64.0,
-  48.0 / 64.0, 16.0 / 64.0, 56.0 / 64.0, 24.0 / 64.0, 50.0 / 64.0, 18.0 / 64.0, 58.0 / 64.0, 26.0 / 64.0,
-  12.0 / 64.0, 44.0 / 64.0,  4.0 / 64.0, 36.0 / 64.0, 14.0 / 64.0, 46.0 / 64.0,  6.0 / 64.0, 38.0 / 64.0,
-  60.0 / 64.0, 28.0 / 64.0, 52.0 / 64.0, 20.0 / 64.0, 62.0 / 64.0, 30.0 / 64.0, 54.0 / 64.0, 22.0 / 64.0,
-   3.0 / 64.0, 35.0 / 64.0, 11.0 / 64.0, 43.0 / 64.0,  1.0 / 64.0, 33.0 / 64.0,  9.0 / 64.0, 41.0 / 64.0,
-  51.0 / 64.0, 19.0 / 64.0, 59.0 / 64.0, 27.0 / 64.0, 49.0 / 64.0, 17.0 / 64.0, 57.0 / 64.0, 25.0 / 64.0,
-  15.0 / 64.0, 47.0 / 64.0,  7.0 / 64.0, 39.0 / 64.0, 13.0 / 64.0, 45.0 / 64.0,  5.0 / 64.0, 37.0 / 64.0,
-  63.0 / 64.0, 31.0 / 64.0, 55.0 / 64.0, 23.0 / 64.0, 61.0 / 64.0, 29.0 / 64.0, 53.0 / 64.0, 21.0 / 64.0
-);
-
-float getBayer4x4(ivec2 pos) {
-  int x = pos.x % 4;
-  int y = pos.y % 4;
-  return bayer4x4[y * 4 + x];
+// 2x2 Bayer threshold: [[0,2],[3,1]]
+float bayer2(float x, float y) {
+  return mod(2.0 * x + 3.0 * y, 4.0);
 }
 
-float getBayer8x8(ivec2 pos) {
-  int x = pos.x % 8;
-  int y = pos.y % 8;
-  return bayer8x8[y * 8 + x];
+// 4x4 Bayer threshold (returns 0..15)
+float bayer4(float x, float y) {
+  return 4.0 * bayer2(mod(x, 2.0), mod(y, 2.0))
+       + bayer2(floor(x / 2.0), floor(y / 2.0));
+}
+
+// 8x8 Bayer threshold (returns 0..63)
+float bayer8(float x, float y) {
+  return 4.0 * bayer4(mod(x, 4.0), mod(y, 4.0))
+       + bayer2(floor(x / 4.0), floor(y / 4.0));
 }
 
 float hash(vec2 p) {
@@ -52,24 +39,30 @@ void main() {
   // Step 2: Sample color at pixelated UV
   vec3 color = texture2D(uImage, clamp(pixelatedUv, 0.0, 1.0)).rgb;
 
+  // Optional: convert to grayscale
+  if (uGrayscale > 0.5) {
+    float gray = dot(color, vec3(0.299, 0.587, 0.114));
+    color = vec3(gray);
+  }
+
   // Step 3: Determine pixel grid position for Bayer lookup
-  ivec2 pixelPos = ivec2(floor(vUv * uResolution / uPixelSize));
+  vec2 pixelPos = floor(vUv * uResolution / uPixelSize);
 
   float bayer;
 
   if (uNoiseType < 0.5) {
     // 4x4 Bayer matrix
-    bayer = getBayer4x4(pixelPos);
+    bayer = bayer4(pixelPos.x, pixelPos.y) / 16.0;
   } else if (uNoiseType < 1.5) {
     // 8x8 Bayer matrix
-    bayer = getBayer8x8(pixelPos);
+    bayer = bayer8(pixelPos.x, pixelPos.y) / 64.0;
   } else {
     // Hash-based pseudo-random
-    bayer = hash(vec2(pixelPos));
+    bayer = hash(pixelPos);
   }
 
   // Shift bayer from [0,1] to [-0.5, 0.5] range for balanced dithering
-  bayer = bayer - 0.5;
+  bayer = (bayer - 0.5) * uDitherStrength;
 
   // Step 4: Quantize each channel with dithering
   float levels = max(uLevels, 2.0);

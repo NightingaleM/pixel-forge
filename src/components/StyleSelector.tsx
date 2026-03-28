@@ -15,7 +15,8 @@ function StyleSelector({ styles, activeId, onSelect }: StyleSelectorProps) {
           className={`style-item${style.id === activeId ? ' active' : ''}`}
           onClick={() => onSelect(style.id)}
         >
-          {style.label}
+          <span className="style-item-label">{style.label}</span>
+          <span className="style-item-desc">{style.description}</span>
         </div>
       ))}
     </div>

@@ -82,28 +82,30 @@ function App() {
   const handleImageLoad = useCallback(
     (img: HTMLImageElement) => {
       setImage(img)
-
-      const canvas = canvasRef.current
-      if (!canvas) return
-
-      // Create renderer if needed
-      if (!rendererRef.current) {
-        rendererRef.current = new ShaderRenderer(canvas)
-      }
-
-      rendererRef.current.loadImage(img)
-
       setImageInfo({
         width: img.naturalWidth || img.width,
         height: img.naturalHeight || img.height,
         size: formatFileSize(Math.round((img.naturalWidth || img.width) * (img.naturalHeight || img.height) * 4 / 1024) * 1024),
       })
-
-      // Render with current style + params
-      renderWithStyle(activeStyleRef.current, paramsRef.current)
     },
-    [renderWithStyle],
+    [],
   )
+
+  // ---------------------------------------------------------------------------
+  // Effect: create renderer & load image when canvas becomes available
+  // ---------------------------------------------------------------------------
+
+  useEffect(() => {
+    if (!image) return
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    if (!rendererRef.current) {
+      rendererRef.current = new ShaderRenderer(canvas)
+    }
+
+    rendererRef.current.loadImage(image)
+  }, [image])
 
   // ---------------------------------------------------------------------------
   // Style change handler
@@ -191,6 +193,8 @@ function App() {
         <StyleSelector styles={styles} activeId={activeStyle} onSelect={handleStyleChange} />
         {image && currentStyle && (
           <ParamPanel
+            styleLabel={currentStyle.label}
+            styleDescription={currentStyle.description}
             params={currentStyle.params}
             values={params}
             onChange={handleParamChange}
