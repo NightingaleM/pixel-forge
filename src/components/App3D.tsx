@@ -42,7 +42,9 @@ export default function App3D() {
 
     const newParams: Record<string, number> = {}
     for (const param of effectDef.params) {
-      newParams[param.uniform] = param.default
+      if (param.type !== 'text') {
+        newParams[param.uniform] = param.default
+      }
     }
     setParams(newParams)
   }, [activeEffect])
@@ -84,7 +86,9 @@ export default function App3D() {
         }
 
         // Sample particles
-        engine.sampleParticles(particleCount, effectDef.samplingType)
+        if (effectDef) {
+          engine.sampleParticles(particleCount, effectDef.samplingType)
+        }
 
         // Apply material
         if (effectDef) {
@@ -124,9 +128,11 @@ export default function App3D() {
 
     const randomParams: Record<string, number> = {}
     for (const param of effectDef.params) {
-      const range = param.max - param.min
-      const raw = param.min + Math.random() * range
-      randomParams[param.uniform] = Math.round(raw / param.step) * param.step
+      if (param.type !== 'text') {
+        const range = param.max - param.min
+        const raw = param.min + Math.random() * range
+        randomParams[param.uniform] = Math.round(raw / param.step) * param.step
+      }
     }
 
     setParams(randomParams)

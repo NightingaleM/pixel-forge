@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import * as THREE from 'three'
 import type { ModelInfo } from '../types'
 
 interface ModelUploaderProps {
@@ -39,9 +40,10 @@ export default function ModelUploader({ onModelLoad, label = '上传 GLTF/GLB �
             let faceCount = 0
 
             gltf.scene.traverse((child) => {
-              if (child instanceof THREE.Mesh) {
-                const posAttr = child.geometry.attributes.position
-                const indexAttr = child.geometry.index
+              if ((child as THREE.Mesh).isMesh) {
+                const mesh = child as THREE.Mesh
+                const posAttr = mesh.geometry.attributes.position
+                const indexAttr = mesh.geometry.index
                 vertexCount += posAttr.count
                 faceCount += indexAttr ? indexAttr.count / 3 : posAttr.count / 3
               }

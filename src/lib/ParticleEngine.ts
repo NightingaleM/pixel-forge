@@ -4,7 +4,13 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { MeshSurfaceSampler } from 'three/examples/jsm/math/MeshSurfaceSampler.js'
 import type { EffectDef, ModelInfo, SamplingType } from '../types'
 import coreVertSource from '../shaders3d/core.vert?raw'
-import particleDefaultFragSource from '../shaders3d/particle_default.frag?raw'
+
+/**
+ * Type guard to check if material is a ShaderMaterial
+ */
+function isShaderMaterial(material: THREE.Material): material is THREE.ShaderMaterial {
+  return material.type === 'ShaderMaterial'
+}
 
 /**
  * ParticleEngine - Core 3D particle animation engine with Three.js
@@ -27,8 +33,8 @@ export class ParticleEngine {
   mouseNDC: THREE.Vector2  // Normalized Device Coordinates [-1, 1]
 
   // Shader material management
-  currentMaterial: THREE.ShaderMaterial | null = null
-  previousMaterial: THREE.ShaderMaterial | null = null  // Fallback on error
+  currentMaterial: THREE.Material | null = null
+  previousMaterial: THREE.Material | null = null  // Fallback on error
 
   // Model handling
   modelGeometry: THREE.BufferGeometry | null = null
@@ -95,14 +101,14 @@ export class ParticleEngine {
       this.mouseNDC.set(x, y)
 
       // Update shader uniform if material exists
-      if (this.currentMaterial) {
+      if (this.currentMaterial && isShaderMaterial(this.currentMaterial)) {
         this.currentMaterial.uniforms.uMouse.value.set(x, y)
       }
     })
 
     this.canvas.addEventListener('mouseleave', () => {
       this.mouseNDC.set(0, 0)
-      if (this.currentMaterial) {
+      if (this.currentMaterial && isShaderMaterial(this.currentMaterial)) {
         this.currentMaterial.uniforms.uMouse.value.set(0, 0)
       }
     })
@@ -172,7 +178,7 @@ export class ParticleEngine {
         }
 
         // Clone geometry to avoid modifying original
-        const geometry = mesh.geometry.clone()
+        const geometry = (mesh as THREE.Mesh).geometry.clone()
 
         // Normalize geometry to unit bounding box
         this.modelGeometry = this.normalizeGeometry(geometry)
@@ -224,7 +230,7 @@ export class ParticleEngine {
           return
         }
 
-        const geometry = mesh.geometry.clone()
+        const geometry = (mesh as THREE.Mesh).geometry.clone()
         this.targetGeometry = this.normalizeGeometry(geometry)
         resolve()
       }
@@ -411,7 +417,12 @@ export class ParticleEngine {
     tempMaterial.dispose()
     if (tempTargetMesh) {
       tempTargetMesh.geometry.dispose()
-      tempTargetMesh.material.dispose()
+      const material = tempTargetMesh.material
+      if (Array.isArray(material)) {
+        material.forEach(m => m.dispose())
+      } else {
+        material.dispose()
+      }
     }
   }
 
@@ -637,7 +648,7 @@ export class ParticleEngine {
       return
     }
 
-    if (name in this.currentMaterial.uniforms) {
+    if (isShaderMaterial(this.currentMaterial) && name in this.currentMaterial.uniforms) {
       this.currentMaterial.uniforms[name].value = value
     } else {
       console.warn(`Uniform ${name} not found in current material`)
@@ -667,7 +678,7 @@ export class ParticleEngine {
       const elapsedTime = this.clock.getElapsedTime()
 
       // Update time uniform
-      if (this.currentMaterial) {
+      if (this.currentMaterial && isShaderMaterial(this.currentMaterial)) {
         this.currentMaterial.uniforms.uTime.value = elapsedTime
       }
 
