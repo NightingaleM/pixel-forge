@@ -1,0 +1,33 @@
+uniform float uNoiseScale;
+uniform float uNoiseSpeed;
+uniform float uDensityStrength;
+uniform float uBaseSize;
+
+// Simple noise function
+float hash(vec3 p) {
+  p = fract(p * 0.3183099 + 0.1);
+  p *= 17.0;
+  return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+}
+
+float noise(vec3 p) {
+  vec3 i = floor(p);
+  vec3 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+
+  return mix(
+    mix(mix(hash(i + vec3(0,0,0)), hash(i + vec3(1,0,0)), f.x),
+        mix(hash(i + vec3(0,1,0)), hash(i + vec3(1,1,0)), f.x), f.y),
+    mix(mix(hash(i + vec3(0,0,1)), hash(i + vec3(1,0,1)), f.x),
+        mix(hash(i + vec3(0,1,1)), hash(i + vec3(1,1,1)), f.x), f.y), f.z);
+}
+
+vec3 effectTransform(vec3 position, vec3 normal, float random, float time) {
+  float n = noise(position * uNoiseScale + time * uNoiseSpeed);
+  float displacement = (n - 0.5) * uDensityStrength;
+  return position + normal * displacement;
+}
+
+float effectSize(float baseSize, float random, float time) {
+  return uBaseSize * (0.5 + random * 0.5);
+}

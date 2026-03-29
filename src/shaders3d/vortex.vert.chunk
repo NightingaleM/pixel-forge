@@ -1,0 +1,21 @@
+uniform float uSpeed;
+uniform float uRadius;
+uniform float uBaseSize;
+
+vec3 effectTransform(vec3 position, vec3 normal, float random, float time) {
+  float angle = time * uSpeed + random * 6.28;
+  float r = length(position.xz);
+  float c = cos(angle);
+  float s = sin(angle);
+  mat2 rot = mat2(c, -s, s, c);
+  vec3 rotated = vec3(rot * position.xz, position.y);
+
+  float distFromCenter = r / uRadius;
+  float lift = sin(time * 2.0 + r * 3.0) * distFromCenter * 0.5;
+
+  return rotated + vec3(0.0, lift, 0.0);
+}
+
+float effectSize(float baseSize, float random, float time) {
+  return uBaseSize;
+}
