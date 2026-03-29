@@ -34,3 +34,27 @@ export interface StyleDefinition {
   params: ParamDef[]
   isMultiPass?: boolean
 }
+
+// ---------------------------------------------------------------------------
+// 3D Particle Animation Types
+// ---------------------------------------------------------------------------
+
+export type EffectId = 'surface' | 'explosion' | 'morph' | 'vortex' | 'density'
+
+export type SamplingType = 'surface' | 'volumetric'
+
+export interface EffectDef {
+  id: EffectId
+  label: string
+  description: string
+  samplingType: SamplingType
+  requiresTargetModel?: boolean
+  vertexChunk: () => Promise<string>
+  fragmentChunk: () => Promise<string>
+  params: ParamDef[]
+}
+
+export interface ModelInfo {
+  vertices: number
+  faces: number
+}
