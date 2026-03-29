@@ -46,7 +46,7 @@ A new home page provides two entry points: 2D image processing (existing) and 3D
 
 **Routing migration strategy:**
 
-1. Current `App.tsx` function body moves to `App2D.tsx` unchanged (the component is renamed to `App2D` and exported as default).
+1. Current `App.tsx` function body moves to `App2D.tsx`. The component is renamed to `App2D`, and its ParamPanel call is updated to use the new generic prop names (`title` instead of `styleLabel`, `description` instead of `styleDescription`). All core rendering logic remains unchanged.
 2. New `App.tsx` becomes a router wrapper:
 
 ```tsx
@@ -156,7 +156,7 @@ Assembly is done in TypeScript via string `replace()`:
 
 For the fragment shader, the chunk is used whole (no assembly needed). Most effects reference `particle_default.frag`.
 
-Three.js r150+ defaults to WebGL 2. The core shader uses `attribute` keyword, which Three.js ShaderMaterial internally converts to `in` via its GLSL3 preprocessing — no manual conversion needed.
+Three.js r150+ defaults to WebGL 2. The core shader uses `attribute` keyword, which Three.js ShaderMaterial internally converts to `in` via its GLSL3 preprocessing — no manual conversion needed. Shaders are written in GLSL 100 syntax (`attribute`, `varying`, `gl_FragColor`); Three.js handles the conversion to GLSL 300 es automatically when `glslVersion` is not explicitly set on ShaderMaterial.
 
 ### Core Vertex Shader (full source: `shaders3d/core.vert`)
 
@@ -350,6 +350,7 @@ Before (style-specific):        After (generic):
   params                           ParamDef[]       (unchanged)
   values                           Record<string, number>  (unchanged)
   textValues                       Record<string, string>  (unchanged)
+  onClose                          (() => void) | undefined (unchanged)
   onChange                         (unchanged)
   onTextChange                     (unchanged)
 ```
