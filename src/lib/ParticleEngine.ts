@@ -555,12 +555,17 @@ export class ParticleEngine {
         uMouseRadius: { value: 0.3 },
       }
 
+      console.log('Effect params:', effectDef.params)
+
       // Add effect-specific uniforms with default values
       effectDef.params.forEach((param) => {
-        if (param.type === 'number') {
+        // type is optional in NumberParamDef, default to 'number' if not specified
+        if (!param.type || param.type === 'number') {
           uniforms[param.uniform] = { value: param.default }
         }
       })
+
+      console.log('Built uniforms:', uniforms)
 
       // Add target position uniform for morph effect
       if (effectDef.id === 'morph' && this.particles?.geometry.hasAttribute('aTargetPosition')) {
@@ -569,6 +574,11 @@ export class ParticleEngine {
 
       // Assemble vertex shader by replacing placeholders
       const vertexShader = this.assembleVertexShader(vertexChunk, effectDef.params)
+
+      // Debug: log assembled shader
+      console.log('=== Assembled Vertex Shader ===')
+      console.log(vertexShader)
+      console.log('=== End Shader ===')
 
       // Assemble fragment shader
       const fragmentShader = fragmentChunk

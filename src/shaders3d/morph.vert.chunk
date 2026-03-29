@@ -1,5 +1,3 @@
-uniform float uSpeed;
-uniform float uBaseSize;
 attribute vec3 aTargetPosition;
 
 vec3 effectTransform(vec3 position, vec3 normal, float random, float time) {
