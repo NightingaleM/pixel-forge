@@ -1,3 +1,7 @@
+uniform float uSpeed;
+uniform float uRadius;
+uniform float uBaseSize;
+
 vec3 effectTransform(vec3 position, vec3 normal, float random, float time) {
   float angle = time * uSpeed + random * 6.28;
   float r = length(position.xz);

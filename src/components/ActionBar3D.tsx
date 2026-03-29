@@ -9,7 +9,7 @@ interface ActionBar3DProps {
   isLoading?: boolean
 }
 
-const PARTICLE_COUNTS = [50000, 100000, 200000, 300000, 500000]
+const PARTICLE_COUNTS = [1000, 10000, 50000, 100000, 200000, 300000, 500000]
 
 function formatCount(count: number): string {
   if (count >= 1000) {

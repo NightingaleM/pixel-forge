@@ -1,3 +1,7 @@
+uniform float uExplosionForce;
+uniform float uAnimSpeed;
+uniform float uBaseSize;
+
 vec3 effectTransform(vec3 position, vec3 normal, float random, float time) {
   float cycle = sin(time * uAnimSpeed) * 0.5 + 0.5;
   vec3 dir = normalize(normal + vec3(random) * 0.5);

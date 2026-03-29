@@ -15,7 +15,7 @@ export default function App3D() {
   const [modelData, setModelData] = useState<ArrayBuffer | null>(null)
   const [modelInfo, setModelInfo] = useState<ModelInfo | null>(null)
   const [targetModelData, setTargetModelData] = useState<ArrayBuffer | null>(null)
-  const [particleCount, setParticleCount] = useState(100000)
+  const [particleCount, setParticleCount] = useState(10000)
   const [params, setParams] = useState<Record<string, number>>({})
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
