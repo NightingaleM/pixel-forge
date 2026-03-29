@@ -7,3 +7,13 @@ declare module '*.frag?raw' {
   const value: string
   export default value
 }
+
+declare module '*.vert.chunk?raw' {
+  const value: string
+  export default value
+}
+
+declare module '*.frag.chunk?raw' {
+  const value: string
+  export default value
+}
