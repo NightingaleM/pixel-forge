@@ -343,9 +343,16 @@ export class ParticleEngine {
       this.particles.geometry.dispose()
     }
 
-    // Create new particle system (will be used with material in applyMaterial)
-    this.particles = new THREE.Points(geometry, new THREE.PointsMaterial())
+    // Create new particle system with temporary visible material
+    // (will be replaced with shader material in applyMaterial)
+    const tempMaterial = new THREE.PointsMaterial({
+      color: 0xffffff,
+      size: 2.0,
+      sizeAttenuation: true,
+    })
+    this.particles = new THREE.Points(geometry, tempMaterial)
     this.particles.frustumCulled = false
+    this.scene.add(this.particles) // Add to scene immediately
   }
 
   /**
@@ -628,11 +635,11 @@ export class ParticleEngine {
       }
     })
 
-    // Replace EFFECT_UNIFORMS placeholder
-    shader = shader.replace('%%EFFECT_UNIFORMS%%', uniformsStrings.join('\n'))
+    // Replace EFFECT_UNIFORMS placeholder (include comment prefix)
+    shader = shader.replace('// %%EFFECT_UNIFORMS%%', uniformsStrings.join('\n  '))
 
-    // Replace EFFECT_TRANSFORM placeholder
-    shader = shader.replace('%%EFFECT_TRANSFORM%%', effectChunk)
+    // Replace EFFECT_TRANSFORM placeholder (include comment prefix)
+    shader = shader.replace('// %%EFFECT_TRANSFORM%%', effectChunk)
 
     return shader
   }
@@ -677,9 +684,10 @@ export class ParticleEngine {
 
       const elapsedTime = this.clock.getElapsedTime()
 
-      // Update time uniform
+      // Update uniforms
       if (this.currentMaterial && isShaderMaterial(this.currentMaterial)) {
         this.currentMaterial.uniforms.uTime.value = elapsedTime
+        this.currentMaterial.uniforms.uMouse.value = this.mouseNDC
       }
 
       // Update controls
