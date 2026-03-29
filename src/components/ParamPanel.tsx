@@ -2,8 +2,8 @@ import { useRef, useState, useCallback, useEffect } from 'react'
 import type { ParamDef } from '../types'
 
 interface ParamPanelProps {
-  styleLabel: string
-  styleDescription: string
+  title: string
+  description: string
   params: ParamDef[]
   values: Record<string, number>
   textValues: Record<string, string>
@@ -16,7 +16,7 @@ function formatValue(value: number): string {
   return Number.isInteger(value) ? value.toString() : value.toFixed(2)
 }
 
-function ParamPanel({ styleLabel, styleDescription, params, values, textValues, onChange, onTextChange, onClose }: ParamPanelProps) {
+function ParamPanel({ title, description, params, values, textValues, onChange, onTextChange, onClose }: ParamPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState({ x: 16, y: 60 })
   const dragging = useRef(false)
@@ -50,12 +50,12 @@ function ParamPanel({ styleLabel, styleDescription, params, values, textValues, 
     <div className="param-panel" ref={panelRef} style={{ left: pos.x, top: pos.y }}>
       <div className="param-panel-header" onMouseDown={onMouseDown}>
         <div className="param-panel-title-row">
-          <div className="param-panel-title">{styleLabel}</div>
+          <div className="param-panel-title">{title}</div>
           {onClose && (
             <button className="param-panel-close" onClick={onClose}>x</button>
           )}
         </div>
-        <div className="param-panel-desc">{styleDescription}</div>
+        <div className="param-panel-desc">{description}</div>
       </div>
       <div className="param-panel-body">
       {params.map((param) => {
