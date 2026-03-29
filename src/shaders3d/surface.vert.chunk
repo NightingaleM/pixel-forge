@@ -1,0 +1,9 @@
+uniform float uBaseSize;
+
+vec3 effectTransform(vec3 position, vec3 normal, float random, float time) {
+  return position;
+}
+
+float effectSize(float baseSize, float random, float time) {
+  return uBaseSize;
+}
