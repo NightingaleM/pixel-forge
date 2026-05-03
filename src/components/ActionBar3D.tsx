@@ -8,6 +8,7 @@ interface ActionBar3DProps {
   onParticleCountChange: (count: number) => void
   modelInfo: ModelInfo | null
   isLoading?: boolean
+  isParticleMode?: boolean
 }
 
 const PARTICLE_COUNTS = [1000, 10000, 50000, 100000, 200000, 300000, 500000]
@@ -26,33 +27,38 @@ export default function ActionBar3D({
   onParticleCountChange,
   modelInfo,
   isLoading = false,
+  isParticleMode = true,
 }: ActionBar3DProps) {
   const { t } = useTranslation()
 
   return (
     <div className="action-bar-3d">
-      <button className="action-btn" onClick={onRandom} disabled={isLoading}>
-        {t('app3d.randomParams')}
-      </button>
+      {isParticleMode && (
+        <button className="action-btn" onClick={onRandom} disabled={isLoading}>
+          {t('app3d.randomParams')}
+        </button>
+      )}
       <button className="action-btn" onClick={onResetView} disabled={isLoading}>
         {t('app3d.resetView')}
       </button>
 
-      <div className="particle-count-control">
-        <label className="particle-count-label">{t('app3d.particleCount')}</label>
-        <select
-          className="particle-count-select"
-          value={particleCount}
-          onChange={(e) => onParticleCountChange(Number(e.target.value))}
-          disabled={isLoading}
-        >
-          {PARTICLE_COUNTS.map((count) => (
-            <option key={count} value={count}>
-              {formatCount(count)}
-            </option>
-          ))}
-        </select>
-      </div>
+      {isParticleMode && (
+        <div className="particle-count-control">
+          <label className="particle-count-label">{t('app3d.particleCount')}</label>
+          <select
+            className="particle-count-select"
+            value={particleCount}
+            onChange={(e) => onParticleCountChange(Number(e.target.value))}
+            disabled={isLoading}
+          >
+            {PARTICLE_COUNTS.map((count) => (
+              <option key={count} value={count}>
+                {formatCount(count)}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {modelInfo && (
         <div className="model-info-display">

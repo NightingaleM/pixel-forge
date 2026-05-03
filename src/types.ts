@@ -39,7 +39,7 @@ export interface StyleDefinition {
 // 3D Particle Animation Types
 // ---------------------------------------------------------------------------
 
-export type EffectId = 'surface' | 'explosion' | 'morph' | 'vortex' | 'density'
+export type EffectId = 'none' | 'surface' | 'explosion' | 'morph' | 'vortex' | 'density'
 
 export type SamplingType = 'surface' | 'volumetric'
 

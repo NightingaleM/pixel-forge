@@ -40,6 +40,7 @@ export class ParticleEngine {
   modelGeometry: THREE.BufferGeometry | null = null
   modelInfo: ModelInfo | null = null
   targetGeometry: THREE.BufferGeometry | null = null  // For morph effects
+  originalMesh: THREE.Object3D | null = null  // Raw model for "none" effect
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas
@@ -163,25 +164,38 @@ export class ParticleEngine {
       const loader = new GLTFLoader()
 
       const onLoad = (gltf: any) => {
-        let mesh: THREE.Mesh | null = null
-
-        // Find first mesh in the scene
+        // Collect all meshes from the GLTF scene
+        gltf.scene.updateMatrixWorld(true)
+        const meshes: THREE.Mesh[] = []
         gltf.scene.traverse((child: any) => {
-          if (child.isMesh && !mesh) {
-            mesh = child
-          }
+          if (child.isMesh) meshes.push(child)
         })
 
-        if (!mesh) {
+        if (meshes.length === 0) {
           reject(new Error('No mesh found in GLTF model'))
           return
         }
 
-        // Clone geometry to avoid modifying original
-        const geometry = (mesh as THREE.Mesh).geometry.clone()
+        // Merge all mesh geometries (apply each mesh's world transform)
+        let geometry: THREE.BufferGeometry
+        if (meshes.length === 1) {
+          geometry = meshes[0].geometry.clone()
+          geometry.applyMatrix4(meshes[0].matrixWorld)
+        } else {
+          geometry = this.mergeMeshGeometries(meshes)
+        }
 
         // Normalize geometry to unit bounding box
         this.modelGeometry = this.normalizeGeometry(geometry)
+
+        // Save original mesh for "none" (raw display) mode
+        this.removeOriginalMesh()
+        const gltfScene = gltf.scene.clone()
+        // Normalize the cloned GLTF scene to match particle geometry scale
+        this.normalizeScene(gltfScene)
+        this.originalMesh = gltfScene
+        this.originalMesh.visible = false
+        this.scene.add(this.originalMesh)
 
         // Extract model info
         const positionAttribute = this.modelGeometry.getAttribute('position')
@@ -217,20 +231,25 @@ export class ParticleEngine {
       const loader = new GLTFLoader()
 
       const onLoad = (gltf: any) => {
-        let mesh: THREE.Mesh | null = null
-
+        gltf.scene.updateMatrixWorld(true)
+        const meshes: THREE.Mesh[] = []
         gltf.scene.traverse((child: any) => {
-          if (child.isMesh && !mesh) {
-            mesh = child
-          }
+          if (child.isMesh) meshes.push(child)
         })
 
-        if (!mesh) {
+        if (meshes.length === 0) {
           reject(new Error('No mesh found in target GLTF model'))
           return
         }
 
-        const geometry = (mesh as THREE.Mesh).geometry.clone()
+        let geometry: THREE.BufferGeometry
+        if (meshes.length === 1) {
+          geometry = meshes[0].geometry.clone()
+          geometry.applyMatrix4(meshes[0].matrixWorld)
+        } else {
+          geometry = this.mergeMeshGeometries(meshes)
+        }
+
         this.targetGeometry = this.normalizeGeometry(geometry)
         resolve()
       }
@@ -245,6 +264,50 @@ export class ParticleEngine {
         loader.parse(data, '', onLoad, onError)
       }
     })
+  }
+
+  /**
+   * Merge multiple mesh geometries into one, applying each mesh's world transform
+   */
+  private mergeMeshGeometries(meshes: THREE.Mesh[]): THREE.BufferGeometry {
+    const allPositions: number[] = []
+    const allNormals: number[] = []
+    const allIndices: number[] = []
+    let vertexOffset = 0
+
+    for (const mesh of meshes) {
+      const g = mesh.geometry.clone()
+      g.applyMatrix4(mesh.matrixWorld)
+
+      const pos = g.getAttribute('position')
+      const norm = g.hasAttribute('normal') ? g.getAttribute('normal') : null
+      const idx = g.index
+
+      for (let i = 0; i < pos.count; i++) {
+        allPositions.push(pos.getX(i), pos.getY(i), pos.getZ(i))
+        if (norm) {
+          allNormals.push(norm.getX(i), norm.getY(i), norm.getZ(i))
+        } else {
+          allNormals.push(0, 1, 0)
+        }
+      }
+
+      if (idx) {
+        for (let i = 0; i < idx.count; i++) {
+          allIndices.push(idx.getX(i) + vertexOffset)
+        }
+      }
+
+      vertexOffset += pos.count
+    }
+
+    const merged = new THREE.BufferGeometry()
+    merged.setAttribute('position', new THREE.Float32BufferAttribute(allPositions, 3))
+    merged.setAttribute('normal', new THREE.Float32BufferAttribute(allNormals, 3))
+    if (allIndices.length > 0) {
+      merged.setIndex(allIndices)
+    }
+    return merged
   }
 
   /**
@@ -297,8 +360,23 @@ export class ParticleEngine {
   }
 
   /**
-   * Sample particles from model geometry
-   * @param count - Number of particles to sample
+   * Normalize a GLTF scene to match the same centering/scaling as normalizeGeometry
+   */
+  private normalizeScene(scene: THREE.Object3D): void {
+    const box = new THREE.Box3().setFromObject(scene)
+    const center = new THREE.Vector3()
+    box.getCenter(center)
+
+    const size = new THREE.Vector3()
+    box.getSize(size)
+    const maxDim = Math.max(size.x, size.y, size.z)
+    const scale = 1.0 / maxDim
+
+    scene.position.sub(center).multiplyScalar(scale)
+    scene.scale.setScalar(scale)
+  }
+
+  /**
    * @param type - Sampling type: 'surface' or 'volumetric'
    */
   sampleParticles(count: number, type: SamplingType): void {
@@ -323,7 +401,9 @@ export class ParticleEngine {
     }
 
     // Set geometry attributes
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+    const posBuffer = new THREE.Float32BufferAttribute(positions, 3)
+    geometry.setAttribute('position', posBuffer)    // Three.js needs this for vertex count
+    geometry.setAttribute('aPosition', posBuffer)    // Shader reads from this
     geometry.setAttribute('aColor', new THREE.Float32BufferAttribute(colors, 3))
     geometry.setAttribute('aNormal', new THREE.Float32BufferAttribute(normals, 3))
     geometry.setAttribute('aSize', new THREE.Float32BufferAttribute(sizes, 1))
@@ -640,7 +720,7 @@ export class ParticleEngine {
     // Build effect uniforms string
     const uniformsStrings: string[] = []
     params.forEach((param) => {
-      if (param.type === 'number') {
+      if (!param.type || param.type === 'number') {
         uniformsStrings.push(`uniform float ${param.uniform};`)
       }
     })
@@ -743,6 +823,51 @@ export class ParticleEngine {
   }
 
   /**
+   * Show original mesh (for "none" effect - raw model display)
+   */
+  showMesh(): void {
+    if (this.particles) {
+      this.particles.visible = false
+    }
+    if (this.originalMesh) {
+      this.originalMesh.visible = true
+    }
+  }
+
+  /**
+   * Hide original mesh and show particle system
+   */
+  hideMesh(): void {
+    if (this.originalMesh) {
+      this.originalMesh.visible = false
+    }
+    if (this.particles) {
+      this.particles.visible = true
+    }
+  }
+
+  /**
+   * Remove original mesh from scene and dispose resources
+   */
+  private removeOriginalMesh(): void {
+    if (this.originalMesh) {
+      this.scene.remove(this.originalMesh)
+      this.originalMesh.traverse((child: any) => {
+        if (child.isMesh) {
+          child.geometry?.dispose()
+          const mat = child.material
+          if (Array.isArray(mat)) {
+            mat.forEach((m: THREE.Material) => m.dispose())
+          } else if (mat) {
+            mat.dispose()
+          }
+        }
+      })
+      this.originalMesh = null
+    }
+  }
+
+  /**
    * Dispose all resources
    */
   dispose(): void {
@@ -757,6 +882,9 @@ export class ParticleEngine {
       }
       this.particles = null
     }
+
+    // Dispose original mesh
+    this.removeOriginalMesh()
 
     // Dispose geometries
     if (this.modelGeometry) {

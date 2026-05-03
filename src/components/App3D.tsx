@@ -13,7 +13,7 @@ export default function App3D() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const engineRef = useRef<ParticleEngine | null>(null)
 
-  const [activeEffect, setActiveEffect] = useState<EffectId>('surface')
+  const [activeEffect, setActiveEffect] = useState<EffectId>('none')
   const [modelData, setModelData] = useState<ArrayBuffer | null>(null)
   const [modelInfo, setModelInfo] = useState<ModelInfo | null>(null)
   const [targetModelData, setTargetModelData] = useState<ArrayBuffer | null>(null)
@@ -56,6 +56,7 @@ export default function App3D() {
     setModelData(data)
     setModelInfo(info)
     setTargetModelData(null)
+    engineRef.current?.resetCamera()
   }, [])
 
   // Handle target model load (for morph effect)
@@ -74,25 +75,32 @@ export default function App3D() {
 
       try {
         const effectDef = getEffect(activeEffect)
-        if (!effectDef?.requiresTargetModel) {
-          engine.clearTargetModel()
-        }
 
         await engine.loadModel(modelData)
 
-        if (effectDef?.requiresTargetModel && targetModelData) {
-          await engine.loadTargetModel(targetModelData)
-        }
+        if (activeEffect === 'none') {
+          engine.showMesh()
+        } else {
+          engine.hideMesh()
 
-        if (effectDef) {
-          engine.sampleParticles(particleCount, effectDef.samplingType)
-        }
+          if (!effectDef?.requiresTargetModel) {
+            engine.clearTargetModel()
+          }
 
-        if (effectDef) {
-          await engine.applyMaterial(effectDef)
+          if (effectDef?.requiresTargetModel && targetModelData) {
+            await engine.loadTargetModel(targetModelData)
+          }
 
-          for (const [name, value] of Object.entries(params)) {
-            engine.setUniform(name, value)
+          if (effectDef) {
+            engine.sampleParticles(particleCount, effectDef.samplingType)
+          }
+
+          if (effectDef) {
+            await engine.applyMaterial(effectDef)
+
+            for (const [name, value] of Object.entries(params)) {
+              engine.setUniform(name, value)
+            }
           }
         }
       } catch (err) {
@@ -174,7 +182,7 @@ export default function App3D() {
           />
         )}
 
-        {currentEffect && (
+        {currentEffect && activeEffect !== 'none' && (
           <ParamPanel
             title={t(currentEffect.label)}
             description={t(currentEffect.description)}
@@ -204,6 +212,7 @@ export default function App3D() {
           onParticleCountChange={handleParticleCountChange}
           modelInfo={modelInfo}
           isLoading={isLoading}
+          isParticleMode={activeEffect !== 'none'}
         />
       </div>
     </div>

@@ -227,6 +227,10 @@
     }
   },
   "effect": {
+    "none": {
+      "label": "Normal",
+      "desc": "Display the original 3D model without any particle effects"
+    },
     "surface": {
       "label": "Surface Particles",
       "desc": "Particles rest on the model surface, basic particle visualization",
