@@ -234,7 +234,17 @@
     "surface": {
       "label": "表面粒子",
       "desc": "粒子静止在模型表面，基础粒子可视化效果",
-      "baseSize": "粒子大小"
+      "baseSize": "粒子大小",
+      "mouseEnabled": "启用鼠标排斥",
+      "mouseRadius": "鼠标影响范围",
+      "mouseStrength": "鼠标排斥力度",
+      "useCustomColor": "自定义颜色",
+      "particleColor": "粒子颜色",
+      "shapeType": "粒子形状",
+      "shapeCircle": "圆形",
+      "shapeSquare": "方形",
+      "shapeDiamond": "菱形",
+      "shapeGlow": "光晕"
     },
     "explosion": {
       "label": "爆散聚合",

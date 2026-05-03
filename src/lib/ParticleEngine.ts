@@ -107,12 +107,7 @@ export class ParticleEngine {
       }
     })
 
-    this.canvas.addEventListener('mouseleave', () => {
-      this.mouseNDC.set(0, 0)
-      if (this.currentMaterial && isShaderMaterial(this.currentMaterial)) {
-        this.currentMaterial.uniforms.uMouse.value.set(0, 0)
-      }
-    })
+    // Keep last mouse position when cursor leaves canvas (don't reset to center)
   }
 
   /**
@@ -433,6 +428,12 @@ export class ParticleEngine {
     this.particles = new THREE.Points(geometry, tempMaterial)
     this.particles.frustumCulled = false
     this.scene.add(this.particles) // Add to scene immediately
+
+    // Sync orbit controls target to particle system center
+    geometry.computeBoundingSphere()
+    if (geometry.boundingSphere) {
+      this.controls.target.copy(geometry.boundingSphere.center)
+    }
   }
 
   /**
@@ -628,20 +629,32 @@ export class ParticleEngine {
         effectDef.fragmentChunk(),
       ])
 
-      // Build uniforms object
+      // Build uniforms object with common uniforms
       const uniforms: THREE.ShaderMaterial['uniforms'] = {
         uTime: { value: 0 },
         uMouse: { value: new THREE.Vector2(0, 0) },
-        uMouseRadius: { value: 0.3 },
+        uMouseRadius: { value: 0.15 },
+        uMouseEnabled: { value: 1.0 },
+        uMouseStrength: { value: 0.5 },
+        uUseCustomColor: { value: 0.0 },
+        uColorR: { value: 1.0 },
+        uColorG: { value: 1.0 },
+        uColorB: { value: 1.0 },
+        uShapeType: { value: 0.0 },
       }
-
-      console.log('Effect params:', effectDef.params)
 
       // Add effect-specific uniforms with default values
       effectDef.params.forEach((param) => {
-        // type is optional in NumberParamDef, default to 'number' if not specified
-        if (!param.type || param.type === 'number') {
+        if (!param.type || param.type === 'number' || param.type === 'toggle' || param.type === 'select') {
           uniforms[param.uniform] = { value: param.default }
+        } else if (param.type === 'color') {
+          const hex = param.default as string
+          const r = parseInt(hex.slice(1, 3), 16) / 255
+          const g = parseInt(hex.slice(3, 5), 16) / 255
+          const b = parseInt(hex.slice(5, 7), 16) / 255
+          uniforms[`${param.uniform}R`] = { value: r }
+          uniforms[`${param.uniform}G`] = { value: g }
+          uniforms[`${param.uniform}B`] = { value: b }
         }
       })
 
@@ -717,11 +730,25 @@ export class ParticleEngine {
   private assembleVertexShader(effectChunk: string, params: any[]): string {
     let shader = coreVertSource
 
+    // Uniforms already declared in core.vert - skip these in template
+    const commonUniforms = new Set([
+      'uMouseRadius', 'uMouseEnabled', 'uMouseStrength',
+      'uUseCustomColor', 'uColorR', 'uColorG', 'uColorB',
+    ])
+
     // Build effect uniforms string
     const uniformsStrings: string[] = []
     params.forEach((param) => {
-      if (!param.type || param.type === 'number') {
-        uniformsStrings.push(`uniform float ${param.uniform};`)
+      if (!param.type || param.type === 'number' || param.type === 'toggle' || param.type === 'select') {
+        if (!commonUniforms.has(param.uniform)) {
+          uniformsStrings.push(`uniform float ${param.uniform};`)
+        }
+      } else if (param.type === 'color') {
+        ['R', 'G', 'B'].forEach((s) => {
+          if (!commonUniforms.has(`${param.uniform}${s}`)) {
+            uniformsStrings.push(`uniform float ${param.uniform}${s};`)
+          }
+        })
       }
     })
 

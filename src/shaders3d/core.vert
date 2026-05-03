@@ -9,6 +9,14 @@ attribute float aRandom;
 uniform float uTime;
 uniform vec2 uMouse;
 uniform float uMouseRadius;
+uniform float uMouseEnabled;
+uniform float uMouseStrength;
+
+// Custom color uniforms
+uniform float uUseCustomColor;
+uniform float uColorR;
+uniform float uColorG;
+uniform float uColorB;
 
 // Varying
 varying vec3 vColor;
@@ -18,12 +26,15 @@ varying float vAlpha;
 
 // Mouse deformation: push particles away from cursor in screen space
 vec3 mouseDeformation(vec3 worldPos, vec2 mouseNDC, float radius) {
+  if (uMouseEnabled < 0.5) return worldPos;
+
   vec4 clipPos = projectionMatrix * modelViewMatrix * vec4(worldPos, 1.0);
   vec2 screenPos = clipPos.xy / clipPos.w;
   float dist = distance(screenPos, mouseNDC);
   if (dist < radius) {
     vec2 dir = normalize(screenPos - mouseNDC);
-    float strength = (1.0 - dist / radius) * 0.5;
+    float t = 1.0 - dist / radius;
+    float strength = t * t * uMouseStrength;
     clipPos.xy += dir * strength * clipPos.w;
     return (inverse(projectionMatrix * modelViewMatrix) * clipPos).xyz;
   }
@@ -34,6 +45,9 @@ vec3 mouseDeformation(vec3 worldPos, vec2 mouseNDC, float radius) {
 
 void main() {
   vColor = aColor;
+  if (uUseCustomColor > 0.5) {
+    vColor = vec3(uColorR, uColorG, uColorB);
+  }
   vAlpha = 1.0;
 
   vec3 transformed = effectTransform(aPosition, aNormal, aRandom, uTime);

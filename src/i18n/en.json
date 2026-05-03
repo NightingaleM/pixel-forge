@@ -234,7 +234,17 @@
     "surface": {
       "label": "Surface Particles",
       "desc": "Particles rest on the model surface, basic particle visualization",
-      "baseSize": "Particle Size"
+      "baseSize": "Particle Size",
+      "mouseEnabled": "Enable Mouse Repulsion",
+      "mouseRadius": "Mouse Influence Range",
+      "mouseStrength": "Mouse Repulsion Strength",
+      "useCustomColor": "Custom Color",
+      "particleColor": "Particle Color",
+      "shapeType": "Particle Shape",
+      "shapeCircle": "Circle",
+      "shapeSquare": "Square",
+      "shapeDiamond": "Diamond",
+      "shapeGlow": "Glow"
     },
     "explosion": {
       "label": "Explosion",

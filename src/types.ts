@@ -19,7 +19,32 @@ export interface TextParamDef {
   description?: string
 }
 
-export type ParamDef = NumberParamDef | TextParamDef
+export interface ToggleParamDef {
+  type: 'toggle'
+  name: string
+  uniform: string
+  default: number  // 0 or 1
+  description?: string
+}
+
+export interface ColorParamDef {
+  type: 'color'
+  name: string
+  uniform: string  // base name, creates ${uniform}R/G/B in shader
+  default: string  // hex color like '#ffffff'
+  description?: string
+}
+
+export interface SelectParamDef {
+  type: 'select'
+  name: string
+  uniform: string
+  options: { label: string; value: number }[]
+  default: number
+  description?: string
+}
+
+export type ParamDef = NumberParamDef | TextParamDef | ToggleParamDef | ColorParamDef | SelectParamDef
 
 export interface ShaderPass {
   fragSource: string

@@ -85,6 +85,59 @@ function ParamPanel({ title, description, params, values, textValues, onChange, 
           )
         }
 
+        if (param.type === 'toggle') {
+          return (
+            <div key={param.uniform} className="param-row">
+              <label className="param-toggle">
+                <input
+                  type="checkbox"
+                  checked={(values[param.uniform] ?? param.default) === 1}
+                  onChange={(e) => onChange(param.uniform, e.target.checked ? 1 : 0)}
+                />
+                <span className="param-label">{param.name}</span>
+              </label>
+            </div>
+          )
+        }
+
+        if (param.type === 'color') {
+          return (
+            <div key={param.uniform} className="param-row">
+              <div className="param-header">
+                <span className="param-label">{param.name}</span>
+              </div>
+              <input
+                type="color"
+                className="param-color-input"
+                value={textValues[param.uniform] ?? param.default}
+                onInput={(e: React.FormEvent<HTMLInputElement>) => {
+                  onTextChange(param.uniform, (e.target as HTMLInputElement).value)
+                }}
+              />
+            </div>
+          )
+        }
+
+        if (param.type === 'select') {
+          return (
+            <div key={param.uniform} className="param-row">
+              <div className="param-header">
+                <span className="param-label">{param.name}</span>
+              </div>
+              <select
+                className="param-select"
+                value={values[param.uniform] ?? param.default}
+                onChange={(e) => onChange(param.uniform, parseFloat(e.target.value))}
+              >
+                {param.options.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+          )
+        }
+
+        // Default: number slider
         return (
           <div key={param.uniform} className="param-row">
             <div className="param-header">
