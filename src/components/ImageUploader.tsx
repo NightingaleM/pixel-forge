@@ -1,10 +1,12 @@
 import { useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 
 interface ImageUploaderProps {
   onImageLoad: (image: HTMLImageElement) => void
 }
 
 function ImageUploader({ onImageLoad }: ImageUploaderProps) {
+  const { t } = useTranslation()
   const inputRef = useRef<HTMLInputElement>(null)
 
   const handleFile = (file: File) => {
@@ -54,7 +56,7 @@ function ImageUploader({ onImageLoad }: ImageUploaderProps) {
         style={{ display: 'none' }}
         onChange={handleInputChange}
       />
-      <span>拖拽图片到此处或点击上传</span>
+      <span>{t('uploader.dragOrClick')}</span>
     </div>
   )
 }

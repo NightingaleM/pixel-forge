@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import * as THREE from 'three'
 import type { ModelInfo } from '../types'
 
@@ -7,7 +8,9 @@ interface ModelUploaderProps {
   label?: string
 }
 
-export default function ModelUploader({ onModelLoad, label = '上传 GLTF/GLB 模型' }: ModelUploaderProps) {
+export default function ModelUploader({ onModelLoad, label }: ModelUploaderProps) {
+  const { t } = useTranslation()
+  const displayLabel = label ?? t('modelUploader.defaultLabel')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [modelInfo, setModelInfo] = useState<ModelInfo | null>(null)
@@ -19,7 +22,7 @@ export default function ModelUploader({ onModelLoad, label = '上传 GLTF/GLB �
     setIsLoading(true)
 
     if (!file.name.match(/\.(gltf|glb)$/i)) {
-      setError('请上传 .gltf 或 .glb 格式的文件')
+      setError(t('modelUploader.formatError'))
       setIsLoading(false)
       return
     }
@@ -27,7 +30,6 @@ export default function ModelUploader({ onModelLoad, label = '上传 GLTF/GLB �
     try {
       const data = await file.arrayBuffer()
 
-      // Parse model to get info using same method as ParticleEngine
       const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js')
       const loader = new GLTFLoader()
 
@@ -54,15 +56,14 @@ export default function ModelUploader({ onModelLoad, label = '上传 GLTF/GLB �
             onModelLoad(data, info)
             resolve()
           },
-          (error) => {
-            setError('无法加载模型，请检查文件格式')
-            reject(error)
+          () => {
+            setError(t('modelUploader.loadError'))
+            reject(new Error('parse failed'))
           }
         )
       })
-    } catch (err) {
-      setError('无法加载模型，请检查文件格式')
-      console.error(err)
+    } catch {
+      setError(t('modelUploader.loadError'))
     } finally {
       setIsLoading(false)
     }
@@ -111,13 +112,13 @@ export default function ModelUploader({ onModelLoad, label = '上传 GLTF/GLB �
           {isLoading ? (
             <>
               <div className="upload-icon">⏳</div>
-              <div className="upload-label">加载中...</div>
+              <div className="upload-label">{t('common.loading')}</div>
             </>
           ) : (
             <>
               <div className="upload-icon">📁</div>
-              <div className="upload-label">{label}</div>
-              <div className="upload-hint">拖拽文件到此处或点击上传</div>
+              <div className="upload-label">{displayLabel}</div>
+              <div className="upload-hint">{t('uploader.dragFileOrClick')}</div>
             </>
           )}
         </div>
@@ -128,11 +129,11 @@ export default function ModelUploader({ onModelLoad, label = '上传 GLTF/GLB �
       {modelInfo && (
         <div className="model-info">
           <div className="model-info-item">
-            <span className="model-info-label">顶点数:</span>
+            <span className="model-info-label">{t('modelUploader.vertices')}</span>
             <span className="model-info-value">{modelInfo.vertices.toLocaleString()}</span>
           </div>
           <div className="model-info-item">
-            <span className="model-info-label">面数:</span>
+            <span className="model-info-label">{t('modelUploader.faces')}</span>
             <span className="model-info-value">{modelInfo.faces.toLocaleString()}</span>
           </div>
         </div>

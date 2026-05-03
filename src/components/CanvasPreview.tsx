@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import type { RefObject } from 'react'
 
 interface CanvasPreviewProps {
@@ -5,10 +6,12 @@ interface CanvasPreviewProps {
 }
 
 function CanvasPreview({ canvasRef }: CanvasPreviewProps) {
+  const { t } = useTranslation()
+
   return (
     <div className="preview-area">
       <canvas ref={canvasRef} />
-      <span className="placeholder-text">请先上传图片</span>
+      <span className="placeholder-text">{t('app2d.uploadFirst')}</span>
     </div>
   )
 }

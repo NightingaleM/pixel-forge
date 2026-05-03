@@ -1,26 +1,29 @@
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 
 export default function Home() {
+  const { t } = useTranslation()
+
   return (
     <div className="home-page">
       <div className="home-content">
         <h1 className="home-title">PixelForge</h1>
-        <p className="home-subtitle">图片风格化 & 3D 粒子动画</p>
+        <p className="home-subtitle">{t('home.subtitle')}</p>
 
         <div className="home-links">
           <Link to="/2d" className="home-link">
             <div className="home-link-card">
               <div className="home-link-icon">🎨</div>
-              <div className="home-link-title">2D 图片风格化</div>
-              <div className="home-link-desc">WebGL shader 实时图片处理</div>
+              <div className="home-link-title">{t('home.style2d')}</div>
+              <div className="home-link-desc">{t('home.style2dDesc')}</div>
             </div>
           </Link>
 
           <Link to="/3d" className="home-link">
             <div className="home-link-card">
               <div className="home-link-icon">🎭</div>
-              <div className="home-link-title">3D 粒子动画</div>
-              <div className="home-link-desc">GLTF 模型粒子特效</div>
+              <div className="home-link-title">{t('home.style3d')}</div>
+              <div className="home-link-desc">{t('home.style3dDesc')}</div>
             </div>
           </Link>
         </div>

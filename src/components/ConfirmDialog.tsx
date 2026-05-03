@@ -1,4 +1,5 @@
 import { useCallback, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 
 interface ConfirmDialogProps {
   message: string
@@ -7,6 +8,8 @@ interface ConfirmDialogProps {
 }
 
 export default function ConfirmDialog({ message, onConfirm, onCancel }: ConfirmDialogProps) {
+  const { t } = useTranslation()
+
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (e.key === 'Escape') onCancel()
@@ -25,10 +28,10 @@ export default function ConfirmDialog({ message, onConfirm, onCancel }: ConfirmD
         <p className="dialog-message">{message}</p>
         <div className="dialog-actions">
           <button className="dialog-btn dialog-btn--secondary" onClick={onCancel}>
-            取消
+            {t('common.cancel')}
           </button>
           <button className="dialog-btn dialog-btn--primary" onClick={onConfirm}>
-            确认退出
+            {t('app2d.confirmExitBtn')}
           </button>
         </div>
       </div>

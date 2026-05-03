@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import type { ModelInfo } from '../types'
 
 interface ActionBar3DProps {
@@ -26,17 +27,19 @@ export default function ActionBar3D({
   modelInfo,
   isLoading = false,
 }: ActionBar3DProps) {
+  const { t } = useTranslation()
+
   return (
     <div className="action-bar-3d">
       <button className="action-btn" onClick={onRandom} disabled={isLoading}>
-        随机参数
+        {t('app3d.randomParams')}
       </button>
       <button className="action-btn" onClick={onResetView} disabled={isLoading}>
-        重置视角
+        {t('app3d.resetView')}
       </button>
 
       <div className="particle-count-control">
-        <label className="particle-count-label">粒子数量:</label>
+        <label className="particle-count-label">{t('app3d.particleCount')}</label>
         <select
           className="particle-count-select"
           value={particleCount}
@@ -53,12 +56,12 @@ export default function ActionBar3D({
 
       {modelInfo && (
         <div className="model-info-display">
-          <div className="model-info-line">顶点: {modelInfo.vertices.toLocaleString()}</div>
-          <div className="model-info-line">面: {modelInfo.faces.toLocaleString()}</div>
+          <div className="model-info-line">{t('app3d.vertices')} {modelInfo.vertices.toLocaleString()}</div>
+          <div className="model-info-line">{t('app3d.faces')} {modelInfo.faces.toLocaleString()}</div>
         </div>
       )}
 
-      {isLoading && <div className="loading-indicator">处理中...</div>}
+      {isLoading && <div className="loading-indicator">{t('app3d.processing')}</div>}
     </div>
   )
 }

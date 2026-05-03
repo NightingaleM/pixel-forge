@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect, type RefObject } from 'react'
+import { useTranslation } from 'react-i18next'
 
 interface CompareSliderProps {
   canvasRef: RefObject<HTMLCanvasElement | null>
@@ -15,6 +16,7 @@ function CompareSlider({
   onToggleCompare,
   onClose,
 }: CompareSliderProps) {
+  const { t } = useTranslation()
   const [sliderPosition, setSliderPosition] = useState(0.5)
   const dragging = useRef(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -82,16 +84,12 @@ function CompareSlider({
 
   const clipInsetPercent = (1 - sliderPosition) * 100
 
-  const handleClose = () => {
-    onClose()
-  }
-
   return (
     <div className="compare-container">
       <button
         className="close-btn"
-        onClick={handleClose}
-        title="关闭图片"
+        onClick={onClose}
+        title={t('compare.closeImage')}
       >
         x
       </button>
@@ -133,7 +131,7 @@ function CompareSlider({
         className={`compare-toggle${compareMode ? ' active' : ''}`}
         onClick={onToggleCompare}
       >
-        {compareMode ? 'Compare ON' : 'Compare'}
+        {compareMode ? t('compare.compareOn') : t('compare.compare')}
       </button>
     </div>
   )
