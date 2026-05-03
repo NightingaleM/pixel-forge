@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ParticleEngine } from '../lib/ParticleEngine'
 import { getAllEffects, getEffect } from '../lib/EffectRegistry'
 import type { EffectId, ModelInfo } from '../types'
@@ -8,6 +9,7 @@ import ActionBar3D from './ActionBar3D'
 import ParamPanel from './ParamPanel'
 
 export default function App3D() {
+  const { t } = useTranslation()
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const engineRef = useRef<ParticleEngine | null>(null)
 
@@ -53,7 +55,7 @@ export default function App3D() {
   const handleModelLoad = useCallback((data: ArrayBuffer, info: ModelInfo) => {
     setModelData(data)
     setModelInfo(info)
-    setTargetModelData(null) // Clear target model when loading new source
+    setTargetModelData(null)
   }, [])
 
   // Handle target model load (for morph effect)
@@ -71,44 +73,38 @@ export default function App3D() {
       setError(null)
 
       try {
-        // Clear target model if not needed
         const effectDef = getEffect(activeEffect)
         if (!effectDef?.requiresTargetModel) {
           engine.clearTargetModel()
         }
 
-        // Load source model
         await engine.loadModel(modelData)
 
-        // Load target model if needed
         if (effectDef?.requiresTargetModel && targetModelData) {
           await engine.loadTargetModel(targetModelData)
         }
 
-        // Sample particles
         if (effectDef) {
           engine.sampleParticles(particleCount, effectDef.samplingType)
         }
 
-        // Apply material
         if (effectDef) {
           await engine.applyMaterial(effectDef)
 
-          // Set initial params
           for (const [name, value] of Object.entries(params)) {
             engine.setUniform(name, value)
           }
         }
       } catch (err) {
         console.error('Failed to initialize model:', err)
-        setError(err instanceof Error ? err.message : '加载失败')
+        setError(t('app3d.loadFailed'))
       } finally {
         setIsLoading(false)
       }
     }
 
     initEffect()
-  }, [modelData, targetModelData, activeEffect, particleCount])
+  }, [modelData, targetModelData, activeEffect, particleCount, t])
 
   // Handle effect change
   const handleEffectChange = useCallback((id: EffectId) => {
@@ -167,21 +163,21 @@ export default function App3D() {
 
         <ModelUploader
           onModelLoad={handleModelLoad}
-          label="上传 GLTF/GLB 源模型"
+          label={t('modelUploader.sourceLabel')}
         />
 
         {needsTargetModel && (
           <ModelUploader
             onModelLoad={handleTargetModelLoad}
-            label="上传 GLTF/GLB 目标模型"
+            label={t('modelUploader.targetLabel')}
           />
         )}
 
         {currentEffect && (
           <ParamPanel
-            title={currentEffect.label}
-            description={currentEffect.description}
-            params={currentEffect.params}
+            title={t(currentEffect.label)}
+            description={t(currentEffect.description)}
+            params={currentEffect.params.map(p => ({ ...p, name: t(p.name) }))}
             values={params}
             textValues={{}}
             onChange={handleParamChange}
@@ -192,7 +188,7 @@ export default function App3D() {
         {error && (
           <div className="error-message">
             {error}
-            <button onClick={() => setError(null)}>关闭</button>
+            <button onClick={() => setError(null)}>{t('common.close')}</button>
           </div>
         )}
       </div>
