@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ShaderRenderer } from '../lib/ShaderRenderer'
 import { styles, getStyle } from '../lib/StyleRegistry'
 import type { StyleId } from '../types'
@@ -8,6 +9,8 @@ import ParamPanel from './ParamPanel'
 import ActionBar from './ActionBar'
 import { CompareSlider } from './CompareSlider'
 import ConfirmDialog from './ConfirmDialog'
+
+const SKIP_RANDOM_UNIFORMS = ['uCenterX', 'uCenterY', 'uRotation', 'uAngle']
 
 function initParams(styleId: StyleId): Record<string, number> {
   const styleDef = getStyle(styleId)
@@ -39,6 +42,7 @@ function formatFileSize(bytes: number): string {
 }
 
 function App2D() {
+  const { t } = useTranslation()
   const [image, setImage] = useState<HTMLImageElement | null>(null)
   const [activeStyle, setActiveStyle] = useState<StyleId>('halftone')
   const [params, setParams] = useState<Record<string, number>>(() => initParams('halftone'))
@@ -155,14 +159,12 @@ function App2D() {
     (id: StyleId) => {
       setActiveStyle(id)
       setTextParams(initTextParams(id))
-      // 随机参数，但固定中心偏移和旋转角度为 0
       const styleDef = getStyle(id)
       if (!styleDef) { setParams(initParams(id)); return }
-      const skipRandomNames = ['中心X偏移', '中心Y偏移', '旋转角度', '网格旋转角度']
       const randomParams: Record<string, number> = {}
       for (const p of styleDef.params) {
         if (p.type === 'text') continue
-        if (skipRandomNames.includes(p.name)) {
+        if (SKIP_RANDOM_UNIFORMS.includes(p.uniform)) {
           randomParams[p.uniform] = 0
           continue
         }
@@ -217,12 +219,10 @@ function App2D() {
     const styleDef = getStyle(activeStyle)
     if (!styleDef) return
     const randomParams: Record<string, number> = {}
-    const skipRandomNames = ['中心X偏移', '中心Y偏移', '旋转角度', '网格旋转角度']
     for (const p of styleDef.params) {
       if (p.type === 'text') continue
-      if (skipRandomNames.includes(p.name)) continue
+      if (SKIP_RANDOM_UNIFORMS.includes(p.uniform)) continue
       const range = p.max - p.min
-      // Snap to step
       const raw = p.min + Math.random() * range
       randomParams[p.uniform] = Math.round(raw / p.step) * p.step
     }
@@ -296,13 +296,13 @@ function App2D() {
           <ImageUploader onImageLoad={handleImageLoad} />
         )}
         <div className="test-images-bar">
-          {testImages.map((t) => (
+          {testImages.map((ti) => (
             <img
-              key={t.label}
+              key={ti.label}
               className="test-image-thumb"
-              src={t.src}
-              alt={t.label}
-              onClick={() => handleTestImageClick(t.src)}
+              src={ti.src}
+              alt={ti.label}
+              onClick={() => handleTestImageClick(ti.src)}
             />
           ))}
         </div>
@@ -315,9 +315,9 @@ function App2D() {
       />
       {image && currentStyle && (
         <ParamPanel
-          title={currentStyle.label}
-          description={currentStyle.description}
-          params={currentStyle.params}
+          title={t(currentStyle.label)}
+          description={t(currentStyle.description)}
+          params={currentStyle.params.map(p => ({ ...p, name: t(p.name), description: p.description ? t(p.description) : undefined }))}
           values={params}
           textValues={textParams}
           onChange={handleParamChange}
@@ -326,7 +326,7 @@ function App2D() {
       )}
       {showCloseDialog && (
         <ConfirmDialog
-          message="确定要退出当前编辑吗？未保存的修改将丢失。"
+          message={t('app2d.confirmExit')}
           onConfirm={handleClose}
           onCancel={() => setShowCloseDialog(false)}
         />
