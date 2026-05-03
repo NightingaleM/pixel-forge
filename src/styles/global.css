@@ -960,3 +960,25 @@ body {
   font-size: 18px;
   color: #999;
 }
+
+/* --- Language Switch --- */
+
+.lang-switch {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 9999;
+  padding: 4px 10px;
+  border: 1px solid #333;
+  background: #fff;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  letter-spacing: 0.5px;
+  color: #333;
+  user-select: none;
+}
+.lang-switch:hover {
+  background: #333;
+  color: #fff;
+}
