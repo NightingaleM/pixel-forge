@@ -53,13 +53,6 @@ function App2D() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const rendererRef = useRef<ShaderRenderer | null>(null)
 
-  // Keep a ref to latest params so the render pipeline can read current values
-  // without stale closures.
-  const paramsRef = useRef<Record<string, number>>(params)
-  paramsRef.current = params
-  const activeStyleRef = useRef<StyleId>(activeStyle)
-  activeStyleRef.current = activeStyle
-
   // ---------------------------------------------------------------------------
   // Render pipeline
   // ---------------------------------------------------------------------------

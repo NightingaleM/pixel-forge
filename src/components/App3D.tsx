@@ -104,6 +104,7 @@ export default function App3D() {
     }
 
     initEffect()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- params intentionally excluded: including it would re-init the model on every slider move
   }, [modelData, targetModelData, activeEffect, particleCount, t])
 
   // Handle effect change
