@@ -31,6 +31,13 @@ export class ParticleEngine {
 
   // Mouse interaction
   mouseNDC: THREE.Vector2  // Normalized Device Coordinates [-1, 1]
+  private lastFrameTime = 0
+  private particleCount = 0
+  private originalPositions: Float32Array | null = null  // immutable copy of sampled positions
+  private displacementData: Float32Array | null = null    // per-particle displacement (x,y,z)
+  private velocityData: Float32Array | null = null        // per-particle spring velocity
+  private tempMVP = new THREE.Matrix4()
+  private tempInvMVP = new THREE.Matrix4()
 
   // Shader material management
   currentMaterial: THREE.Material | null = null
@@ -100,14 +107,7 @@ export class ParticleEngine {
       const x = ((event.clientX - rect.left) / rect.width) * 2 - 1
       const y = -((event.clientY - rect.top) / rect.height) * 2 + 1
       this.mouseNDC.set(x, y)
-
-      // Update shader uniform if material exists
-      if (this.currentMaterial && isShaderMaterial(this.currentMaterial)) {
-        this.currentMaterial.uniforms.uMouse.value.set(x, y)
-      }
     })
-
-    // Keep last mouse position when cursor leaves canvas (don't reset to center)
   }
 
   /**
@@ -408,6 +408,12 @@ export class ParticleEngine {
     if (targetPositions.length > 0) {
       geometry.setAttribute('aTargetPosition', new THREE.Float32BufferAttribute(targetPositions, 3))
     }
+
+    // Per-particle mouse inertia (spring-damper)
+    this.particleCount = count
+    this.originalPositions = new Float32Array(posBuffer.array as Float32Array)  // immutable copy
+    this.displacementData = new Float32Array(count * 3)
+    this.velocityData = new Float32Array(count * 3)
 
     // Store geometry for later use
     this.modelGeometry = geometry
@@ -796,10 +802,17 @@ export class ParticleEngine {
       return  // Already running
     }
 
+    this.lastFrameTime = this.clock.getElapsedTime()
+
     const animate = () => {
       this.animationId = requestAnimationFrame(animate)
 
       const elapsedTime = this.clock.getElapsedTime()
+      const dt = Math.min(elapsedTime - this.lastFrameTime, 0.05)
+      this.lastFrameTime = elapsedTime
+
+      // Per-particle spring physics for mouse inertia
+      this.updateParticleDisplacement(elapsedTime, dt)
 
       // Update uniforms
       if (this.currentMaterial && isShaderMaterial(this.currentMaterial)) {
@@ -815,6 +828,108 @@ export class ParticleEngine {
     }
 
     animate()
+  }
+
+  /**
+   * Per-particle spring-damper: computes mouse wind displacement on CPU,
+   * each particle tracks its target with inertia (pendulum-like oscillation).
+   * stiffness=80 damping=8 → underdamped (ratio≈0.45), ~0.7s period, ~1.5s decay
+   */
+  private updateParticleDisplacement(time: number, dt: number): void {
+    if (!this.particles || !this.displacementData || !this.velocityData || !this.originalPositions || dt <= 0) return
+
+    const material = this.currentMaterial as THREE.ShaderMaterial | null
+    const mouseEnabled = (material && isShaderMaterial(material))
+      ? (material.uniforms.uMouseEnabled?.value ?? 0) >= 0.5
+      : false
+
+    const mouseStrength = (material && isShaderMaterial(material))
+      ? (material.uniforms.uMouseStrength?.value ?? 0.5) : 0.5
+    const mouseRadius = (material && isShaderMaterial(material))
+      ? (material.uniforms.uMouseRadius?.value ?? 0.15) : 0.15
+    const mouseX = this.mouseNDC.x
+    const mouseY = this.mouseNDC.y
+
+    // Precompute projection matrices
+    if (mouseEnabled) {
+      this.tempMVP.multiplyMatrices(this.camera.projectionMatrix, this.camera.matrixWorldInverse)
+      this.tempInvMVP.copy(this.tempMVP).invert()
+    }
+    const me = this.tempMVP.elements
+    const ie = this.tempInvMVP.elements
+
+    const randAttr = this.particles.geometry.getAttribute('aRandom') as THREE.BufferAttribute
+    const randData = randAttr.array as Float32Array
+
+    const count = this.particleCount
+    const orig = this.originalPositions
+    const disp = this.displacementData
+    const vel = this.velocityData
+    const stiffness = 80.0
+    const dampingCoeff = 8.0
+
+    for (let i = 0; i < count; i++) {
+      const i3 = i * 3
+      let targetX = 0, targetY = 0, targetZ = 0
+
+      if (mouseEnabled) {
+        const wx = orig[i3], wy = orig[i3 + 1], wz = orig[i3 + 2]
+
+        const cx = me[0] * wx + me[4] * wy + me[8] * wz + me[12]
+        const cy = me[1] * wx + me[5] * wy + me[9] * wz + me[13]
+        const cz = me[2] * wx + me[6] * wy + me[10] * wz + me[14]
+        const cw = me[3] * wx + me[7] * wy + me[11] * wz + me[15]
+
+        if (Math.abs(cw) > 0.001) {
+          const sx = cx / cw, sy = cy / cw
+          const dx = sx - mouseX, dy = sy - mouseY
+          const dist = Math.sqrt(dx * dx + dy * dy)
+
+          if (dist < mouseRadius && dist > 0.001) {
+            const t = 1.0 - dist / mouseRadius
+            const falloff = t * t * (3.0 - 2.0 * t)
+            const invDist = 1.0 / dist
+            const rdx = dx * invDist, rdy = dy * invDist
+            const phase = randData[i] * 6.2831
+            const wind = Math.sin(time * 2.5 + phase + dist * 8.0) * 0.8
+                        + Math.cos(time * 1.3 + phase * 1.7) * 0.2
+            const strength = falloff * mouseStrength * 1.0
+            const clipDx = (-rdy * wind + rdx * 0.2) * strength
+            const clipDy = (rdx * wind + rdy * 0.2) * strength
+
+            const dcx = cx + clipDx * cw
+            const dcy = cy + clipDy * cw
+            const w1x = ie[0] * dcx + ie[4] * dcy + ie[8] * cz + ie[12] * cw
+            const w1y = ie[1] * dcx + ie[5] * dcy + ie[9] * cz + ie[13] * cw
+            const w1z = ie[2] * dcx + ie[6] * dcy + ie[10] * cz + ie[14] * cw
+            const w1w = ie[3] * dcx + ie[7] * dcy + ie[11] * cz + ie[15] * cw
+            const invW = 1.0 / w1w
+            targetX = w1x * invW - wx
+            targetY = w1y * invW - wy
+            targetZ = w1z * invW - wz
+          }
+        }
+      }
+
+      // Spring-damper physics per particle
+      const fx = (targetX - disp[i3]) * stiffness - vel[i3] * dampingCoeff
+      const fy = (targetY - disp[i3 + 1]) * stiffness - vel[i3 + 1] * dampingCoeff
+      const fz = (targetZ - disp[i3 + 2]) * stiffness - vel[i3 + 2] * dampingCoeff
+      vel[i3] += fx * dt
+      vel[i3 + 1] += fy * dt
+      vel[i3 + 2] += fz * dt
+      disp[i3] += vel[i3] * dt
+      disp[i3 + 1] += vel[i3 + 1] * dt
+      disp[i3 + 2] += vel[i3 + 2] * dt
+    }
+
+    // Write original + displacement into position/aPosition buffer
+    const posAttr = this.particles.geometry.getAttribute('position') as THREE.BufferAttribute
+    const posData = posAttr.array as Float32Array
+    for (let i = 0; i < count * 3; i++) {
+      posData[i] = orig[i] + disp[i]
+    }
+    posAttr.needsUpdate = true
   }
 
   /**

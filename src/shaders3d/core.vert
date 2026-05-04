@@ -24,23 +24,6 @@ varying float vAlpha;
 
 // %%EFFECT_UNIFORMS%%
 
-// Mouse deformation: push particles away from cursor in screen space
-vec3 mouseDeformation(vec3 worldPos, vec2 mouseNDC, float radius) {
-  if (uMouseEnabled < 0.5) return worldPos;
-
-  vec4 clipPos = projectionMatrix * modelViewMatrix * vec4(worldPos, 1.0);
-  vec2 screenPos = clipPos.xy / clipPos.w;
-  float dist = distance(screenPos, mouseNDC);
-  if (dist < radius) {
-    vec2 dir = normalize(screenPos - mouseNDC);
-    float t = 1.0 - dist / radius;
-    float strength = t * t * uMouseStrength;
-    clipPos.xy += dir * strength * clipPos.w;
-    return (inverse(projectionMatrix * modelViewMatrix) * clipPos).xyz;
-  }
-  return worldPos;
-}
-
 // %%EFFECT_TRANSFORM%%
 
 void main() {
@@ -51,7 +34,6 @@ void main() {
   vAlpha = 1.0;
 
   vec3 transformed = effectTransform(aPosition, aNormal, aRandom, uTime);
-  transformed = mouseDeformation(transformed, uMouse, uMouseRadius);
 
   vec4 mvPosition = modelViewMatrix * vec4(transformed, 1.0);
   gl_Position = projectionMatrix * mvPosition;
