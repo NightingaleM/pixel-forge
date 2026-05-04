@@ -789,9 +789,21 @@ export class ParticleEngine {
    * Reset camera to default position
    */
   resetCamera(): void {
-    this.camera.position.set(0, 0, 3)
-    this.camera.lookAt(0, 0, 0)
-    this.controls.reset()
+    // Use the actual particle center as the reset target,
+    // not the hard-coded (0,0,0) which may differ from the
+    // bounding-sphere center set by sampleParticles().
+    const target = new THREE.Vector3(0, 0, 0)
+    if (this.particles) {
+      const geo = this.particles.geometry
+      geo.computeBoundingSphere()
+      if (geo.boundingSphere) {
+        target.copy(geo.boundingSphere.center)
+      }
+    }
+    this.controls.target.copy(target)
+    this.camera.position.set(target.x, target.y, target.z + 3)
+    this.camera.lookAt(target)
+    this.controls.update()
   }
 
   /**
