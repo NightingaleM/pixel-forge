@@ -18,7 +18,7 @@ function formatValue(value: number): string {
 
 function ParamPanel({ title, description, params, values, textValues, onChange, onTextChange, onClose }: ParamPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null)
-  const [pos, setPos] = useState({ x: 16, y: 60 })
+  const [pos, setPos] = useState({ x: 345, y: 35 })
   const dragging = useRef(false)
   const offset = useRef({ x: 0, y: 0 })
 

@@ -60,13 +60,6 @@ export default function ActionBar3D({
         </div>
       )}
 
-      {modelInfo && (
-        <div className="model-info-display">
-          <div className="model-info-line">{t('app3d.vertices')} {modelInfo.vertices.toLocaleString()}</div>
-          <div className="model-info-line">{t('app3d.faces')} {modelInfo.faces.toLocaleString()}</div>
-        </div>
-      )}
-
       {isLoading && <div className="loading-indicator">{t('app3d.processing')}</div>}
     </div>
   )

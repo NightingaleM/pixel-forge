@@ -882,6 +882,7 @@ body {
 .particle-count-label {
   font-size: 12px;
   color: #666;
+  width: max-content;
 }
 
 .particle-count-select {
