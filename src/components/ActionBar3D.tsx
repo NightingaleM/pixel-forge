@@ -9,6 +9,7 @@ interface ActionBar3DProps {
   onParticleCountChange: (count: number) => void
   modelInfo: ModelInfo | null
   isLoading?: boolean
+  samplingProgress?: number
   isParticleMode?: boolean
 }
 
@@ -38,6 +39,7 @@ export default function ActionBar3D({
   onParticleCountChange,
   modelInfo,
   isLoading = false,
+  samplingProgress = -1,
   isParticleMode = true,
 }: ActionBar3DProps) {
   const { t } = useTranslation()
@@ -136,7 +138,13 @@ export default function ActionBar3D({
         </div>
       )}
 
-      {isLoading && <div className="loading-indicator">{t('app3d.processing')}</div>}
+      {isLoading && (
+        <div className="loading-indicator">
+          {samplingProgress >= 0
+            ? `${t('app3d.sampling')} ${samplingProgress}%`
+            : t('app3d.processing')}
+        </div>
+      )}
     </div>
   )
 }

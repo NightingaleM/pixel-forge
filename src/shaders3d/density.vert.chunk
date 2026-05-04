@@ -20,7 +20,17 @@ float noise(vec3 p) {
 vec3 effectTransform(vec3 position, vec3 normal, float random, float time) {
   float n = noise(position * uNoiseScale + time * uNoiseSpeed);
   float displacement = (n - 0.5) * uDensityStrength;
-  return position + normal * displacement;
+
+  // Use deterministic pseudo-random direction based on particle's random seed
+  float angle1 = random * 6.2831853;
+  float angle2 = fract(random * 7.31 + 0.5) * 6.2831853;
+  vec3 dir = vec3(
+    cos(angle1) * sin(angle2),
+    sin(angle1) * sin(angle2),
+    cos(angle2)
+  );
+
+  return position + dir * displacement;
 }
 
 float effectSize(float baseSize, float random, float time) {

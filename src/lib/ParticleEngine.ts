@@ -6,6 +6,8 @@ import type { EffectDef, ModelInfo, SamplingType } from '../types'
 import { BASE_PARAMS } from './EffectRegistry'
 import coreVertSource from '../shaders3d/core.vert?raw'
 
+export type SamplingProgressCallback = (progress: number) => void
+
 /**
  * Type guard to check if material is a ShaderMaterial
  */
@@ -373,60 +375,74 @@ export class ParticleEngine {
   }
 
   /**
-   * @param type - Sampling type: 'surface' or 'volumetric'
+   * Sample particles and build the particle system.
+   * For volumetric sampling, runs computation in a Web Worker with progress reporting.
    */
-  sampleParticles(count: number, type: SamplingType): void {
+  async sampleParticles(
+    count: number,
+    type: SamplingType,
+    onProgress?: SamplingProgressCallback,
+  ): Promise<void> {
     if (!this.modelGeometry) {
       throw new Error('No model loaded. Call loadModel() first.')
     }
 
-    const geometry = new THREE.BufferGeometry()
     const positions: number[] = []
     const colors: number[] = []
     const normals: number[] = []
     const sizes: number[] = []
     const randoms: number[] = []
-
-    // Pre-compute target positions for morph effect
     const targetPositions: number[] = []
 
     if (type === 'surface') {
+      const t0 = performance.now()
       this.surfaceSample(count, positions, colors, normals, sizes, randoms, targetPositions)
+      console.log(`[ParticleEngine] surfaceSample(${count}): ${(performance.now() - t0).toFixed(1)}ms`)
     } else {
-      this.volumetricSample(count, positions, colors, normals, sizes, randoms)
+      await this.volumetricSampleAsync(count, positions, colors, normals, sizes, randoms, onProgress)
     }
 
-    // Set geometry attributes
+    this.buildParticleSystem(count, positions, colors, normals, sizes, randoms, targetPositions)
+  }
+
+  /**
+   * Build the Three.js Points object from sampled data
+   */
+  private buildParticleSystem(
+    count: number,
+    positions: number[],
+    colors: number[],
+    normals: number[],
+    sizes: number[],
+    randoms: number[],
+    targetPositions: number[],
+  ): void {
+    const geometry = new THREE.BufferGeometry()
+
     const posBuffer = new THREE.Float32BufferAttribute(positions, 3)
-    geometry.setAttribute('position', posBuffer)    // Three.js needs this for vertex count
-    geometry.setAttribute('aPosition', posBuffer)    // Shader reads from this
+    geometry.setAttribute('position', posBuffer)
+    geometry.setAttribute('aPosition', posBuffer)
     geometry.setAttribute('aColor', new THREE.Float32BufferAttribute(colors, 3))
     geometry.setAttribute('aNormal', new THREE.Float32BufferAttribute(normals, 3))
     geometry.setAttribute('aSize', new THREE.Float32BufferAttribute(sizes, 1))
     geometry.setAttribute('aRandom', new THREE.Float32BufferAttribute(randoms, 1))
 
-    // Add target positions attribute for morph effect
     if (targetPositions.length > 0) {
       geometry.setAttribute('aTargetPosition', new THREE.Float32BufferAttribute(targetPositions, 3))
     }
 
-    // Per-particle mouse inertia (spring-damper)
     this.particleCount = count
-    this.originalPositions = new Float32Array(posBuffer.array as Float32Array)  // immutable copy
+    this.originalPositions = new Float32Array(posBuffer.array as Float32Array)
     this.displacementData = new Float32Array(count * 3)
     this.velocityData = new Float32Array(count * 3)
 
-    // Store geometry for later use
     this.modelGeometry = geometry
 
-    // Remove old particles
     if (this.particles) {
       this.scene.remove(this.particles)
       this.particles.geometry.dispose()
     }
 
-    // Create new particle system with temporary visible material
-    // (will be replaced with shader material in applyMaterial)
     const tempMaterial = new THREE.PointsMaterial({
       color: 0xffffff,
       size: 2.0,
@@ -434,9 +450,8 @@ export class ParticleEngine {
     })
     this.particles = new THREE.Points(geometry, tempMaterial)
     this.particles.frustumCulled = false
-    this.scene.add(this.particles) // Add to scene immediately
+    this.scene.add(this.particles)
 
-    // Sync orbit controls target to particle system center
     geometry.computeBoundingSphere()
     if (geometry.boundingSphere) {
       this.controls.target.copy(geometry.boundingSphere.center)
@@ -522,106 +537,104 @@ export class ParticleEngine {
   }
 
   /**
-   * Volumetric sampling using ray-casting for inside/outside testing
-   * Fills the volume with particles using Monte Carlo sampling
+   * Async volumetric sampling using a Web Worker for voxel grid precomputation.
+   * Reports progress via onProgress callback (0–100).
    */
-  private volumetricSample(
+  private volumetricSampleAsync(
     count: number,
     positions: number[],
     colors: number[],
     normals: number[],
     sizes: number[],
-    randoms: number[]
-  ): void {
-    if (!this.modelGeometry) return
+    randoms: number[],
+    onProgress?: SamplingProgressCallback,
+  ): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (!this.modelGeometry) { resolve(); return }
 
-    const boundingBox = this.modelGeometry.boundingBox!
-    const size = new THREE.Vector3()
-    boundingBox.getSize(size)
+      const boundingBox = this.modelGeometry.boundingBox!
+      const size = new THREE.Vector3()
+      boundingBox.getSize(size)
+      const center = new THREE.Vector3()
+      boundingBox.getCenter(center)
 
-    const center = new THREE.Vector3()
-    boundingBox.getCenter(center)
+      // Extract raw geometry data for transfer
+      const posAttr = this.modelGeometry.getAttribute('position')
+      const positionsArray = new Float32Array(posAttr.array as Float32Array)
+      const indexAttr = this.modelGeometry.getIndex()
+      const indicesArray = indexAttr ? new Uint32Array(indexAttr.array as Uint32Array) : null
 
-    const position = new THREE.Vector3()
-    const normal = new THREE.Vector3()
-    const color = new THREE.Color()
-    const raycaster = new THREE.Raycaster()
-    const direction = new THREE.Vector3(1, 0, 0)
-
-    // Create temporary mesh for raycasting
-    const tempGeometry = this.modelGeometry.clone()
-    const tempMaterial = new THREE.MeshBasicMaterial()
-    const tempMesh = new THREE.Mesh(tempGeometry, tempMaterial)
-
-    let sampled = 0
-    let attempts = 0
-    const maxAttempts = count * 10  // Prevent infinite loop
-
-    while (sampled < count && attempts < maxAttempts) {
-      attempts++
-
-      // Random point in bounding box
-      position.set(
-        center.x + (Math.random() - 0.5) * size.x,
-        center.y + (Math.random() - 0.5) * size.y,
-        center.z + (Math.random() - 0.5) * size.z
+      const worker = new Worker(
+        new URL('./volumetricSampler.worker.ts', import.meta.url),
+        { type: 'module' },
       )
 
-      // Use raycasting to test if point is inside mesh
-      raycaster.set(position, direction)
-      const intersects = raycaster.intersectObject(tempMesh)
-
-      // Count intersections - odd means inside, even means outside
-      const intersectionCount = intersects.length
-
-      if (intersectionCount % 2 === 1) {
-        // Point is inside mesh
-        positions.push(position.x, position.y, position.z)
-
-        // Estimate normal by sampling nearby points
-        const epsilon = 0.01
-        normal.set(0, 0, 0)
-        for (let i = 0; i < 6; i++) {
-          const offset = new THREE.Vector3(
-            i % 2 === 0 ? epsilon : 0,
-            i % 4 < 2 ? epsilon : 0,
-            i < 4 ? epsilon : 0
-          )
-          const testPoint = position.clone().add(offset)
-          raycaster.set(testPoint, direction)
-          const testIntersects = raycaster.intersectObject(tempMesh)
-          const testCount = testIntersects.length
-
-          if (testCount % 2 === 0) {
-            // Outside, add to normal
-            normal.add(offset.normalize())
-          }
+      worker.onmessage = (e: MessageEvent) => {
+        const data = e.data
+        if (data.type === 'progress') {
+          onProgress?.(data.progress)
+          return
         }
-        normal.normalize()
-        normals.push(normal.x, normal.y, normal.z)
 
-        // Color based on position with more variation for volume
-        const hue = (position.x + position.y + position.z) * 0.3 + Math.random() * 0.15
-        const saturation = 0.5 + Math.random() * 0.3
-        const lightness = 0.4 + Math.random() * 0.4
-        color.setHSL(hue % 1.0, saturation, lightness)
-        colors.push(color.r, color.g, color.b)
+        if (data.type === 'complete') {
+          console.log(`[ParticleEngine] volumetric voxel grid (worker): ${data.timing.toFixed(1)}ms`)
+          const insideVoxels = data.insideVoxels as Int32Array
+          worker.terminate()
 
-        sizes.push(0.7 + Math.random() * 0.6)
-        randoms.push(Math.random())
+          if (insideVoxels.length === 0) {
+            console.warn('No inside voxels found in volumetric mode')
+            resolve()
+            return
+          }
 
-        sampled++
+          const res = 32
+          const cellX = size.x / res
+          const cellY = size.y / res
+          const cellZ = size.z / res
+          const halfRes = res * 0.5
+          const voxelCount = insideVoxels.length / 3
+          const color = new THREE.Color()
+
+          for (let i = 0; i < count; i++) {
+            const idx = Math.floor(Math.random() * voxelCount) * 3
+            const ix = insideVoxels[idx]
+            const iy = insideVoxels[idx + 1]
+            const iz = insideVoxels[idx + 2]
+
+            const px = center.x + (ix - halfRes + Math.random()) * cellX
+            const py = center.y + (iy - halfRes + Math.random()) * cellY
+            const pz = center.z + (iz - halfRes + Math.random()) * cellZ
+
+            positions.push(px, py, pz)
+            normals.push(0, 0, 1)
+
+            const hue = (px + py + pz) * 0.3 + Math.random() * 0.15
+            const saturation = 0.5 + Math.random() * 0.3
+            const lightness = 0.4 + Math.random() * 0.4
+            color.setHSL(hue % 1.0, saturation, lightness)
+            colors.push(color.r, color.g, color.b)
+
+            sizes.push(0.7 + Math.random() * 0.6)
+            randoms.push(Math.random())
+          }
+
+          resolve()
+        }
       }
-    }
 
-    // Warning if we couldn't sample enough particles
-    if (sampled < count) {
-      console.warn(`Only sampled ${sampled}/${count} particles in volumetric mode`)
-    }
+      worker.onerror = (err) => {
+        worker.terminate()
+        reject(err)
+      }
 
-    // Cleanup
-    tempGeometry.dispose()
-    tempMaterial.dispose()
+      worker.postMessage({
+        positions: positionsArray,
+        indices: indicesArray,
+        center: { x: center.x, y: center.y, z: center.z },
+        size: { x: size.x, y: size.y, z: size.z },
+        resolution: 32,
+      }, [positionsArray.buffer, ...(indicesArray ? [indicesArray.buffer] : [])])
+    })
   }
 
   /**
@@ -651,7 +664,8 @@ export class ParticleEngine {
       }
 
       // Add effect-specific uniforms with default values
-      effectDef.params.forEach((param) => {
+      const allParams = [...BASE_PARAMS, ...effectDef.params]
+      allParams.forEach((param) => {
         if (!param.type || param.type === 'number' || param.type === 'toggle' || param.type === 'select') {
           uniforms[param.uniform] = { value: param.default }
         } else if (param.type === 'color') {

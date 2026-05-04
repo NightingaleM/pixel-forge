@@ -48,6 +48,7 @@ export default function App3D() {
   const [textValues, setTextValues] = useState<Record<string, string>>({})
 
   const [isLoading, setIsLoading] = useState(false)
+  const [samplingProgress, setSamplingProgress] = useState(-1)  // -1 = not sampling
   const [error, setError] = useState<string | null>(null)
 
   // Initialize engine
@@ -107,6 +108,7 @@ export default function App3D() {
 
     const initEffect = async () => {
       setIsLoading(true)
+      setSamplingProgress(-1)
       setError(null)
 
       try {
@@ -128,7 +130,9 @@ export default function App3D() {
           }
 
           if (effectDef) {
-            engine.sampleParticles(particleCount, effectDef.samplingType)
+            await engine.sampleParticles(particleCount, effectDef.samplingType, (p) => {
+              setSamplingProgress(p)
+            })
           }
 
           if (effectDef) {
@@ -152,6 +156,7 @@ export default function App3D() {
         setError(t('app3d.loadFailed'))
       } finally {
         setIsLoading(false)
+        setSamplingProgress(-1)
       }
     }
 
@@ -342,6 +347,7 @@ export default function App3D() {
           onParticleCountChange={handleParticleCountChange}
           modelInfo={modelInfo}
           isLoading={isLoading}
+          samplingProgress={samplingProgress}
           isParticleMode={activeEffect !== 'none'}
         />
       </div>

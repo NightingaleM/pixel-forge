@@ -41,6 +41,7 @@
     "vertices": "Vertices:",
     "faces": "Faces:",
     "processing": "Processing...",
+    "sampling": "Volumetric sampling...",
     "particleEffect": "Particle Effects",
     "customCount": "Custom...",
     "backToPreset": "Back to preset"

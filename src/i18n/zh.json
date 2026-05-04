@@ -41,6 +41,7 @@
     "vertices": "顶点:",
     "faces": "面:",
     "processing": "处理中...",
+    "sampling": "体积采样中...",
     "particleEffect": "粒子特效",
     "customCount": "自定义...",
     "backToPreset": "返回预设"
