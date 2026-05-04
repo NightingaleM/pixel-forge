@@ -3,6 +3,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { MeshSurfaceSampler } from 'three/examples/jsm/math/MeshSurfaceSampler.js'
 import type { EffectDef, ModelInfo, SamplingType } from '../types'
+import { BASE_PARAMS } from './EffectRegistry'
 import coreVertSource from '../shaders3d/core.vert?raw'
 
 /**
@@ -672,7 +673,7 @@ export class ParticleEngine {
       }
 
       // Assemble vertex shader by replacing placeholders
-      const vertexShader = this.assembleVertexShader(vertexChunk, effectDef.params)
+      const vertexShader = this.assembleVertexShader(vertexChunk, [...BASE_PARAMS, ...effectDef.params])
 
       // Debug: log assembled shader
       console.log('=== Assembled Vertex Shader ===')

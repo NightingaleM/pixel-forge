@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ParticleEngine } from '../lib/ParticleEngine'
-import { getAllEffects, getEffect } from '../lib/EffectRegistry'
-import type { EffectId, ModelInfo } from '../types'
+import { getAllEffects, getEffect, BASE_PARAMS } from '../lib/EffectRegistry'
+import type { EffectId, ModelInfo, ParamDef } from '../types'
 import ModelUploader from './ModelUploader'
 import EffectSelector from './EffectSelector'
 import ActionBar3D from './ActionBar3D'
@@ -15,6 +15,19 @@ function hexToRgb(hex: string): [number, number, number] {
   return [r, g, b]
 }
 
+function initDefaults(params: ParamDef[]) {
+  const nums: Record<string, number> = {}
+  const texts: Record<string, string> = {}
+  for (const p of params) {
+    if (!p.type || p.type === 'number' || p.type === 'toggle' || p.type === 'select') {
+      nums[p.uniform] = p.default as number
+    } else if (p.type === 'color') {
+      texts[p.uniform] = p.default as string
+    }
+  }
+  return { nums, texts }
+}
+
 export default function App3D() {
   const { t } = useTranslation()
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -25,8 +38,15 @@ export default function App3D() {
   const [modelInfo, setModelInfo] = useState<ModelInfo | null>(null)
   const [targetModelData, setTargetModelData] = useState<ArrayBuffer | null>(null)
   const [particleCount, setParticleCount] = useState(10000)
+
+  // Shared base params (persist across effect switches)
+  const [baseParams, setBaseParams] = useState<Record<string, number>>(() => initDefaults(BASE_PARAMS).nums)
+  const [baseTextValues, setBaseTextValues] = useState<Record<string, string>>(() => initDefaults(BASE_PARAMS).texts)
+
+  // Effect-specific params (reset on effect switch)
   const [params, setParams] = useState<Record<string, number>>({})
   const [textValues, setTextValues] = useState<Record<string, string>>({})
+
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -45,22 +65,13 @@ export default function App3D() {
     }
   }, [])
 
-  // Initialize params when effect changes
+  // Initialize effect-specific params when effect changes
   useEffect(() => {
     const effectDef = getEffect(activeEffect)
     if (!effectDef) return
-
-    const newParams: Record<string, number> = {}
-    const newTextValues: Record<string, string> = {}
-    for (const param of effectDef.params) {
-      if (!param.type || param.type === 'number' || param.type === 'toggle' || param.type === 'select') {
-        newParams[param.uniform] = param.default as number
-      } else if (param.type === 'color') {
-        newTextValues[param.uniform] = param.default as string
-      }
-    }
-    setParams(newParams)
-    setTextValues(newTextValues)
+    const { nums, texts } = initDefaults(effectDef.params)
+    setParams(nums)
+    setTextValues(texts)
   }, [activeEffect])
 
   // Handle model load
@@ -74,6 +85,19 @@ export default function App3D() {
   // Handle target model load (for morph effect)
   const handleTargetModelLoad = useCallback((data: ArrayBuffer) => {
     setTargetModelData(data)
+  }, [])
+
+  // Helper: apply all color params from a param list
+  const applyColorParams = useCallback((paramDefs: ParamDef[], textVals: Record<string, string>) => {
+    for (const param of paramDefs) {
+      if (param.type === 'color') {
+        const hex = textVals[param.uniform] ?? (param.default as string)
+        const [r, g, b] = hexToRgb(hex)
+        engineRef.current?.setUniform(`${param.uniform}R`, r)
+        engineRef.current?.setUniform(`${param.uniform}G`, g)
+        engineRef.current?.setUniform(`${param.uniform}B`, b)
+      }
+    }
   }, [])
 
   // Apply model and sampling
@@ -110,20 +134,17 @@ export default function App3D() {
           if (effectDef) {
             await engine.applyMaterial(effectDef)
 
+            // Apply base params
+            for (const [name, value] of Object.entries(baseParams)) {
+              engine.setUniform(name, value)
+            }
+            applyColorParams(BASE_PARAMS, baseTextValues)
+
+            // Apply effect-specific params
             for (const [name, value] of Object.entries(params)) {
               engine.setUniform(name, value)
             }
-
-            // Apply color uniforms from textValues
-            for (const param of effectDef.params) {
-              if (param.type === 'color') {
-                const hex = textValues[param.uniform] ?? (param.default as string)
-                const [r, g, b] = hexToRgb(hex)
-                engine.setUniform(`${param.uniform}R`, r)
-                engine.setUniform(`${param.uniform}G`, g)
-                engine.setUniform(`${param.uniform}B`, b)
-              }
-            }
+            applyColorParams(effectDef.params, textValues)
           }
         }
       } catch (err) {
@@ -135,7 +156,7 @@ export default function App3D() {
     }
 
     initEffect()
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- params intentionally excluded: including it would re-init the model on every slider move
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- params/baseParams intentionally excluded
   }, [modelData, targetModelData, activeEffect, particleCount, t])
 
   // Handle effect change
@@ -143,17 +164,33 @@ export default function App3D() {
     setActiveEffect(id)
   }, [])
 
-  // Handle param change
+  // Handle base param change
+  const handleBaseParamChange = useCallback((uniform: string, value: number) => {
+    setBaseParams((prev) => ({ ...prev, [uniform]: value }))
+    engineRef.current?.setUniform(uniform, value)
+  }, [])
+
+  // Handle base text/color param change
+  const handleBaseTextChange = useCallback((uniform: string, value: string) => {
+    setBaseTextValues((prev) => ({ ...prev, [uniform]: value }))
+    const param = BASE_PARAMS.find(p => p.type === 'color' && p.uniform === uniform)
+    if (param?.type === 'color') {
+      const [r, g, b] = hexToRgb(value)
+      engineRef.current?.setUniform(`${uniform}R`, r)
+      engineRef.current?.setUniform(`${uniform}G`, g)
+      engineRef.current?.setUniform(`${uniform}B`, b)
+    }
+  }, [])
+
+  // Handle effect-specific param change
   const handleParamChange = useCallback((uniform: string, value: number) => {
     setParams((prev) => ({ ...prev, [uniform]: value }))
     engineRef.current?.setUniform(uniform, value)
   }, [])
 
-  // Handle text/color param change
+  // Handle effect-specific text/color param change
   const handleTextChange = useCallback((uniform: string, value: string) => {
     setTextValues((prev) => ({ ...prev, [uniform]: value }))
-
-    // For color params, convert hex to RGB uniforms
     const effectDef = getEffect(activeEffect)
     const param = effectDef?.params.find(p => p.type === 'color' && p.uniform === uniform)
     if (param?.type === 'color') {
@@ -164,46 +201,49 @@ export default function App3D() {
     }
   }, [activeEffect])
 
-  // Handle random params
+  // Handle random params (both base + effect-specific)
   const handleRandom = useCallback(() => {
     const effectDef = getEffect(activeEffect)
     if (!effectDef) return
 
-    const randomParams: Record<string, number> = {}
-    const randomTextValues: Record<string, string> = {}
-    for (const param of effectDef.params) {
-      if (!param.type || param.type === 'number') {
-        const range = param.max - param.min
-        const raw = param.min + Math.random() * range
-        randomParams[param.uniform] = Math.round(raw / param.step) * param.step
-      } else if (param.type === 'toggle') {
-        randomParams[param.uniform] = Math.random() > 0.5 ? 1 : 0
-      } else if (param.type === 'select') {
-        const idx = Math.floor(Math.random() * param.options.length)
-        randomParams[param.uniform] = param.options[idx].value
-      } else if (param.type === 'color') {
-        const hex = '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0')
-        randomTextValues[param.uniform] = hex
+    const randomize = (paramDefs: ParamDef[]) => {
+      const nums: Record<string, number> = {}
+      const texts: Record<string, string> = {}
+      for (const param of paramDefs) {
+        if (!param.type || param.type === 'number') {
+          const range = param.max - param.min
+          const raw = param.min + Math.random() * range
+          nums[param.uniform] = Math.round(raw / param.step) * param.step
+        } else if (param.type === 'toggle') {
+          nums[param.uniform] = Math.random() > 0.5 ? 1 : 0
+        } else if (param.type === 'select') {
+          const idx = Math.floor(Math.random() * param.options.length)
+          nums[param.uniform] = param.options[idx].value
+        } else if (param.type === 'color') {
+          texts[param.uniform] = '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0')
+        }
       }
+      return { nums, texts }
     }
 
-    setParams(randomParams)
-    setTextValues(randomTextValues)
-
-    for (const [name, value] of Object.entries(randomParams)) {
+    // Randomize base params
+    const base = randomize(BASE_PARAMS)
+    setBaseParams(base.nums)
+    setBaseTextValues(base.texts)
+    for (const [name, value] of Object.entries(base.nums)) {
       engineRef.current?.setUniform(name, value)
     }
+    applyColorParams(BASE_PARAMS, base.texts)
 
-    // Apply random color uniforms
-    for (const param of effectDef.params) {
-      if (param.type === 'color' && randomTextValues[param.uniform]) {
-        const [r, g, b] = hexToRgb(randomTextValues[param.uniform])
-        engineRef.current?.setUniform(`${param.uniform}R`, r)
-        engineRef.current?.setUniform(`${param.uniform}G`, g)
-        engineRef.current?.setUniform(`${param.uniform}B`, b)
-      }
+    // Randomize effect-specific params
+    const fx = randomize(effectDef.params)
+    setParams(fx.nums)
+    setTextValues(fx.texts)
+    for (const [name, value] of Object.entries(fx.nums)) {
+      engineRef.current?.setUniform(name, value)
     }
-  }, [activeEffect])
+    applyColorParams(effectDef.params, fx.texts)
+  }, [activeEffect, applyColorParams])
 
   // Handle reset camera
   const handleResetView = useCallback(() => {
@@ -218,6 +258,22 @@ export default function App3D() {
   const effects = getAllEffects()
   const currentEffect = getEffect(activeEffect)
   const needsTargetModel = currentEffect?.requiresTargetModel
+  const effectParams = currentEffect?.params ?? []
+
+  // Translate param names for rendering
+  const translatedBaseParams = BASE_PARAMS.map(p => {
+    if (p.type === 'select') {
+      return { ...p, name: t(p.name), options: p.options.map(o => ({ ...o, label: t(o.label) })) }
+    }
+    return { ...p, name: t(p.name) }
+  })
+
+  const translatedEffectParams = effectParams.map(p => {
+    if (p.type === 'select') {
+      return { ...p, name: t(p.name), options: p.options.map(o => ({ ...o, label: t(o.label) })) }
+    }
+    return { ...p, name: t(p.name) }
+  })
 
   return (
     <div className="app-3d">
@@ -240,23 +296,6 @@ export default function App3D() {
           />
         )}
 
-        {currentEffect && activeEffect !== 'none' && (
-          <ParamPanel
-            title={t(currentEffect.label)}
-            description={t(currentEffect.description)}
-            params={currentEffect.params.map(p => {
-              if (p.type === 'select') {
-                return { ...p, name: t(p.name), options: p.options.map(o => ({ ...o, label: t(o.label) })) }
-              }
-              return { ...p, name: t(p.name) }
-            })}
-            values={params}
-            textValues={textValues}
-            onChange={handleParamChange}
-            onTextChange={handleTextChange}
-          />
-        )}
-
         {error && (
           <div className="error-message">
             {error}
@@ -267,6 +306,34 @@ export default function App3D() {
 
       <div className="app-3d-main">
         <canvas ref={canvasRef} className="canvas-3d" />
+
+        {/* Base params — always visible draggable panel */}
+        {activeEffect !== 'none' && (
+          <ParamPanel
+            title={t('app3d.particleEffect')}
+            description=""
+            params={translatedBaseParams}
+            values={baseParams}
+            textValues={baseTextValues}
+            onChange={handleBaseParamChange}
+            onTextChange={handleBaseTextChange}
+            defaultPos={{ x: 345, y: 35 }}
+          />
+        )}
+
+        {/* Effect-specific params — floating panel */}
+        {currentEffect && activeEffect !== 'none' && effectParams.length > 0 && (
+          <ParamPanel
+            title={t(currentEffect.label)}
+            description={t(currentEffect.description)}
+            params={translatedEffectParams}
+            values={params}
+            textValues={textValues}
+            onChange={handleParamChange}
+            onTextChange={handleTextChange}
+            defaultPos={{ x: 632, y: 35 }}
+          />
+        )}
 
         <ActionBar3D
           onRandom={handleRandom}

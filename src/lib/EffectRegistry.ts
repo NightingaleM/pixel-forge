@@ -1,4 +1,22 @@
-import type { EffectDef, EffectId } from '../types'
+import type { EffectDef, EffectId, ParamDef } from '../types'
+
+// ---------------------------------------------------------------------------
+// Shared base params — always visible for every particle effect
+// ---------------------------------------------------------------------------
+export const BASE_PARAMS: ParamDef[] = [
+  { name: 'base.baseSize', uniform: 'uBaseSize', min: 0.005, max: 0.05, step: 0.001, default: 0.02 },
+  { type: 'toggle', name: 'base.mouseEnabled', uniform: 'uMouseEnabled', default: 1 },
+  { name: 'base.mouseRadius', uniform: 'uMouseRadius', min: 0.05, max: 0.5, step: 0.01, default: 0.15 },
+  { name: 'base.mouseStrength', uniform: 'uMouseStrength', min: 0.1, max: 2.0, step: 0.01, default: 0.5 },
+  { type: 'toggle', name: 'base.useCustomColor', uniform: 'uUseCustomColor', default: 0 },
+  { type: 'color', name: 'base.particleColor', uniform: 'uColor', default: '#ffffff' },
+  { type: 'select', name: 'base.shapeType', uniform: 'uShapeType', options: [
+    { label: 'base.shapeCircle', value: 0 },
+    { label: 'base.shapeSquare', value: 1 },
+    { label: 'base.shapeDiamond', value: 2 },
+    { label: 'base.shapeGlow', value: 3 },
+  ], default: 0 },
+]
 
 const effects: EffectDef[] = [
   // ---------------------------------------------------------------------------
@@ -24,20 +42,7 @@ const effects: EffectDef[] = [
     samplingType: 'surface',
     vertexChunk: () => import('../shaders3d/surface.vert.chunk?raw').then(m => m.default),
     fragmentChunk: () => import('../shaders3d/particle_default.frag?raw').then(m => m.default),
-    params: [
-      { name: 'effect.surface.baseSize', uniform: 'uBaseSize', min: 0.005, max: 0.05, step: 0.001, default: 0.02 },
-      { type: 'toggle', name: 'effect.surface.mouseEnabled', uniform: 'uMouseEnabled', default: 1 },
-      { name: 'effect.surface.mouseRadius', uniform: 'uMouseRadius', min: 0.05, max: 0.5, step: 0.01, default: 0.15 },
-      { name: 'effect.surface.mouseStrength', uniform: 'uMouseStrength', min: 0.1, max: 2.0, step: 0.01, default: 0.5 },
-      { type: 'toggle', name: 'effect.surface.useCustomColor', uniform: 'uUseCustomColor', default: 0 },
-      { type: 'color', name: 'effect.surface.particleColor', uniform: 'uColor', default: '#ffffff' },
-      { type: 'select', name: 'effect.surface.shapeType', uniform: 'uShapeType', options: [
-        { label: 'effect.surface.shapeCircle', value: 0 },
-        { label: 'effect.surface.shapeSquare', value: 1 },
-        { label: 'effect.surface.shapeDiamond', value: 2 },
-        { label: 'effect.surface.shapeGlow', value: 3 },
-      ], default: 0 },
-    ],
+    params: [],
   },
 
   // ---------------------------------------------------------------------------
@@ -53,7 +58,6 @@ const effects: EffectDef[] = [
     params: [
       { name: 'effect.explosion.explosionForce', uniform: 'uExplosionForce', min: 0.0, max: 5.0, step: 0.01, default: 2.0 },
       { name: 'effect.explosion.animSpeed', uniform: 'uAnimSpeed', min: 0.1, max: 3.0, step: 0.01, default: 1.0 },
-      { name: 'effect.explosion.baseSize', uniform: 'uBaseSize', min: 0.005, max: 0.05, step: 0.001, default: 0.02 },
     ],
   },
 
@@ -70,7 +74,6 @@ const effects: EffectDef[] = [
     fragmentChunk: () => import('../shaders3d/particle_default.frag?raw').then(m => m.default),
     params: [
       { name: 'effect.morph.speed', uniform: 'uSpeed', min: 0.1, max: 2.0, step: 0.01, default: 0.5 },
-      { name: 'effect.morph.baseSize', uniform: 'uBaseSize', min: 0.005, max: 0.05, step: 0.001, default: 0.02 },
     ],
   },
 
@@ -87,7 +90,6 @@ const effects: EffectDef[] = [
     params: [
       { name: 'effect.vortex.speed', uniform: 'uSpeed', min: 0.0, max: 3.0, step: 0.01, default: 1.0 },
       { name: 'effect.vortex.radius', uniform: 'uRadius', min: 0.5, max: 5.0, step: 0.1, default: 2.0 },
-      { name: 'effect.vortex.baseSize', uniform: 'uBaseSize', min: 0.005, max: 0.05, step: 0.001, default: 0.02 },
     ],
   },
 
@@ -105,7 +107,6 @@ const effects: EffectDef[] = [
       { name: 'effect.density.noiseScale', uniform: 'uNoiseScale', min: 0.1, max: 5.0, step: 0.1, default: 1.0 },
       { name: 'effect.density.noiseSpeed', uniform: 'uNoiseSpeed', min: 0.0, max: 2.0, step: 0.01, default: 0.5 },
       { name: 'effect.density.densityStrength', uniform: 'uDensityStrength', min: 0.0, max: 2.0, step: 0.01, default: 0.5 },
-      { name: 'effect.density.baseSize', uniform: 'uBaseSize', min: 0.005, max: 0.05, step: 0.001, default: 0.02 },
     ],
   },
 ]

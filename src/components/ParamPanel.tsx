@@ -10,15 +10,131 @@ interface ParamPanelProps {
   onChange: (uniform: string, value: number) => void
   onTextChange: (uniform: string, value: string) => void
   onClose?: () => void
+  defaultPos?: { x: number; y: number }
 }
 
 function formatValue(value: number): string {
   return Number.isInteger(value) ? value.toString() : value.toFixed(2)
 }
 
-function ParamPanel({ title, description, params, values, textValues, onChange, onTextChange, onClose }: ParamPanelProps) {
+function renderParam(
+  param: ParamDef,
+  values: Record<string, number>,
+  textValues: Record<string, string>,
+  onChange: (u: string, v: number) => void,
+  onTextChange: (u: string, v: string) => void,
+) {
+  if (param.type === 'text') {
+    return (
+      <div key={param.uniform} className="param-row">
+        <div className="param-header">
+          <span className="param-label">
+            {param.name}
+            {param.description && (
+              <span className="param-tooltip-wrap">
+                <span className="param-tooltip-icon">?</span>
+                <span className="param-tooltip-text">{param.description}</span>
+              </span>
+            )}
+          </span>
+        </div>
+        <input
+          type="text"
+          className="param-text-input"
+          value={textValues[param.uniform] ?? param.textDefault}
+          onInput={(e: React.FormEvent<HTMLInputElement>) => {
+            onTextChange(param.uniform, (e.target as HTMLInputElement).value)
+          }}
+        />
+      </div>
+    )
+  }
+
+  if (param.type === 'toggle') {
+    return (
+      <div key={param.uniform} className="param-row">
+        <label className="param-toggle">
+          <input
+            type="checkbox"
+            checked={(values[param.uniform] ?? param.default) === 1}
+            onChange={(e) => onChange(param.uniform, e.target.checked ? 1 : 0)}
+          />
+          <span className="param-label">{param.name}</span>
+        </label>
+      </div>
+    )
+  }
+
+  if (param.type === 'color') {
+    return (
+      <div key={param.uniform} className="param-row">
+        <div className="param-header">
+          <span className="param-label">{param.name}</span>
+        </div>
+        <input
+          type="color"
+          className="param-color-input"
+          value={textValues[param.uniform] ?? param.default}
+          onInput={(e: React.FormEvent<HTMLInputElement>) => {
+            onTextChange(param.uniform, (e.target as HTMLInputElement).value)
+          }}
+        />
+      </div>
+    )
+  }
+
+  if (param.type === 'select') {
+    return (
+      <div key={param.uniform} className="param-row">
+        <div className="param-header">
+          <span className="param-label">{param.name}</span>
+        </div>
+        <select
+          className="param-select"
+          value={values[param.uniform] ?? param.default}
+          onChange={(e) => onChange(param.uniform, parseFloat(e.target.value))}
+        >
+          {param.options.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+      </div>
+    )
+  }
+
+  // Default: number slider
+  return (
+    <div key={param.uniform} className="param-row">
+      <div className="param-header">
+        <span className="param-label">
+          {param.name}
+          {param.description && (
+            <span className="param-tooltip-wrap">
+              <span className="param-tooltip-icon">?</span>
+              <span className="param-tooltip-text">{param.description}</span>
+            </span>
+          )}
+        </span>
+        <span className="param-value">{formatValue(values[param.uniform] ?? param.default)}</span>
+      </div>
+      <input
+        type="range"
+        className="param-slider"
+        min={param.min}
+        max={param.max}
+        step={param.step}
+        value={values[param.uniform] ?? param.default}
+        onInput={(e: React.FormEvent<HTMLInputElement>) => {
+          onChange(param.uniform, parseFloat((e.target as HTMLInputElement).value))
+        }}
+      />
+    </div>
+  )
+}
+
+function ParamPanel({ title, description, params, values, textValues, onChange, onTextChange, onClose, defaultPos }: ParamPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null)
-  const [pos, setPos] = useState({ x: 345, y: 35 })
+  const [pos, setPos] = useState(defaultPos ?? { x: typeof window !== 'undefined' ? window.innerWidth - 320 : 600, y: 35 })
   const dragging = useRef(false)
   const offset = useRef({ x: 0, y: 0 })
 
@@ -58,114 +174,7 @@ function ParamPanel({ title, description, params, values, textValues, onChange, 
         <div className="param-panel-desc">{description}</div>
       </div>
       <div className="param-panel-body">
-      {params.map((param) => {
-        if (param.type === 'text') {
-          return (
-            <div key={param.uniform} className="param-row">
-              <div className="param-header">
-                <span className="param-label">
-                  {param.name}
-                  {param.description && (
-                    <span className="param-tooltip-wrap">
-                      <span className="param-tooltip-icon">?</span>
-                      <span className="param-tooltip-text">{param.description}</span>
-                    </span>
-                  )}
-                </span>
-              </div>
-              <input
-                type="text"
-                className="param-text-input"
-                value={textValues[param.uniform] ?? param.textDefault}
-                onInput={(e: React.FormEvent<HTMLInputElement>) => {
-                  onTextChange(param.uniform, (e.target as HTMLInputElement).value)
-                }}
-              />
-            </div>
-          )
-        }
-
-        if (param.type === 'toggle') {
-          return (
-            <div key={param.uniform} className="param-row">
-              <label className="param-toggle">
-                <input
-                  type="checkbox"
-                  checked={(values[param.uniform] ?? param.default) === 1}
-                  onChange={(e) => onChange(param.uniform, e.target.checked ? 1 : 0)}
-                />
-                <span className="param-label">{param.name}</span>
-              </label>
-            </div>
-          )
-        }
-
-        if (param.type === 'color') {
-          return (
-            <div key={param.uniform} className="param-row">
-              <div className="param-header">
-                <span className="param-label">{param.name}</span>
-              </div>
-              <input
-                type="color"
-                className="param-color-input"
-                value={textValues[param.uniform] ?? param.default}
-                onInput={(e: React.FormEvent<HTMLInputElement>) => {
-                  onTextChange(param.uniform, (e.target as HTMLInputElement).value)
-                }}
-              />
-            </div>
-          )
-        }
-
-        if (param.type === 'select') {
-          return (
-            <div key={param.uniform} className="param-row">
-              <div className="param-header">
-                <span className="param-label">{param.name}</span>
-              </div>
-              <select
-                className="param-select"
-                value={values[param.uniform] ?? param.default}
-                onChange={(e) => onChange(param.uniform, parseFloat(e.target.value))}
-              >
-                {param.options.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
-            </div>
-          )
-        }
-
-        // Default: number slider
-        return (
-          <div key={param.uniform} className="param-row">
-            <div className="param-header">
-              <span className="param-label">
-                {param.name}
-                {param.description && (
-                  <span className="param-tooltip-wrap">
-                    <span className="param-tooltip-icon">?</span>
-                    <span className="param-tooltip-text">{param.description}</span>
-                  </span>
-                )}
-              </span>
-              <span className="param-value">{formatValue(values[param.uniform] ?? param.default)}</span>
-            </div>
-            <input
-              type="range"
-              className="param-slider"
-              min={param.min}
-              max={param.max}
-              step={param.step}
-              value={values[param.uniform] ?? param.default}
-              onInput={(e: React.FormEvent<HTMLInputElement>) => {
-                onChange(param.uniform, parseFloat((e.target as HTMLInputElement).value))
-              }}
-            />
-          </div>
-        )
-      })}
+        {params.map((p) => renderParam(p, values, textValues, onChange, onTextChange))}
       </div>
     </div>
   )

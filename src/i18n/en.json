@@ -228,6 +228,19 @@
       "angleDesc": "Overall grid rotation angle"
     }
   },
+  "base": {
+    "baseSize": "Particle Size",
+    "mouseEnabled": "Enable Mouse Repulsion",
+    "mouseRadius": "Mouse Influence Range",
+    "mouseStrength": "Mouse Repulsion Strength",
+    "useCustomColor": "Custom Color",
+    "particleColor": "Particle Color",
+    "shapeType": "Particle Shape",
+    "shapeCircle": "Circle",
+    "shapeSquare": "Square",
+    "shapeDiamond": "Diamond",
+    "shapeGlow": "Glow"
+  },
   "effect": {
     "none": {
       "label": "Normal",
@@ -235,46 +248,31 @@
     },
     "surface": {
       "label": "Surface Particles",
-      "desc": "Particles rest on the model surface, basic particle visualization",
-      "baseSize": "Particle Size",
-      "mouseEnabled": "Enable Mouse Repulsion",
-      "mouseRadius": "Mouse Influence Range",
-      "mouseStrength": "Mouse Repulsion Strength",
-      "useCustomColor": "Custom Color",
-      "particleColor": "Particle Color",
-      "shapeType": "Particle Shape",
-      "shapeCircle": "Circle",
-      "shapeSquare": "Square",
-      "shapeDiamond": "Diamond",
-      "shapeGlow": "Glow"
+      "desc": "Particles rest on the model surface, basic particle visualization"
     },
     "explosion": {
       "label": "Explosion",
       "desc": "Particles scatter from the model surface and return",
       "explosionForce": "Explosion Force",
-      "animSpeed": "Animation Speed",
-      "baseSize": "Particle Size"
+      "animSpeed": "Animation Speed"
     },
     "morph": {
       "label": "Morph",
       "desc": "Smooth shape transition between two models",
-      "speed": "Transition Speed",
-      "baseSize": "Particle Size"
+      "speed": "Transition Speed"
     },
     "vortex": {
       "label": "Vortex",
       "desc": "Particles orbit around the model forming a vortex",
       "speed": "Rotation Speed",
-      "radius": "Rotation Radius",
-      "baseSize": "Particle Size"
+      "radius": "Rotation Radius"
     },
     "density": {
       "label": "Density",
       "desc": "Particles fill the model volume, showing density variation",
       "noiseScale": "Noise Scale",
       "noiseSpeed": "Noise Speed",
-      "densityStrength": "Density Strength",
-      "baseSize": "Particle Size"
+      "densityStrength": "Density Strength"
     }
   }
 }

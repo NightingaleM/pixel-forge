@@ -228,6 +228,19 @@
       "angleDesc": "网格整体旋转角度"
     }
   },
+  "base": {
+    "baseSize": "粒子大小",
+    "mouseEnabled": "启用鼠标排斥",
+    "mouseRadius": "鼠标影响范围",
+    "mouseStrength": "鼠标排斥力度",
+    "useCustomColor": "自定义颜色",
+    "particleColor": "粒子颜色",
+    "shapeType": "粒子形状",
+    "shapeCircle": "圆形",
+    "shapeSquare": "方形",
+    "shapeDiamond": "菱形",
+    "shapeGlow": "光晕"
+  },
   "effect": {
     "none": {
       "label": "正常显示",
@@ -235,46 +248,31 @@
     },
     "surface": {
       "label": "表面粒子",
-      "desc": "粒子静止在模型表面，基础粒子可视化效果",
-      "baseSize": "粒子大小",
-      "mouseEnabled": "启用鼠标排斥",
-      "mouseRadius": "鼠标影响范围",
-      "mouseStrength": "鼠标排斥力度",
-      "useCustomColor": "自定义颜色",
-      "particleColor": "粒子颜色",
-      "shapeType": "粒子形状",
-      "shapeCircle": "圆形",
-      "shapeSquare": "方形",
-      "shapeDiamond": "菱形",
-      "shapeGlow": "光晕"
+      "desc": "粒子静止在模型表面，基础粒子可视化效果"
     },
     "explosion": {
       "label": "爆散聚合",
       "desc": "粒子从模型表面散射出去再回收",
       "explosionForce": "爆炸力度",
-      "animSpeed": "动画速度",
-      "baseSize": "粒子大小"
+      "animSpeed": "动画速度"
     },
     "morph": {
       "label": "形状变换",
       "desc": "两个模型之间的平滑形状过渡",
-      "speed": "变换速度",
-      "baseSize": "粒子大小"
+      "speed": "变换速度"
     },
     "vortex": {
       "label": "旋转涡流",
       "desc": "粒子围绕模型旋转并形成涡流",
       "speed": "旋转速度",
-      "radius": "旋转半径",
-      "baseSize": "粒子大小"
+      "radius": "旋转半径"
     },
     "density": {
       "label": "密度模拟",
       "desc": "粒子填充模型体积，呈现密度变化",
       "noiseScale": "噪声缩放",
       "noiseSpeed": "噪声速度",
-      "densityStrength": "密度强度",
-      "baseSize": "粒子大小"
+      "densityStrength": "密度强度"
     }
   }
 }
