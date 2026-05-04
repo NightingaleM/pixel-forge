@@ -41,7 +41,9 @@
     "vertices": "Vertices:",
     "faces": "Faces:",
     "processing": "Processing...",
-    "particleEffect": "Particle Effects"
+    "particleEffect": "Particle Effects",
+    "customCount": "Custom...",
+    "backToPreset": "Back to preset"
   },
   "compare": {
     "closeImage": "Close image",

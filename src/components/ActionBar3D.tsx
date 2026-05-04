@@ -1,3 +1,4 @@
+import { useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { ModelInfo } from '../types'
 
@@ -11,13 +12,23 @@ interface ActionBar3DProps {
   isParticleMode?: boolean
 }
 
-const PARTICLE_COUNTS = [1000, 10000, 50000, 100000, 200000, 300000, 500000]
+const PARTICLE_COUNTS = [
+  1000, 10000, 50000, 100000, 200000, 300000, 500000,
+  1000000, 5000000, 10000000,
+]
+
+const MIN_COUNT = 500
+const MAX_COUNT = 50000000
 
 function formatCount(count: number): string {
-  if (count >= 1000) {
-    return `${(count / 1000).toFixed(0)}k`
-  }
+  if (count >= 1000000 && count % 1000000 === 0) return `${count / 1000000}M`
+  if (count >= 1000000) return `${(count / 1000000).toFixed(1)}M`
+  if (count >= 1000) return `${(count / 1000).toFixed(0)}k`
   return count.toString()
+}
+
+function clampCount(v: number): number {
+  return Math.min(MAX_COUNT, Math.max(MIN_COUNT, v))
 }
 
 export default function ActionBar3D({
@@ -30,6 +41,37 @@ export default function ActionBar3D({
   isParticleMode = true,
 }: ActionBar3DProps) {
   const { t } = useTranslation()
+  const isPreset = PARTICLE_COUNTS.includes(particleCount)
+
+  const [customMode, setCustomMode] = useState(!isPreset)
+  const [inputValue, setInputValue] = useState(
+    isPreset ? '' : String(particleCount),
+  )
+
+  const switchToPreset = useCallback(() => {
+    setCustomMode(false)
+    setInputValue('')
+  }, [])
+
+  const switchToCustom = useCallback(() => {
+    setCustomMode(true)
+  }, [])
+
+  const applyCustom = useCallback(() => {
+    const raw = parseInt(inputValue, 10)
+    if (!isNaN(raw)) {
+      const clamped = clampCount(raw)
+      onParticleCountChange(clamped)
+      setInputValue(String(clamped))
+    }
+  }, [inputValue, onParticleCountChange])
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === 'Enter') applyCustom()
+    },
+    [applyCustom],
+  )
 
   return (
     <div className="action-bar-3d">
@@ -45,18 +87,52 @@ export default function ActionBar3D({
       {isParticleMode && (
         <div className="particle-count-control">
           <label className="particle-count-label">{t('app3d.particleCount')}</label>
-          <select
-            className="particle-count-select"
-            value={particleCount}
-            onChange={(e) => onParticleCountChange(Number(e.target.value))}
-            disabled={isLoading}
-          >
-            {PARTICLE_COUNTS.map((count) => (
-              <option key={count} value={count}>
-                {formatCount(count)}
-              </option>
-            ))}
-          </select>
+
+          {customMode ? (
+            <input
+              className="particle-count-input"
+              type="number"
+              min={MIN_COUNT}
+              max={MAX_COUNT}
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onBlur={applyCustom}
+              onKeyDown={handleKeyDown}
+              disabled={isLoading}
+              placeholder="500–50M"
+            />
+          ) : (
+            <select
+              className="particle-count-select"
+              value={isPreset ? particleCount : ''}
+              onChange={(e) => {
+                if (e.target.value === '__custom__') {
+                  switchToCustom()
+                } else {
+                  onParticleCountChange(Number(e.target.value))
+                }
+              }}
+              disabled={isLoading}
+            >
+              {PARTICLE_COUNTS.map((count) => (
+                <option key={count} value={count}>
+                  {formatCount(count)}
+                </option>
+              ))}
+              <option value="__custom__">{t('app3d.customCount')}</option>
+            </select>
+          )}
+
+          {customMode && (
+            <button
+              className="particle-count-back-btn"
+              onClick={switchToPreset}
+              disabled={isLoading}
+              title={t('app3d.backToPreset')}
+            >
+              ✕
+            </button>
+          )}
         </div>
       )}
 

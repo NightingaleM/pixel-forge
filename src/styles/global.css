@@ -885,12 +885,48 @@ body {
   width: max-content;
 }
 
-.particle-count-select {
+.particle-count-select,
+.particle-count-input {
   padding: 4px 8px;
   border: 1px solid #000;
   background: #fff;
   font-size: 13px;
   cursor: pointer;
+}
+
+.particle-count-input {
+  width: 90px;
+  outline: none;
+}
+
+.particle-count-input:focus {
+  border-color: #4a90d9;
+  box-shadow: 0 0 0 2px rgba(74, 144, 217, 0.25);
+}
+
+/* hide number spinners */
+.particle-count-input::-webkit-inner-spin-button,
+.particle-count-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.particle-count-input {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.particle-count-back-btn {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 14px;
+  color: #999;
+  padding: 2px 4px;
+  line-height: 1;
+}
+
+.particle-count-back-btn:hover {
+  color: #333;
 }
 
 .model-info-display {
