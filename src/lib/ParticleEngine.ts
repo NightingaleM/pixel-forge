@@ -41,6 +41,8 @@ export class ParticleEngine {
   private velocityData: Float32Array | null = null        // per-particle spring velocity
   private tempMVP = new THREE.Matrix4()
   private tempInvMVP = new THREE.Matrix4()
+  private _sdfOrigin = new THREE.Vector3(-0.5, -0.5, -0.5)
+  private _sdfScale = new THREE.Vector3(2, 2, 2)
 
   // Shader material management
   currentMaterial: THREE.Material | null = null
@@ -51,6 +53,9 @@ export class ParticleEngine {
   modelInfo: ModelInfo | null = null
   targetGeometry: THREE.BufferGeometry | null = null  // For morph effects
   originalMesh: THREE.Object3D | null = null  // Raw model for "none" effect
+
+  // SDF texture for density boundary constraint
+  sdfTexture: THREE.Data3DTexture | null = null
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas
@@ -579,6 +584,7 @@ export class ParticleEngine {
         if (data.type === 'complete') {
           console.log(`[ParticleEngine] volumetric voxel grid (worker): ${data.timing.toFixed(1)}ms`)
           const insideVoxels = data.insideVoxels as Int32Array
+          const sdfData = data.sdfData as Float32Array | undefined
           worker.terminate()
 
           if (insideVoxels.length === 0) {
@@ -587,11 +593,34 @@ export class ParticleEngine {
             return
           }
 
+          // Create SDF 3D texture (guard against missing data from older worker)
+          if (this.sdfTexture) this.sdfTexture.dispose()
+          if (sdfData && sdfData.length > 0) {
+            this.sdfTexture = new THREE.Data3DTexture(sdfData, 32, 32, 32)
+          this.sdfTexture.format = THREE.RedFormat
+          this.sdfTexture.type = THREE.FloatType
+          this.sdfTexture.minFilter = THREE.LinearFilter
+          this.sdfTexture.magFilter = THREE.LinearFilter
+          this.sdfTexture.wrapS = THREE.ClampToEdgeWrapping
+          this.sdfTexture.wrapT = THREE.ClampToEdgeWrapping
+          this.sdfTexture.wrapR = THREE.ClampToEdgeWrapping
+          this.sdfTexture.needsUpdate = true
+          }
+
+          // Store SDF coordinate mapping (bbox min + 1/size)
           const res = 32
           const cellX = size.x / res
           const cellY = size.y / res
           const cellZ = size.z / res
           const halfRes = res * 0.5
+
+          this._sdfOrigin = new THREE.Vector3(
+            center.x - halfRes * cellX,
+            center.y - halfRes * cellY,
+            center.z - halfRes * cellZ,
+          )
+          this._sdfScale = new THREE.Vector3(1 / size.x, 1 / size.y, 1 / size.z)
+
           const voxelCount = insideVoxels.length / 3
           const color = new THREE.Color()
 
@@ -680,6 +709,17 @@ export class ParticleEngine {
       })
 
       console.log('Built uniforms:', uniforms)
+
+      // Add SDF texture + coordinate uniforms for density effect
+      // (dispose on non-density to prevent GPU memory leak)
+      if (effectDef.id === 'density' && this.sdfTexture) {
+        uniforms.uSDFTexture = { value: this.sdfTexture }
+        uniforms.uSDFOrigin = { value: this._sdfOrigin }
+        uniforms.uSDFScale = { value: this._sdfScale }
+      } else if (effectDef.id !== 'density' && this.sdfTexture) {
+        this.sdfTexture.dispose()
+        this.sdfTexture = null
+      }
 
       // Add target position uniform for morph effect
       if (effectDef.id === 'morph' && this.particles?.geometry.hasAttribute('aTargetPosition')) {
@@ -1075,6 +1115,12 @@ export class ParticleEngine {
     if (this.previousMaterial) {
       this.previousMaterial.dispose()
       this.previousMaterial = null
+    }
+
+    // Dispose SDF texture
+    if (this.sdfTexture) {
+      this.sdfTexture.dispose()
+      this.sdfTexture = null
     }
 
     // Dispose controls
