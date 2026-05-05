@@ -43,6 +43,8 @@ export class ParticleEngine {
   private tempInvMVP = new THREE.Matrix4()
   private _sdfOrigin = new THREE.Vector3(-0.5, -0.5, -0.5)
   private _sdfScale = new THREE.Vector3(2, 2, 2)
+  private _activeWorker: Worker | null = null
+  private _samplingReject: ((reason: unknown) => void) | null = null
 
   // Shader material management
   currentMaterial: THREE.Material | null = null
@@ -776,6 +778,8 @@ export class ParticleEngine {
     return new Promise((resolve, reject) => {
       if (!this.modelGeometry) { resolve(); return }
 
+      this._samplingReject = reject
+
       const boundingBox = this.modelGeometry.boundingBox!
       const size = new THREE.Vector3()
       boundingBox.getSize(size)
@@ -792,6 +796,7 @@ export class ParticleEngine {
         new URL('./volumetricSampler.worker.ts', import.meta.url),
         { type: 'module' },
       )
+      this._activeWorker = worker
 
       worker.onmessage = (e: MessageEvent) => {
         const data = e.data
@@ -805,6 +810,8 @@ export class ParticleEngine {
           const insideVoxels = data.insideVoxels as Int32Array
           const sdfData = data.sdfData as Float32Array | undefined
           worker.terminate()
+          this._activeWorker = null
+          this._samplingReject = null
 
           if (insideVoxels.length === 0) {
             console.warn('No inside voxels found in volumetric mode')
@@ -872,6 +879,8 @@ export class ParticleEngine {
 
       worker.onerror = (err) => {
         worker.terminate()
+        this._activeWorker = null
+        this._samplingReject = null
         reject(err)
       }
 
@@ -883,6 +892,17 @@ export class ParticleEngine {
         resolution: 32,
       }, [positionsArray.buffer, ...(indicesArray ? [indicesArray.buffer] : [])])
     })
+  }
+
+  cancelSampling(): void {
+    if (this._activeWorker) {
+      this._activeWorker.terminate()
+      this._activeWorker = null
+    }
+    if (this._samplingReject) {
+      this._samplingReject(new DOMException('Aborted', 'AbortError'))
+      this._samplingReject = null
+    }
   }
 
   /**
