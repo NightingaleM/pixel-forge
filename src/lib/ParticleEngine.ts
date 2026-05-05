@@ -329,9 +329,12 @@ export class ParticleEngine {
     const maxDim = Math.max(size.x, size.y, size.z)
     const scale = 1.0 / maxDim
 
-    // Create transformation matrix
+    // Build S * T so translation is also scaled:
+    //   result = (vertex - center) * scale
+    // Matrix4.scale() only scales the upper-left 3×3, leaving the
+    // translation column untouched, so we must pre-multiply center by scale.
     const matrix = new THREE.Matrix4()
-    matrix.makeTranslation(-center.x, -center.y, -center.z)
+    matrix.makeTranslation(-center.x * scale, -center.y * scale, -center.z * scale)
     matrix.scale(new THREE.Vector3(scale, scale, scale))
 
     // Apply transformation to position attribute
@@ -458,9 +461,7 @@ export class ParticleEngine {
     this.scene.add(this.particles)
 
     geometry.computeBoundingSphere()
-    if (geometry.boundingSphere) {
-      this.controls.target.copy(geometry.boundingSphere.center)
-    }
+    this.controls.target.set(0, 0, 0)
   }
 
   /**
@@ -847,20 +848,14 @@ export class ParticleEngine {
    * Reset camera to default position
    */
   resetCamera(): void {
-    // Use the actual particle center as the reset target,
-    // not the hard-coded (0,0,0) which may differ from the
-    // bounding-sphere center set by sampleParticles().
-    const target = new THREE.Vector3(0, 0, 0)
-    if (this.particles) {
-      const geo = this.particles.geometry
-      geo.computeBoundingSphere()
-      if (geo.boundingSphere) {
-        target.copy(geo.boundingSphere.center)
-      }
-    }
-    this.controls.target.copy(target)
-    this.camera.position.set(target.x, target.y, target.z + 3)
-    this.camera.lookAt(target)
+    // All models are normalized to center at origin (0,0,0) and all
+    // effects (vortex, explosion, morph, density) operate relative to
+    // origin.  Using boundingSphere.center can drift away from origin
+    // due to mouse displacement or asymmetric sampling, causing the
+    // camera target to misalign with the effect center.
+    this.controls.target.set(0, 0, 0)
+    this.camera.position.set(0, 0, 3)
+    this.camera.lookAt(0, 0, 0)
     this.controls.update()
   }
 
