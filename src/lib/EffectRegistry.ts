@@ -107,6 +107,8 @@ const effects: EffectDef[] = [
       { name: 'effect.density.noiseScale', uniform: 'uNoiseScale', min: 0.1, max: 5.0, step: 0.1, default: 1.0 },
       { name: 'effect.density.noiseSpeed', uniform: 'uNoiseSpeed', min: 0.0, max: 2.0, step: 0.01, default: 0.5 },
       { name: 'effect.density.densityStrength', uniform: 'uDensityStrength', min: 0.0, max: 2.0, step: 0.01, default: 0.5 },
+      { name: 'effect.density.sdfMargin', uniform: 'uSDFMargin', min: 0.0, max: 0.05, step: 0.005, default: 0.01 },
+      { name: 'effect.density.bounceStrength', uniform: 'uBounceStrength', min: 0.0, max: 1.0, step: 0.05, default: 0.8 },
     ],
   },
 ]

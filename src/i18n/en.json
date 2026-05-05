@@ -273,7 +273,9 @@
       "desc": "Particles fill the model volume, showing density variation",
       "noiseScale": "Noise Scale",
       "noiseSpeed": "Noise Speed",
-      "densityStrength": "Density Strength"
+      "densityStrength": "Density Strength",
+      "sdfMargin": "SDF Margin",
+      "bounceStrength": "Bounce Strength"
     }
   }
 }

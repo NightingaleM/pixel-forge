@@ -273,7 +273,9 @@
       "desc": "粒子填充模型体积，呈现密度变化",
       "noiseScale": "噪声缩放",
       "noiseSpeed": "噪声速度",
-      "densityStrength": "密度强度"
+      "densityStrength": "密度强度",
+      "sdfMargin": "边界距离",
+      "bounceStrength": "反弹强度"
     }
   }
 }
