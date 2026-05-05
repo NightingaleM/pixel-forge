@@ -1,3 +1,8 @@
+// SDF boundary uniforms (declared here — not float, so not in EFFECT_UNIFORMS)
+uniform sampler3D uSDFTexture;
+uniform vec3 uSDFOrigin;
+uniform vec3 uSDFScale;
+
 // Simple noise function
 float hash(vec3 p) {
   p = fract(p * 0.3183099 + 0.1);
@@ -21,7 +26,7 @@ vec3 effectTransform(vec3 position, vec3 normal, float random, float time) {
   float n = noise(position * uNoiseScale + time * uNoiseSpeed);
   float displacement = (n - 0.5) * uDensityStrength;
 
-  // Use deterministic pseudo-random direction based on particle's random seed
+  // Deterministic pseudo-random direction based on particle's random seed
   float angle1 = random * 6.2831853;
   float angle2 = fract(random * 7.31 + 0.5) * 6.2831853;
   vec3 dir = vec3(
@@ -30,7 +35,44 @@ vec3 effectTransform(vec3 position, vec3 normal, float random, float time) {
     cos(angle2)
   );
 
-  return position + dir * displacement;
+  vec3 tempPos = position + dir * displacement;
+
+  // --- SDF boundary constraint ---
+  vec3 sdfCoord = (tempPos - uSDFOrigin) * uSDFScale;
+  float d = texture(uSDFTexture, sdfCoord).r;
+
+  if (d < uSDFMargin) {
+    // Compute gradient (surface normal) via 6-tap central differences
+    float eps = 0.5 / 32.0; // half voxel in texture space
+    vec3 gradRaw = vec3(
+      texture(uSDFTexture, sdfCoord + vec3(eps, 0.0, 0.0)).r
+        - texture(uSDFTexture, sdfCoord - vec3(eps, 0.0, 0.0)).r,
+      texture(uSDFTexture, sdfCoord + vec3(0.0, eps, 0.0)).r
+        - texture(uSDFTexture, sdfCoord - vec3(0.0, eps, 0.0)).r,
+      texture(uSDFTexture, sdfCoord + vec3(0.0, 0.0, eps)).r
+        - texture(uSDFTexture, sdfCoord - vec3(0.0, 0.0, eps)).r
+    );
+    float gradLen = length(gradRaw);
+    if (gradLen > 1e-6) {
+      vec3 grad = gradRaw / gradLen;
+
+      // Reflect displacement off gradient normal
+      vec3 reflDir = reflect(dir, grad);
+      tempPos = position + reflDir * abs(displacement) * uBounceStrength;
+
+      // If still outside after reflection, clamp to surface inner side
+      vec3 clampCoord = (tempPos - uSDFOrigin) * uSDFScale;
+      float clampD = texture(uSDFTexture, clampCoord).r;
+      if (clampD < uSDFMargin) {
+        tempPos += grad * (uSDFMargin - clampD + 0.001);
+      }
+    } else {
+      // Zero gradient — just push particle inward by the violation amount
+      tempPos += normalize(position) * (uSDFMargin - d + 0.001);
+    }
+  }
+
+  return tempPos;
 }
 
 float effectSize(float baseSize, float random, float time) {
