@@ -70,6 +70,13 @@
     "screenshot": "Screenshot",
     "startRecording": "Record",
     "stopRecording": "Stop",
+    "gradientEditor": "Gradient",
+    "addColorStop": "Add Color",
+    "gradientMode": {
+      "height": "Height",
+      "radial": "Radial",
+      "random": "Random"
+    },
     "customCount": "Custom...",
     "backToPreset": "Back to preset"
   },

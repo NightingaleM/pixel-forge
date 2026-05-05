@@ -929,6 +929,53 @@ body {
   50% { opacity: 0.6; }
 }
 
+/* Gradient editor */
+.gradient-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.gradient-preview {
+  height: 20px;
+  border-radius: 4px;
+  border: 1px solid #333;
+}
+.gradient-stop-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.gradient-stop-color {
+  width: 28px !important;
+  height: 28px !important;
+  padding: 0 !important;
+  flex-shrink: 0;
+}
+.gradient-stop-row .param-slider {
+  flex: 1;
+}
+.gradient-stop-row .param-value {
+  width: 36px;
+  font-size: 11px;
+  color: #aaa;
+}
+.gradient-stop-remove {
+  background: none;
+  border: none;
+  color: #c0392b;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 0 2px;
+}
+.gradient-stop-remove:hover {
+  color: #e74c3c;
+}
+.gradient-modes {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+
 .particle-count-control {
   display: flex;
   align-items: center;

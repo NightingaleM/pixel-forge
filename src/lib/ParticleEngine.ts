@@ -204,6 +204,7 @@ export class ParticleEngine {
   private mediaRecorder: MediaRecorder | null = null
   private recordedChunks: Blob[] = []
   private _isRecording = false
+  private gradientTexture: THREE.DataTexture | null = null
 
   get isRecording(): boolean {
     return this._isRecording
@@ -250,6 +251,75 @@ export class ParticleEngine {
       }
       this.mediaRecorder.stop()
     })
+  }
+
+  updateGradient(config: { stops: { color: string; position: number }[]; mode: string }): void {
+    const size = 256
+    const data = new Uint8Array(size * 4)
+    const stops = [...config.stops].sort((a, b) => a.position - b.position)
+
+    for (let i = 0; i < size; i++) {
+      const t = i / (size - 1)
+      let lower = stops[0], upper = stops[stops.length - 1]
+      for (let s = 0; s < stops.length - 1; s++) {
+        if (t >= stops[s].position && t <= stops[s + 1].position) {
+          lower = stops[s]
+          upper = stops[s + 1]
+          break
+        }
+      }
+      const range = upper.position - lower.position
+      const localT = range > 0 ? (t - lower.position) / range : 0
+      const cLower = new THREE.Color(lower.color)
+      const cUpper = new THREE.Color(upper.color)
+      const c = cLower.clone().lerp(cUpper, localT)
+      data[i * 4] = Math.round(c.r * 255)
+      data[i * 4 + 1] = Math.round(c.g * 255)
+      data[i * 4 + 2] = Math.round(c.b * 255)
+      data[i * 4 + 3] = 255
+    }
+
+    if (this.gradientTexture) this.gradientTexture.dispose()
+    this.gradientTexture = new THREE.DataTexture(data, size, 1, THREE.RGBAFormat)
+    this.gradientTexture.minFilter = THREE.LinearFilter
+    this.gradientTexture.magFilter = THREE.LinearFilter
+    this.gradientTexture.needsUpdate = true
+
+    if (this.currentMaterial && this.currentMaterial instanceof THREE.ShaderMaterial) {
+      const u = this.currentMaterial.uniforms
+      u.uGradientMap.value = this.gradientTexture
+      u.uGradientMode.value = config.mode === 'height' ? 0 : config.mode === 'radial' ? 1 : 2
+      u.uNumColorStops.value = config.stops.length
+    }
+
+    this.updateGradientBounds()
+  }
+
+  private updateGradientBounds(): void {
+    if (!this.currentMaterial || !(this.currentMaterial instanceof THREE.ShaderMaterial)) return
+    if (!this.originalPositions) return
+    const positions = this.originalPositions
+    let minY = Infinity, maxY = -Infinity
+    let cx = 0, cy = 0, cz = 0
+    const count = positions.length / 3
+    for (let i = 0; i < positions.length; i += 3) {
+      const x = positions[i], y = positions[i + 1], z = positions[i + 2]
+      if (y < minY) minY = y
+      if (y > maxY) maxY = y
+      cx += x; cy += y; cz += z
+    }
+    cx /= count; cy /= count; cz /= count
+    let maxR = 0
+    for (let i = 0; i < positions.length; i += 3) {
+      const dx = positions[i] - cx, dy = positions[i + 1] - cy, dz = positions[i + 2] - cz
+      const d = Math.sqrt(dx * dx + dy * dy + dz * dz)
+      if (d > maxR) maxR = d
+    }
+    const u = this.currentMaterial.uniforms
+    u.uGradientMinY.value = minY
+    u.uGradientMaxY.value = maxY
+    u.uGradientCenter.value.set(cx, cy, cz)
+    u.uGradientMaxRadius.value = maxR
   }
 
   /**
@@ -838,6 +908,13 @@ export class ParticleEngine {
         uColorG: { value: 1.0 },
         uColorB: { value: 1.0 },
         uShapeType: { value: 0.0 },
+        uGradientMode: { value: -1.0 },
+        uNumColorStops: { value: 2.0 },
+        uGradientMap: { value: null },
+        uGradientMinY: { value: 0.0 },
+        uGradientMaxY: { value: 1.0 },
+        uGradientCenter: { value: new THREE.Vector3() },
+        uGradientMaxRadius: { value: 1.0 },
       }
 
       // Add effect-specific uniforms with default values

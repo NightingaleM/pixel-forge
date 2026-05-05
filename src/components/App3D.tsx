@@ -11,6 +11,8 @@ import ParamPanel from './ParamPanel'
 import BackgroundPanel from './BackgroundPanel'
 import LightingPanel from './LightingPanel'
 import type { LightingState } from './LightingPanel'
+import GradientEditor from './GradientEditor'
+import type { GradientConfig } from '../types'
 
 function hexToRgb(hex: string): [number, number, number] {
   const r = parseInt(hex.slice(1, 3), 16) / 255
@@ -56,6 +58,13 @@ export default function App3D() {
   const [imageParams, setImageParams] = useState({ z: -2, scale: 1, rotation: 0, opacity: 1 })
   const [lightingState, setLightingState] = useState<LightingState>({
     mainIntensity: 0.8, ambientIntensity: 0.6, colorTemp: 0.5, directionIndex: 2, preset: 'daylight',
+  })
+  const [gradientConfig, setGradientConfig] = useState<GradientConfig>({
+    stops: [
+      { color: '#ff6b6b', position: 0 },
+      { color: '#4ecdc4', position: 1 },
+    ],
+    mode: 'height',
   })
   const [isLoading, setIsLoading] = useState(false)
   const [samplingProgress, setSamplingProgress] = useState(-1)  // -1 = not sampling
@@ -105,6 +114,11 @@ export default function App3D() {
     setLightingState(state)
     const { preset, ...params } = state
     engineRef.current?.updateLighting(params)
+  }, [])
+
+  const handleGradientChange = useCallback((config: GradientConfig) => {
+    setGradientConfig(config)
+    engineRef.current?.updateGradient(config)
   }, [])
 
   // Canvas drag interaction for background image
@@ -445,6 +459,13 @@ export default function App3D() {
           state={lightingState}
           onChange={handleLightingChange}
         />
+
+        {baseParams.uUseCustomColor > 0 && activeEffect !== 'none' && (
+          <div className="sidebar-section">
+            <label className="sidebar-label">{t('app3d.gradientEditor')}</label>
+            <GradientEditor config={gradientConfig} onChange={handleGradientChange} />
+          </div>
+        )}
 
         <EffectSelector
           effects={effects}

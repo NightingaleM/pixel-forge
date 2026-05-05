@@ -83,3 +83,13 @@ export interface ModelInfo {
   vertices: number
   faces: number
 }
+
+export interface ColorStop {
+  color: string
+  position: number
+}
+
+export interface GradientConfig {
+  stops: ColorStop[]
+  mode: 'height' | 'radial' | 'random'
+}

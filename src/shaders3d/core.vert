@@ -18,9 +18,19 @@ uniform float uColorR;
 uniform float uColorG;
 uniform float uColorB;
 
+// Gradient color uniforms
+uniform float uGradientMode;
+uniform float uNumColorStops;
+uniform sampler2D uGradientMap;
+uniform float uGradientMinY;
+uniform float uGradientMaxY;
+uniform vec3 uGradientCenter;
+uniform float uGradientMaxRadius;
+
 // Varying
 varying vec3 vColor;
 varying float vAlpha;
+varying float vGradientUV;
 
 // %%EFFECT_UNIFORMS%%
 
@@ -28,12 +38,27 @@ varying float vAlpha;
 
 void main() {
   vColor = aColor;
+  vGradientUV = 0.0;
   if (uUseCustomColor > 0.5) {
     vColor = vec3(uColorR, uColorG, uColorB);
   }
   vAlpha = 1.0;
 
   vec3 transformed = effectTransform(aPosition, aNormal, aRandom, uTime);
+
+  // Gradient UV computation (after transform)
+  if (uUseCustomColor > 0.5 && uGradientMode >= 0.0) {
+    vec3 pos = aPosition;
+    if (uGradientMode < 0.5) {
+      vGradientUV = clamp((pos.y - uGradientMinY) / max(uGradientMaxY - uGradientMinY, 0.001), 0.0, 1.0);
+    } else if (uGradientMode < 1.5) {
+      float dist = distance(pos, uGradientCenter);
+      vGradientUV = clamp(dist / max(uGradientMaxRadius, 0.001), 0.0, 1.0);
+    } else {
+      float bucket = floor(aRandom * max(uNumColorStops, 1.0)) / max(uNumColorStops, 1.0);
+      vGradientUV = clamp(bucket, 0.0, 1.0);
+    }
+  }
 
   vec4 mvPosition = modelViewMatrix * vec4(transformed, 1.0);
   gl_Position = projectionMatrix * mvPosition;

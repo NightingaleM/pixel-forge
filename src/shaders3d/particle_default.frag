@@ -1,7 +1,11 @@
 varying vec3 vColor;
 varying float vAlpha;
+varying float vGradientUV;
 
 uniform float uShapeType;
+uniform float uUseCustomColor;
+uniform float uGradientMode;
+uniform sampler2D uGradientMap;
 
 void main() {
   vec2 uv = gl_PointCoord - vec2(0.5);
@@ -29,5 +33,9 @@ void main() {
     if (alpha < 0.01) discard;
   }
 
-  gl_FragColor = vec4(vColor, alpha * vAlpha);
+  vec3 finalColor = vColor;
+  if (uUseCustomColor > 0.5 && uGradientMode >= 0.0) {
+    finalColor = texture2D(uGradientMap, vec2(vGradientUV, 0.5)).rgb;
+  }
+  gl_FragColor = vec4(finalColor, alpha * vAlpha);
 }

@@ -70,6 +70,13 @@
     "screenshot": "截图",
     "startRecording": "录制",
     "stopRecording": "停止",
+    "gradientEditor": "渐变配色",
+    "addColorStop": "添加颜色",
+    "gradientMode": {
+      "height": "高度",
+      "radial": "径向",
+      "random": "随机"
+    },
     "customCount": "自定义...",
     "backToPreset": "返回预设"
   },
