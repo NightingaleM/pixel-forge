@@ -12,6 +12,7 @@ import BackgroundPanel from './BackgroundPanel'
 import LightingPanel from './LightingPanel'
 import type { LightingState } from './LightingPanel'
 import GradientEditor from './GradientEditor'
+import RecordingControls from './RecordingControls'
 import type { GradientConfig } from '../types'
 
 function hexToRgb(hex: string): [number, number, number] {
@@ -120,6 +121,31 @@ export default function App3D() {
   const handleGradientChange = useCallback((config: GradientConfig) => {
     setGradientConfig(config)
     engineRef.current?.updateGradient(config)
+  }, [])
+
+  // Keyboard shortcuts for screenshot & recording
+  useEffect(() => {
+    const onKeyDown = async (e: KeyboardEvent) => {
+      // Ctrl+Shift+S → screenshot
+      if (e.ctrlKey && e.shiftKey && e.key === 'S') {
+        e.preventDefault()
+        const engine = engineRef.current
+        if (!engine) return
+        const blob = await engine.captureScreenshot()
+        const ts = new Date().toISOString().replace(/[:.]/g, '-')
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url; a.download = `pixelforge_3d_${ts}.png`; a.click()
+        URL.revokeObjectURL(url)
+      }
+      // Ctrl+Shift+R → toggle recording (delegated to RecordingControls via custom event)
+      if (e.ctrlKey && e.shiftKey && e.key === 'R') {
+        e.preventDefault()
+        window.dispatchEvent(new CustomEvent('pixelforge-toggle-recording'))
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
 
   // Canvas drag interaction for background image
@@ -470,7 +496,7 @@ export default function App3D() {
         {/* Background panel — floating draggable */}
         <ParamPanel
           title={t('app3d.backgroundPanelTitle')}
-          defaultPos={{ x: 10, y: 35 }}
+          defaultPos={{ x: 15, y: 870 }}
           defaultCollapsed={false}
         >
           <BackgroundPanel
@@ -489,13 +515,22 @@ export default function App3D() {
         {/* Lighting panel — floating draggable */}
         <ParamPanel
           title={t('app3d.lighting')}
-          defaultPos={{ x: 10, y: 420 }}
+          defaultPos={{ x: 15, y: 680 }}
           defaultCollapsed={true}
         >
           <LightingPanel
             state={lightingState}
             onChange={handleLightingChange}
           />
+        </ParamPanel>
+
+        {/* Recording panel — floating draggable */}
+        <ParamPanel
+          title={t('app3d.recordingPanelTitle')}
+          defaultPos={{ x: 15, y: 480 }}
+          defaultCollapsed={true}
+        >
+          <RecordingControls engineRef={engineRef} />
         </ParamPanel>
 
         {/* Base params — always visible draggable panel */}
@@ -545,7 +580,6 @@ export default function App3D() {
           isLoading={isLoading}
           samplingProgress={samplingProgress}
           isParticleMode={activeEffect !== 'none'}
-          engineRef={engineRef}
         />
       </div>
     </div>

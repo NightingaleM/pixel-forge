@@ -72,6 +72,16 @@
     "screenshot": "Screenshot",
     "startRecording": "Record",
     "stopRecording": "Stop",
+    "recordingPanelTitle": "Capture",
+    "recordFps": "Frame Rate",
+    "videoBitrate": "Bitrate",
+    "bitrate": {
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High",
+      "ultra": "Ultra",
+      "custom": "Custom"
+    },
     "gradientEditor": "Gradient",
     "addColorStop": "Add Color",
     "gradientMode": {

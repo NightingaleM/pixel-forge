@@ -220,13 +220,14 @@ export class ParticleEngine {
     })
   }
 
-  startRecording(): void {
+  startRecording(fps: number = 60, bitrate: number = 20_000_000): void {
     if (this._isRecording) return
-    const stream = this.canvas.captureStream(30)
+    const stream = this.canvas.captureStream(fps)
     this.mediaRecorder = new MediaRecorder(stream, {
       mimeType: MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
         ? 'video/webm;codecs=vp9'
         : 'video/webm',
+      videoBitsPerSecond: bitrate,
     })
     this.recordedChunks = []
     this.mediaRecorder.ondataavailable = (e) => {

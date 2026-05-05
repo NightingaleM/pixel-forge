@@ -950,6 +950,13 @@ body {
   50% { opacity: 0.6; }
 }
 
+.shortcut-hint {
+  float: right;
+  font-size: 10px;
+  color: #888;
+  font-weight: 400;
+}
+
 /* Gradient editor */
 .gradient-editor {
   display: flex;

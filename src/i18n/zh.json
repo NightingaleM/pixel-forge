@@ -72,6 +72,16 @@
     "screenshot": "截图",
     "startRecording": "录制",
     "stopRecording": "停止",
+    "recordingPanelTitle": "录制截图",
+    "recordFps": "帧率",
+    "videoBitrate": "码率",
+    "bitrate": {
+      "low": "低",
+      "medium": "中",
+      "high": "高",
+      "ultra": "极高",
+      "custom": "自定义"
+    },
     "gradientEditor": "渐变配色",
     "addColorStop": "添加颜色",
     "gradientMode": {
