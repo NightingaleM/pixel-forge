@@ -23,10 +23,11 @@ PixelForge is a public-facing web-based image stylization tool. It currently has
 Reusable wrapper for all info pages:
 - Light gray background (`#f5f5f0`)
 - White card container, max-width 680px, centered
-- "← Back to Home" link at top-left
+- "← Back to Home" link at top-left (uses existing `common.backToHome` translation key)
 - Page title (h1, 32px, bold)
 - 3px black underline accent below title
 - Content area with consistent typography
+- Each page sets `document.title` to `PixelForge - ${pageName}`
 
 ### /about — About Page
 
@@ -100,6 +101,18 @@ Displayed only on the home page (`Home.tsx`):
 | `src/i18n/en.json` | Modify | English translations for all new pages |
 | `src/i18n/zh.json` | Modify | Chinese translations for all new pages |
 | `src/styles/global.css` | Modify | Styles for InfoPage, Footer, 404 |
+
+## i18n Key Structure
+
+New translation keys follow the existing flat namespace pattern (`common`, `home`, `app2d`, etc.):
+
+- `about.*` — about page content (description, features, techStack, contact)
+- `privacy.*` — privacy policy sections (collect, usage, cookies, thirdParty, security, rights, changes, contact)
+- `terms.*` — terms sections (acceptance, license, userContent, limitations, disclaimer, governingLaw, changes, contact)
+- `help.*` — help sections (style2d, style3d, tips)
+- `notFound.*` — 404 page text (title, message)
+- `footer.*` — footer links (about, privacy, terms, help, copyright)
+- Reuse existing `common.backToHome` for all "Back to Home" links
 
 ## Design System Compliance
 
