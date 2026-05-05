@@ -919,6 +919,16 @@ body {
   background: linear-gradient(to right, #ffaa66, #ffffff, #aaccff) !important;
 }
 
+/* Recording button */
+.recording-active {
+  background: #c0392b !important;
+  animation: recording-pulse 1s ease-in-out infinite;
+}
+@keyframes recording-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
 .particle-count-control {
   display: flex;
   align-items: center;

@@ -200,6 +200,58 @@ export class ParticleEngine {
     }
   }
 
+  // Screenshot & Recording
+  private mediaRecorder: MediaRecorder | null = null
+  private recordedChunks: Blob[] = []
+  private _isRecording = false
+
+  get isRecording(): boolean {
+    return this._isRecording
+  }
+
+  async captureScreenshot(): Promise<Blob> {
+    this.renderer.render(this.scene, this.camera)
+    return new Promise((resolve, reject) => {
+      this.canvas.toBlob((blob) => {
+        if (blob) resolve(blob)
+        else reject(new Error('Failed to capture screenshot'))
+      }, 'image/png')
+    })
+  }
+
+  startRecording(): void {
+    if (this._isRecording) return
+    const stream = this.canvas.captureStream(30)
+    this.mediaRecorder = new MediaRecorder(stream, {
+      mimeType: MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+        ? 'video/webm;codecs=vp9'
+        : 'video/webm',
+    })
+    this.recordedChunks = []
+    this.mediaRecorder.ondataavailable = (e) => {
+      if (e.data.size > 0) this.recordedChunks.push(e.data)
+    }
+    this.mediaRecorder.start()
+    this._isRecording = true
+  }
+
+  stopRecording(): Promise<Blob> {
+    return new Promise((resolve) => {
+      if (!this.mediaRecorder || !this._isRecording) {
+        resolve(new Blob())
+        return
+      }
+      this.mediaRecorder.onstop = () => {
+        const blob = new Blob(this.recordedChunks, { type: 'video/webm' })
+        this._isRecording = false
+        this.mediaRecorder = null
+        this.recordedChunks = []
+        resolve(blob)
+      }
+      this.mediaRecorder.stop()
+    })
+  }
+
   /**
    * Convert mouse screen coordinates to Normalized Device Coordinates (NDC)
    * NDC range: [-1, 1] for both x and y

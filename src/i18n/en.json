@@ -67,6 +67,9 @@
     "warm": "Warm",
     "cool": "Cool",
     "neutral": "Neutral",
+    "screenshot": "Screenshot",
+    "startRecording": "Record",
+    "stopRecording": "Stop",
     "customCount": "Custom...",
     "backToPreset": "Back to preset"
   },

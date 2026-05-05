@@ -1,6 +1,8 @@
 import { useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { ModelInfo } from '../types'
+import type { ParticleEngine } from '../lib/ParticleEngine'
+import RecordingControls from './RecordingControls'
 
 interface ActionBar3DProps {
   onRandom: () => void
@@ -11,6 +13,7 @@ interface ActionBar3DProps {
   isLoading?: boolean
   samplingProgress?: number
   isParticleMode?: boolean
+  engineRef?: React.RefObject<ParticleEngine | null>
 }
 
 const PARTICLE_COUNTS = [
@@ -41,6 +44,7 @@ export default function ActionBar3D({
   isLoading = false,
   samplingProgress = -1,
   isParticleMode = true,
+  engineRef,
 }: ActionBar3DProps) {
   const { t } = useTranslation()
   const isPreset = PARTICLE_COUNTS.includes(particleCount)
@@ -85,6 +89,8 @@ export default function ActionBar3D({
       <button className="action-btn" onClick={onResetView} disabled={isLoading}>
         {t('app3d.resetView')}
       </button>
+
+      {engineRef && <RecordingControls engineRef={engineRef} />}
 
       {isParticleMode && (
         <div className="particle-count-control">

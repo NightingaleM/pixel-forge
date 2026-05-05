@@ -512,6 +512,7 @@ export default function App3D() {
           isLoading={isLoading}
           samplingProgress={samplingProgress}
           isParticleMode={activeEffect !== 'none'}
+          engineRef={engineRef}
         />
       </div>
     </div>

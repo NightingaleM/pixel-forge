@@ -67,6 +67,9 @@
     "warm": "暖色",
     "cool": "冷色",
     "neutral": "中性",
+    "screenshot": "截图",
+    "startRecording": "录制",
+    "stopRecording": "停止",
     "customCount": "自定义...",
     "backToPreset": "返回预设"
   },
