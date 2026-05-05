@@ -334,7 +334,7 @@
     "techTitle": "Technology",
     "techStack": "Built with React 19, TypeScript, Three.js, WebGL shaders, and Vite.",
     "contactTitle": "Contact",
-    "contactEmail": "placeholder@example.com"
+    "contactEmail": "oychi.oylz@gmail.com"
   },
   "privacy": {
     "title": "Privacy Policy",
@@ -354,7 +354,7 @@
     "changesTitle": "Changes to This Policy",
     "changesBody": "We may update this privacy policy from time to time. Any changes will be posted on this page with an updated revision date.",
     "contactTitle": "Contact Us",
-    "contactBody": "If you have questions about this privacy policy, please contact us at placeholder@example.com"
+    "contactBody": "If you have questions about this privacy policy, please contact us at oychi.oylz@gmail.com"
   },
   "terms": {
     "title": "Terms of Service",
@@ -374,7 +374,7 @@
     "changesTitle": "Changes to Terms",
     "changesBody": "We reserve the right to modify these terms at any time. Changes will be effective immediately upon posting.",
     "contactTitle": "Contact Us",
-    "contactBody": "For questions about these terms, please contact placeholder@example.com"
+    "contactBody": "For questions about these terms, please contact oychi.oylz@gmail.com"
   },
   "help": {
     "title": "Help",

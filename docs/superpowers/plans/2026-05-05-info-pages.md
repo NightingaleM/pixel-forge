@@ -51,7 +51,7 @@ Append these new top-level keys before the closing `}`:
     "techTitle": "Technology",
     "techStack": "Built with React 19, TypeScript, Three.js, WebGL shaders, and Vite.",
     "contactTitle": "Contact",
-    "contactEmail": "placeholder@example.com"
+    "contactEmail": "oychi.oylz@gmail.com"
   },
   "privacy": {
     "title": "Privacy Policy",
@@ -71,7 +71,7 @@ Append these new top-level keys before the closing `}`:
     "changesTitle": "Changes to This Policy",
     "changesBody": "We may update this privacy policy from time to time. Any changes will be posted on this page with an updated revision date.",
     "contactTitle": "Contact Us",
-    "contactBody": "If you have questions about this privacy policy, please contact us at placeholder@example.com"
+    "contactBody": "If you have questions about this privacy policy, please contact us at oychi.oylz@gmail.com"
   },
   "terms": {
     "title": "Terms of Service",
@@ -91,7 +91,7 @@ Append these new top-level keys before the closing `}`:
     "changesTitle": "Changes to Terms",
     "changesBody": "We reserve the right to modify these terms at any time. Changes will be effective immediately upon posting.",
     "contactTitle": "Contact Us",
-    "contactBody": "For questions about these terms, please contact placeholder@example.com"
+    "contactBody": "For questions about these terms, please contact oychi.oylz@gmail.com"
   },
   "help": {
     "title": "Help",
@@ -131,7 +131,7 @@ Append these new top-level keys before the closing `}`:
     "techTitle": "技术栈",
     "techStack": "基于 React 19、TypeScript、Three.js、WebGL 着色器和 Vite 构建。",
     "contactTitle": "联系方式",
-    "contactEmail": "placeholder@example.com"
+    "contactEmail": "oychi.oylz@gmail.com"
   },
   "privacy": {
     "title": "隐私政策",
@@ -151,7 +151,7 @@ Append these new top-level keys before the closing `}`:
     "changesTitle": "政策变更",
     "changesBody": "我们可能会不时更新本隐私政策。任何变更将在此页面上发布，并附上更新日期。",
     "contactTitle": "联系我们",
-    "contactBody": "如果您对本隐私政策有任何疑问，请通过 placeholder@example.com 联系我们。"
+    "contactBody": "如果您对本隐私政策有任何疑问，请通过 oychi.oylz@gmail.com 联系我们。"
   },
   "terms": {
     "title": "使用条款",
@@ -171,7 +171,7 @@ Append these new top-level keys before the closing `}`:
     "changesTitle": "条款变更",
     "changesBody": "我们保留随时修改这些条款的权利。变更将在发布后立即生效。",
     "contactTitle": "联系我们",
-    "contactBody": "有关这些条款的问题，请通过 placeholder@example.com 联系我们。"
+    "contactBody": "有关这些条款的问题，请通过 oychi.oylz@gmail.com 联系我们。"
   },
   "help": {
     "title": "使用说明",
