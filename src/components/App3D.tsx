@@ -335,6 +335,7 @@ export default function App3D() {
           }
         }
       } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return
         console.error('Failed to initialize model:', err)
         setError(t('app3d.loadFailed'))
       } finally {
