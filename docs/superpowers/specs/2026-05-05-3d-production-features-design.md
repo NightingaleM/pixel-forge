@@ -35,6 +35,12 @@ PixelForge 的 3D 模式目前是一个粒子效果展示工具，缺少让用�
 - 通过 `ParticleEngine` 的公开方法更新 `scene.background`
 - 背景色变更时不需要重建粒子系统
 
+**与背景图片的交互**:
+- `scene.background` 始终保持为背景色（Color 对象）
+- 背景图片是场景内的独立平面，不替换 `scene.background`
+- 上传图片后，背景色仍然可见（图片外围区域和图片透明区域）
+- 用户可通过 `removeBackgroundImage()` 移除图片，回到纯色背景
+
 ---
 
 ## 2. 上传背景图片
@@ -49,7 +55,7 @@ PixelForge 的 3D 模式目前是一个粒子效果展示工具，缺少让用�
 
 **技术实现**:
 - 使用 `THREE.TextureLoader` 加载图片
-- 创建 `THREE.PlaneGeometry` + `THREE.MeshBasicMaterial`（支持透明度）
+- 创建 `THREE.PlaneGeometry` + `THREE.MeshStandardMaterial`（受光照影响，支持透明度）
 - 图片平面添加到 scene，独立于粒子系统
 - 通过 `ParticleEngine` 暴露的接口控制图片属性
 
@@ -75,6 +81,7 @@ PixelForge 的 3D 模式目前是一个粒子效果展示工具，缺少让用�
 **技术要点**:
 - `THREE.Raycaster` 检测鼠标是否悬停在图片平面上
 - 拖拽时临时禁用 `OrbitControls`，松开后恢复
+- 拖拽图片时同时禁用粒子弹簧交互（设 `uMouseEnabled = 0`），松开后恢复，避免拖拽图片时附近粒子跟随鼠标移动
 - Z 轴推拉：将鼠标 Y 轴位移映射到 Z 轴方向
 - 画布光标样式变化提示当前可操作
 
@@ -102,7 +109,7 @@ PixelForge 的 3D 模式目前是一个粒子效果展示工具，缺少让用�
 
 **目标**: 让用户快速调整场景光照氛围，主要影响背景图片和 Mesh 模式。
 
-**影响范围**: 背景图片平面 + Mesh 显示模式。粒子保持自发光，不受光照影响。
+**影响范围**: 背景图片平面 + Mesh 显示模式。粒子保持自发光，不受光照影响。光照面板在所有模式下可见，但实际效果只在有背景图片或 Mesh 显示模式时可见。GLTF 模型的材质如果是 `MeshBasicMaterial` 则不响应光照，如果是 `MeshStandardMaterial`/`MeshPhongMaterial` 则响应。
 
 ### 4.1 预设场景
 
@@ -133,10 +140,22 @@ PixelForge 的 3D 模式目前是一个粒子效果展示工具，缺少让用�
 **方向九宫格**:
 - 3x3 网格代表光源从哪个方向照射
 - 对应 DirectionalLight.position 的 XZ 平面投影
-- 高度固定在 Y=10（预设值）
+- 高度固定在 Y=10
+
+| 九宫格位置 | X | Z |
+|-----------|-----|-----|
+| 左上 | -5 | -5 |
+| 中上 | 0 | -5 |
+| 右上 | 5 | -5 |
+| 左中 | -5 | 0 |
+| 正中 | 0 | 0 |
+| 右中 | 5 | 0 |
+| 左下 | -5 | 5 |
+| 中下 | 0 | 5 |
+| 右下 | 5 | 5 |
 
 **技术实现**:
-- 将现有固定灯光配置改为参数化
+- 将现有固定灯光配置改为参数化：将 `ambientLight` 和 `directionalLight` 存储为 `ParticleEngine` 的实例字段（当前仅在构造函数内局部变量），以便后续通过方法更新
 - `ParticleEngine` 暴露 `updateLighting(params)` 方法
 - 预设作为参数组合存储
 - 面板使用现有浮动面板样式
@@ -152,10 +171,9 @@ PixelForge 的 3D 模式目前是一个粒子效果展示工具，缺少让用�
 **交互**: 点击截图按钮 → 自动下载 PNG
 
 **技术实现**:
-- 调用 `renderer.domElement.toBlob()` 获取 PNG
+- 不使用 `preserveDrawingBuffer: true`（有性能开销），而是采用 render-then-capture 模式：先调用 `renderer.render(scene, camera)` 渲染一帧，然后立即调用 `canvas.toBlob()` 获取 PNG
 - 创建下载链接触发浏览器下载
 - 文件名格式: `pixelforge_3d_{timestamp}.png`
-- 注意: WebGL renderer 需设置 `preserveDrawingBuffer: true` 才能截图
 
 ### 5.2 视频录制
 
@@ -208,14 +226,16 @@ interface GradientConfig {
 ### 6.3 技术实现
 
 **生成渐变纹理**:
-- 创建 256x1 的 `THREE.DataTexture`
+- 创建 256x1 的 `THREE.DataTexture`，格式 `THREE.RGBAFormat`，类型 `THREE.UnsignedByteType`
 - 根据 ColorStop 数组在像素间线性插值
+- 设置 `texture.minFilter = THREE.LinearFilter`、`texture.magFilter = THREE.LinearFilter`
+- 更新后设 `texture.needsUpdate = true`
 - 传给 shader 作为 `uGradientMap` sampler2D
 
 **Shader 修改**:
-- 顶点着色器根据分配模式计算 UV 坐标，传给片元着色器作为 varying
-- 片元着色器中 `texture2D(uGradientMap, vec2(uv, 0.5))` 采样颜色
-- 随机模式使用 `aParticleId` attribute 做 hash 选色
+- 顶点着色器：在 `%%EFFECT_TRANSFORM%%` chunk 区域内，根据分配模式（`uGradientMode` uniform: 0=height, 1=radial, 2=random）计算 UV 坐标，传给片元着色器作为 `vGradientUV` varying
+- 片元着色器：在 `particle_default.frag` 中添加渐变分支。当 `uUseCustomColor == 1` 时，用 `texture2D(uGradientMap, vec2(vGradientUV, 0.5))` 替换原来的纯色，而非直接覆盖 `vColor`
+- 随机模式复用现有 `aRandom` attribute（已存在于粒子系统中，每个粒子有一个随机浮点值），用 `floor(aRandom * numStops) / numStops` 生成离散 UV，无需新增 attribute
 
 **兼容性**:
 - 保留 `uUseCustomColor` 开关
@@ -262,9 +282,9 @@ updateGradient(config: GradientConfig): void
 | 场景 | 处理策略 |
 |------|----------|
 | 拖拽图片 vs OrbitControls | Raycaster 检测命中图片时禁用 OrbitControls |
-| 拖拽图片 vs 粒子鼠标交互 | 图片拖拽优先级高于粒子弹簧交互 |
+| 拖拽图片 vs 粒子鼠标交互 | Raycaster 命中图片时禁用 OrbitControls 并设 `uMouseEnabled = 0`，松开后恢复 |
 | 录制中切换效果 | 允许，录制持续进行 |
-| 截图时 preserveDrawingBuffer | renderer 创建时开启 |
+| 截图时画面捕获 | 不用 preserveDrawingBuffer，采用 render-then-capture 模式 |
 
 ---
 
