@@ -6,6 +6,11 @@ import LangSwitch from './components/LangSwitch'
 const Home = lazy(() => import('./components/Home'))
 const App2D = lazy(() => import('./components/App2D'))
 const App3D = lazy(() => import('./components/App3D'))
+const About = lazy(() => import('./components/About'))
+const Privacy = lazy(() => import('./components/Privacy'))
+const Terms = lazy(() => import('./components/Terms'))
+const Help = lazy(() => import('./components/Help'))
+const NotFound = lazy(() => import('./components/NotFound'))
 
 export default function App() {
   const { t, i18n } = useTranslation()
@@ -40,7 +45,11 @@ export default function App() {
           <Route path="/" element={<Home />} />
           <Route path="/2d" element={<App2D />} />
           <Route path="/3d" element={<App3D />} />
-          <Route path="*" element={<Home />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/privacy" element={<Privacy />} />
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/help" element={<Help />} />
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
     </BrowserRouter>
