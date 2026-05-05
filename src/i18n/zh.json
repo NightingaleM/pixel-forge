@@ -53,6 +53,20 @@
     "imageRotation": "旋转",
     "imageOpacity": "不透明度",
     "resetTransform": "重置",
+    "lighting": "光照",
+    "lightingPresets": {
+      "daylight": "日光",
+      "moonlight": "月光",
+      "spotlight": "聚光灯",
+      "even": "均匀"
+    },
+    "mainLightIntensity": "主光强度",
+    "ambientIntensity": "环境光",
+    "colorTemp": "色温",
+    "lightDirection": "光照方向",
+    "warm": "暖色",
+    "cool": "冷色",
+    "neutral": "中性",
     "customCount": "自定义...",
     "backToPreset": "返回预设"
   },

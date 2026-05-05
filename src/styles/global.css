@@ -871,6 +871,54 @@ body {
   cursor: not-allowed;
 }
 
+/* Lighting panel */
+.lighting-presets {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.preset-btn {
+  flex: 1;
+  padding: 6px 0;
+  background: #1a1a2e;
+  border: 1px solid #333;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: border-color 0.15s, background 0.15s;
+}
+.preset-btn:hover {
+  border-color: #666;
+}
+.preset-btn.active {
+  border-color: #6c63ff;
+  background: #2a2a4e;
+}
+.direction-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3px;
+  margin-top: 4px;
+}
+.dir-btn {
+  aspect-ratio: 1;
+  background: #1a1a2e;
+  border: 1px solid #333;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.dir-btn:hover {
+  border-color: #666;
+}
+.dir-btn.active {
+  border-color: #6c63ff;
+  background: #2a2a4e;
+}
+.color-temp-slider {
+  background: linear-gradient(to right, #ffaa66, #ffffff, #aaccff) !important;
+}
+
 .particle-count-control {
   display: flex;
   align-items: center;

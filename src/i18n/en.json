@@ -53,6 +53,20 @@
     "imageRotation": "Rotation",
     "imageOpacity": "Opacity",
     "resetTransform": "Reset",
+    "lighting": "Lighting",
+    "lightingPresets": {
+      "daylight": "Daylight",
+      "moonlight": "Moonlight",
+      "spotlight": "Spotlight",
+      "even": "Even"
+    },
+    "mainLightIntensity": "Main Light",
+    "ambientIntensity": "Ambient Light",
+    "colorTemp": "Color Temp",
+    "lightDirection": "Direction",
+    "warm": "Warm",
+    "cool": "Cool",
+    "neutral": "Neutral",
     "customCount": "Custom...",
     "backToPreset": "Back to preset"
   },

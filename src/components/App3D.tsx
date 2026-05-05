@@ -9,6 +9,8 @@ import EffectSelector from './EffectSelector'
 import ActionBar3D from './ActionBar3D'
 import ParamPanel from './ParamPanel'
 import BackgroundPanel from './BackgroundPanel'
+import LightingPanel from './LightingPanel'
+import type { LightingState } from './LightingPanel'
 
 function hexToRgb(hex: string): [number, number, number] {
   const r = parseInt(hex.slice(1, 3), 16) / 255
@@ -52,6 +54,9 @@ export default function App3D() {
   const [backgroundColor, setBackgroundColor] = useState('#1a1a2e')
   const [hasBackgroundImage, setHasBackgroundImage] = useState(false)
   const [imageParams, setImageParams] = useState({ z: -2, scale: 1, rotation: 0, opacity: 1 })
+  const [lightingState, setLightingState] = useState<LightingState>({
+    mainIntensity: 0.8, ambientIntensity: 0.6, colorTemp: 0.5, directionIndex: 2, preset: 'daylight',
+  })
   const [isLoading, setIsLoading] = useState(false)
   const [samplingProgress, setSamplingProgress] = useState(-1)  // -1 = not sampling
   const [error, setError] = useState<string | null>(null)
@@ -94,6 +99,12 @@ export default function App3D() {
       engineRef.current?.transformImage(next)
       return next
     })
+  }, [])
+
+  const handleLightingChange = useCallback((state: LightingState) => {
+    setLightingState(state)
+    const { preset, ...params } = state
+    engineRef.current?.updateLighting(params)
   }, [])
 
   // Canvas drag interaction for background image
@@ -428,6 +439,11 @@ export default function App3D() {
           hasImage={hasBackgroundImage}
           imageParams={imageParams}
           onParamChange={handleImageParamChange}
+        />
+
+        <LightingPanel
+          state={lightingState}
+          onChange={handleLightingChange}
         />
 
         <EffectSelector

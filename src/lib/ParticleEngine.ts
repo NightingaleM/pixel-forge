@@ -61,6 +61,10 @@ export class ParticleEngine {
   private backgroundImageMesh: THREE.Mesh | null = null
   private backgroundImageTexture: THREE.Texture | null = null
 
+  // Lighting
+  private ambientLight!: THREE.AmbientLight
+  private directionalLight!: THREE.DirectionalLight
+
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas
     this.clock = new THREE.Clock()
@@ -92,12 +96,12 @@ export class ParticleEngine {
     this.controls.autoRotate = false
 
     // Add lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6)
-    this.scene.add(ambientLight)
+    this.ambientLight = new THREE.AmbientLight(0xffffff, 0.6)
+    this.scene.add(this.ambientLight)
 
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8)
-    directionalLight.position.set(5, 10, 7)
-    this.scene.add(directionalLight)
+    this.directionalLight = new THREE.DirectionalLight(0xffffff, 0.8)
+    this.directionalLight.position.set(5, 10, 7)
+    this.scene.add(this.directionalLight)
 
     // Setup mouse interaction
     this.setupMouseInteraction()
@@ -162,6 +166,38 @@ export class ParticleEngine {
 
   getBackgroundImageMesh(): THREE.Mesh | null {
     return this.backgroundImageMesh
+  }
+
+  updateLighting(params: {
+    mainIntensity?: number
+    ambientIntensity?: number
+    colorTemp?: number
+    directionIndex?: number
+  }): void {
+    if (params.mainIntensity !== undefined) {
+      this.directionalLight.intensity = params.mainIntensity
+    }
+    if (params.ambientIntensity !== undefined) {
+      this.ambientLight.intensity = params.ambientIntensity
+    }
+    if (params.colorTemp !== undefined) {
+      const warm = new THREE.Color(0xffaa66)
+      const neutral = new THREE.Color(0xffffff)
+      const cool = new THREE.Color(0xaaccff)
+      const color = params.colorTemp <= 0.5
+        ? warm.clone().lerp(neutral, params.colorTemp * 2)
+        : neutral.clone().lerp(cool, (params.colorTemp - 0.5) * 2)
+      this.directionalLight.color.copy(color)
+    }
+    if (params.directionIndex !== undefined) {
+      const grid = [
+        [-5, -5], [0, -5], [5, -5],
+        [-5, 0],  [0, 0],  [5, 0],
+        [-5, 5],  [0, 5],  [5, 5],
+      ]
+      const [x, z] = grid[params.directionIndex] ?? [5, -5]
+      this.directionalLight.position.set(x, 10, z)
+    }
   }
 
   /**
