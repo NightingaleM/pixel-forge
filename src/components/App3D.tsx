@@ -47,6 +47,7 @@ export default function App3D() {
   const [params, setParams] = useState<Record<string, number>>({})
   const [textValues, setTextValues] = useState<Record<string, string>>({})
 
+  const [backgroundColor, setBackgroundColor] = useState('#1a1a2e')
   const [isLoading, setIsLoading] = useState(false)
   const [samplingProgress, setSamplingProgress] = useState(-1)  // -1 = not sampling
   const [error, setError] = useState<string | null>(null)
@@ -65,6 +66,11 @@ export default function App3D() {
       engineRef.current = null
     }
   }, [])
+
+  // Sync background color to engine
+  useEffect(() => {
+    engineRef.current?.setBackgroundColor(backgroundColor)
+  }, [backgroundColor])
 
   // Initialize effect-specific params when effect changes
   useEffect(() => {
@@ -283,6 +289,16 @@ export default function App3D() {
   return (
     <div className="app-3d">
       <div className="app-3d-sidebar">
+        <div className="sidebar-section">
+          <label className="sidebar-label">{t('app3d.backgroundColor')}</label>
+          <input
+            type="color"
+            className="param-color-input"
+            value={backgroundColor}
+            onChange={(e) => setBackgroundColor(e.target.value)}
+          />
+        </div>
+
         <EffectSelector
           effects={effects}
           activeId={activeEffect}

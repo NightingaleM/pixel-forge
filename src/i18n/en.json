@@ -43,6 +43,7 @@
     "processing": "Processing...",
     "sampling": "Volumetric sampling...",
     "particleEffect": "Particle Effects",
+    "backgroundColor": "Background Color",
     "customCount": "Custom...",
     "backToPreset": "Back to preset"
   },

@@ -105,6 +105,10 @@ export class ParticleEngine {
     window.addEventListener('resize', this.onResize.bind(this))
   }
 
+  setBackgroundColor(color: string): void {
+    this.scene.background = new THREE.Color(color)
+  }
+
   /**
    * Convert mouse screen coordinates to Normalized Device Coordinates (NDC)
    * NDC range: [-1, 1] for both x and y
