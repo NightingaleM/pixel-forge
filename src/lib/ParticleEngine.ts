@@ -716,7 +716,10 @@ export class ParticleEngine {
         uniforms.uSDFTexture = { value: this.sdfTexture }
         uniforms.uSDFOrigin = { value: this._sdfOrigin }
         uniforms.uSDFScale = { value: this._sdfScale }
-      } else if (effectDef.id !== 'density' && this.sdfTexture) {
+        uniforms.uSDFEnabled = { value: 1.0 }
+      } else if (effectDef.id === 'density') {
+        uniforms.uSDFEnabled = { value: 0.0 }
+      } else if (this.sdfTexture) {
         this.sdfTexture.dispose()
         this.sdfTexture = null
       }

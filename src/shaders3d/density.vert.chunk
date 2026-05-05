@@ -2,6 +2,7 @@
 uniform sampler3D uSDFTexture;
 uniform vec3 uSDFOrigin;
 uniform vec3 uSDFScale;
+uniform float uSDFEnabled;
 
 // Simple noise function
 float hash(vec3 p) {
@@ -37,7 +38,8 @@ vec3 effectTransform(vec3 position, vec3 normal, float random, float time) {
 
   vec3 tempPos = position + dir * displacement;
 
-  // --- SDF boundary constraint ---
+  // --- SDF boundary constraint (only when SDF data is available) ---
+  if (uSDFEnabled > 0.5) {
   vec3 sdfCoord = (tempPos - uSDFOrigin) * uSDFScale;
   float d = texture(uSDFTexture, sdfCoord).r;
 
@@ -67,10 +69,12 @@ vec3 effectTransform(vec3 position, vec3 normal, float random, float time) {
         tempPos += grad * (uSDFMargin - clampD + 0.001);
       }
     } else {
-      // Zero gradient — just push particle inward by the violation amount
-      tempPos += normalize(position) * (uSDFMargin - d + 0.001);
+      // Zero gradient — push inward using safe direction
+      vec3 fallback = length(position) > 1e-6 ? normalize(position) : vec3(0.0, 1.0, 0.0);
+      tempPos += fallback * (uSDFMargin - d + 0.001);
     }
   }
+  } // end SDF boundary
 
   return tempPos;
 }
