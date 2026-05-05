@@ -597,14 +597,14 @@ export class ParticleEngine {
           if (this.sdfTexture) this.sdfTexture.dispose()
           if (sdfData && sdfData.length > 0) {
             this.sdfTexture = new THREE.Data3DTexture(sdfData, 32, 32, 32)
-          this.sdfTexture.format = THREE.RedFormat
-          this.sdfTexture.type = THREE.FloatType
-          this.sdfTexture.minFilter = THREE.LinearFilter
-          this.sdfTexture.magFilter = THREE.LinearFilter
-          this.sdfTexture.wrapS = THREE.ClampToEdgeWrapping
-          this.sdfTexture.wrapT = THREE.ClampToEdgeWrapping
-          this.sdfTexture.wrapR = THREE.ClampToEdgeWrapping
-          this.sdfTexture.needsUpdate = true
+            this.sdfTexture.format = THREE.RedFormat
+            this.sdfTexture.type = THREE.FloatType
+            this.sdfTexture.minFilter = THREE.LinearFilter
+            this.sdfTexture.magFilter = THREE.LinearFilter
+            this.sdfTexture.wrapS = THREE.ClampToEdgeWrapping
+            this.sdfTexture.wrapT = THREE.ClampToEdgeWrapping
+            this.sdfTexture.wrapR = THREE.ClampToEdgeWrapping
+            this.sdfTexture.needsUpdate = true
           }
 
           // Store SDF coordinate mapping (bbox min + 1/size)
