@@ -1,16 +1,18 @@
-import { useRef, useState, useCallback, useEffect } from 'react'
+import { useRef, useState, useCallback, useEffect, type ReactNode } from 'react'
 import type { ParamDef } from '../types'
 
 interface ParamPanelProps {
   title: string
-  description: string
-  params: ParamDef[]
-  values: Record<string, number>
-  textValues: Record<string, string>
-  onChange: (uniform: string, value: number) => void
-  onTextChange: (uniform: string, value: string) => void
+  description?: string
+  params?: ParamDef[]
+  values?: Record<string, number>
+  textValues?: Record<string, string>
+  onChange?: (uniform: string, value: number) => void
+  onTextChange?: (uniform: string, value: string) => void
   onClose?: () => void
   defaultPos?: { x: number; y: number }
+  children?: ReactNode
+  defaultCollapsed?: boolean
 }
 
 function formatValue(value: number): string {
@@ -132,9 +134,10 @@ function renderParam(
   )
 }
 
-function ParamPanel({ title, description, params, values, textValues, onChange, onTextChange, onClose, defaultPos }: ParamPanelProps) {
+function ParamPanel({ title, description, params, values, textValues, onChange, onTextChange, onClose, defaultPos, children, defaultCollapsed }: ParamPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState(defaultPos ?? { x: typeof window !== 'undefined' ? window.innerWidth - 320 : 600, y: 35 })
+  const [collapsed, setCollapsed] = useState(defaultCollapsed ?? false)
   const dragging = useRef(false)
   const offset = useRef({ x: 0, y: 0 })
 
@@ -167,15 +170,22 @@ function ParamPanel({ title, description, params, values, textValues, onChange, 
       <div className="param-panel-header" onMouseDown={onMouseDown}>
         <div className="param-panel-title-row">
           <div className="param-panel-title">{title}</div>
-          {onClose && (
-            <button className="param-panel-close" onClick={onClose}>x</button>
-          )}
+          <div className="param-panel-actions">
+            <button className="param-panel-collapse" onClick={() => setCollapsed(c => !c)}>
+              {collapsed ? '▸' : '▾'}
+            </button>
+            {onClose && (
+              <button className="param-panel-close" onClick={onClose}>x</button>
+            )}
+          </div>
         </div>
-        <div className="param-panel-desc">{description}</div>
+        {description && <div className="param-panel-desc">{description}</div>}
       </div>
-      <div className="param-panel-body">
-        {params.map((p) => renderParam(p, values, textValues, onChange, onTextChange))}
-      </div>
+      {!collapsed && (
+        <div className="param-panel-body">
+          {children ?? params?.map((p) => renderParam(p, values ?? {}, textValues ?? {}, onChange ?? (() => {}), onTextChange ?? (() => {})))}
+        </div>
+      )}
     </div>
   )
 }

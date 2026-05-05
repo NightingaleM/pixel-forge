@@ -211,6 +211,27 @@ body {
   color: #FFF;
 }
 
+.param-panel-actions {
+  display: flex;
+  gap: 4px;
+}
+.param-panel-collapse {
+  background: none;
+  border: 1px solid #FFF;
+  color: #FFF;
+  width: 20px;
+  height: 20px;
+  font-size: 11px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 1;
+}
+.param-panel-collapse:hover {
+  background: rgba(255,255,255,0.1);
+}
 .param-panel-close {
   background: none;
   border: 1px solid #FFF;

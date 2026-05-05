@@ -2,16 +2,22 @@ import { useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 
 interface BackgroundPanelProps {
+  backgroundColor: string
+  onBackgroundColorChange: (color: string) => void
   onImageUpload: (dataURL: string) => void
   onImageRemove: () => void
   hasImage: boolean
   imageParams: { z: number; scale: number; rotation: number; opacity: number }
   onParamChange: (param: string, value: number) => void
+  imageDragLocked: boolean
+  onImageDragLockedChange: (locked: boolean) => void
 }
 
 export default function BackgroundPanel({
+  backgroundColor, onBackgroundColorChange,
   onImageUpload, onImageRemove, hasImage,
   imageParams, onParamChange,
+  imageDragLocked, onImageDragLockedChange,
 }: BackgroundPanelProps) {
   const { t } = useTranslation()
   const fileRef = useRef<HTMLInputElement>(null)
@@ -37,9 +43,29 @@ export default function BackgroundPanel({
   ] : []
 
   return (
-    <div className="sidebar-section">
-      <label className="sidebar-label">{t('app3d.backgroundImage')}</label>
+    <>
+      {/* Background color */}
+      <div className="param-row">
+        <div className="param-header">
+          <span className="param-label">{t('app3d.backgroundColor')}</span>
+        </div>
+        <input
+          type="color"
+          className="param-color-input"
+          value={backgroundColor}
+          onChange={(e) => onBackgroundColorChange(e.target.value)}
+        />
+      </div>
+
+      {/* Divider */}
+      <div style={{ borderTop: '1px solid #333', margin: '8px 0' }} />
+
+      {/* Background image */}
+      <div className="param-header" style={{ marginBottom: 6 }}>
+        <span className="param-label">{t('app3d.backgroundImage')}</span>
+      </div>
       <input ref={fileRef} type="file" accept="image/*" hidden onChange={handleFile} />
+
       {!hasImage ? (
         <button className="action-btn" onClick={() => fileRef.current?.click()}>
           {t('app3d.uploadImage')}
@@ -54,6 +80,19 @@ export default function BackgroundPanel({
               {t('app3d.removeImage')}
             </button>
           </div>
+
+          {/* Lock toggle for canvas drag */}
+          <div className="param-row">
+            <label className="param-toggle">
+              <input
+                type="checkbox"
+                checked={imageDragLocked}
+                onChange={(e) => onImageDragLockedChange(e.target.checked)}
+              />
+              <span className="param-label">{t('app3d.lockImageDrag')}</span>
+            </label>
+          </div>
+
           {sliders.map(s => (
             <div key={s.key} className="param-row">
               <div className="param-header">
@@ -77,6 +116,6 @@ export default function BackgroundPanel({
           </button>
         </>
       )}
-    </div>
+    </>
   )
 }

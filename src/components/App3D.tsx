@@ -56,6 +56,7 @@ export default function App3D() {
   const [backgroundColor, setBackgroundColor] = useState('#1a1a2e')
   const [hasBackgroundImage, setHasBackgroundImage] = useState(false)
   const [imageParams, setImageParams] = useState({ z: -2, scale: 1, rotation: 0, opacity: 1 })
+  const [imageDragLocked, setImageDragLocked] = useState(true)
   const [lightingState, setLightingState] = useState<LightingState>({
     mainIntensity: 0.8, ambientIntensity: 0.6, colorTemp: 0.5, directionIndex: 2, preset: 'daylight',
   })
@@ -124,7 +125,7 @@ export default function App3D() {
   // Canvas drag interaction for background image
   useEffect(() => {
     const canvas = canvasRef.current
-    if (!canvas || !hasBackgroundImage) return
+    if (!canvas || !hasBackgroundImage || imageDragLocked) return
 
     const raycaster = new THREE.Raycaster()
     const mouse = new THREE.Vector2()
@@ -218,7 +219,7 @@ export default function App3D() {
       canvas.removeEventListener('mouseup', onMouseUp)
       canvas.removeEventListener('wheel', onWheel)
     }
-  }, [hasBackgroundImage])
+  }, [hasBackgroundImage, imageDragLocked])
 
   // Initialize effect-specific params when effect changes
   useEffect(() => {
@@ -437,36 +438,6 @@ export default function App3D() {
   return (
     <div className="app-3d">
       <div className="app-3d-sidebar">
-        <div className="sidebar-section">
-          <label className="sidebar-label">{t('app3d.backgroundColor')}</label>
-          <input
-            type="color"
-            className="param-color-input"
-            value={backgroundColor}
-            onChange={(e) => setBackgroundColor(e.target.value)}
-          />
-        </div>
-
-        <BackgroundPanel
-          onImageUpload={handleImageUpload}
-          onImageRemove={handleImageRemove}
-          hasImage={hasBackgroundImage}
-          imageParams={imageParams}
-          onParamChange={handleImageParamChange}
-        />
-
-        <LightingPanel
-          state={lightingState}
-          onChange={handleLightingChange}
-        />
-
-        {baseParams.uUseCustomColor > 0 && activeEffect !== 'none' && (
-          <div className="sidebar-section">
-            <label className="sidebar-label">{t('app3d.gradientEditor')}</label>
-            <GradientEditor config={gradientConfig} onChange={handleGradientChange} />
-          </div>
-        )}
-
         <EffectSelector
           effects={effects}
           activeId={activeEffect}
@@ -496,11 +467,41 @@ export default function App3D() {
       <div className="app-3d-main">
         <canvas ref={canvasRef} className="canvas-3d" />
 
+        {/* Background panel — floating draggable */}
+        <ParamPanel
+          title={t('app3d.backgroundPanelTitle')}
+          defaultPos={{ x: 10, y: 35 }}
+          defaultCollapsed={false}
+        >
+          <BackgroundPanel
+            backgroundColor={backgroundColor}
+            onBackgroundColorChange={setBackgroundColor}
+            onImageUpload={handleImageUpload}
+            onImageRemove={handleImageRemove}
+            hasImage={hasBackgroundImage}
+            imageParams={imageParams}
+            onParamChange={handleImageParamChange}
+            imageDragLocked={imageDragLocked}
+            onImageDragLockedChange={setImageDragLocked}
+          />
+        </ParamPanel>
+
+        {/* Lighting panel — floating draggable */}
+        <ParamPanel
+          title={t('app3d.lighting')}
+          defaultPos={{ x: 10, y: 420 }}
+          defaultCollapsed={true}
+        >
+          <LightingPanel
+            state={lightingState}
+            onChange={handleLightingChange}
+          />
+        </ParamPanel>
+
         {/* Base params — always visible draggable panel */}
         {activeEffect !== 'none' && (
           <ParamPanel
             title={t('app3d.particleEffect')}
-            description=""
             params={translatedBaseParams}
             values={baseParams}
             textValues={baseTextValues}
@@ -522,6 +523,17 @@ export default function App3D() {
             onTextChange={handleTextChange}
             defaultPos={{ x: 632, y: 35 }}
           />
+        )}
+
+        {/* Gradient editor — when custom color enabled */}
+        {baseParams.uUseCustomColor > 0 && activeEffect !== 'none' && (
+          <ParamPanel
+            title={t('app3d.gradientEditor')}
+            defaultPos={{ x: 345, y: 400 }}
+            defaultCollapsed={false}
+          >
+            <GradientEditor config={gradientConfig} onChange={handleGradientChange} />
+          </ParamPanel>
         )}
 
         <ActionBar3D

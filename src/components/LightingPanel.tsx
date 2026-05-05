@@ -45,9 +45,7 @@ export default function LightingPanel({ state, onChange }: LightingPanelProps) {
   ]
 
   return (
-    <div className="sidebar-section">
-      <label className="sidebar-label">{t('app3d.lighting')}</label>
-
+    <>
       <div className="lighting-presets">
         {presetButtons.map(p => (
           <button
@@ -108,6 +106,6 @@ export default function LightingPanel({ state, onChange }: LightingPanelProps) {
           ))}
         </div>
       </div>
-    </div>
+    </>
   )
 }
