@@ -1339,6 +1339,20 @@ export class ParticleEngine {
       this.previousMaterial = null
     }
 
+    // Dispose background image
+    this.removeBackgroundImage()
+
+    // Dispose gradient texture
+    if (this.gradientTexture) {
+      this.gradientTexture.dispose()
+      this.gradientTexture = null
+    }
+
+    // Stop recording if active
+    if (this._isRecording) {
+      this.stopRecording()
+    }
+
     // Dispose SDF texture
     if (this.sdfTexture) {
       this.sdfTexture.dispose()
