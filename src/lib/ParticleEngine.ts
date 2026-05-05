@@ -57,6 +57,10 @@ export class ParticleEngine {
   // SDF texture for density boundary constraint
   sdfTexture: THREE.Data3DTexture | null = null
 
+  // Background image
+  private backgroundImageMesh: THREE.Mesh | null = null
+  private backgroundImageTexture: THREE.Texture | null = null
+
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas
     this.clock = new THREE.Clock()
@@ -107,6 +111,57 @@ export class ParticleEngine {
 
   setBackgroundColor(color: string): void {
     this.scene.background = new THREE.Color(color)
+  }
+
+  addBackgroundImage(dataURL: string): void {
+    this.removeBackgroundImage()
+    const loader = new THREE.TextureLoader()
+    this.backgroundImageTexture = loader.load(dataURL, (texture) => {
+      const aspect = texture.image.width / texture.image.height
+      const height = 4
+      const width = height * aspect
+      const geometry = new THREE.PlaneGeometry(width, height)
+      const material = new THREE.MeshStandardMaterial({
+        map: texture,
+        transparent: true,
+        side: THREE.DoubleSide,
+      })
+      this.backgroundImageMesh = new THREE.Mesh(geometry, material)
+      this.backgroundImageMesh.position.set(0, 0, -2)
+      this.backgroundImageMesh.userData.isBackgroundImage = true
+      this.scene.add(this.backgroundImageMesh)
+    })
+  }
+
+  removeBackgroundImage(): void {
+    if (this.backgroundImageMesh) {
+      this.scene.remove(this.backgroundImageMesh)
+      this.backgroundImageMesh.geometry.dispose()
+      ;(this.backgroundImageMesh.material as THREE.Material).dispose()
+      this.backgroundImageMesh = null
+    }
+    if (this.backgroundImageTexture) {
+      this.backgroundImageTexture.dispose()
+      this.backgroundImageTexture = null
+    }
+  }
+
+  transformImage(params: { z?: number; scale?: number; rotation?: number; opacity?: number; _resetXY?: number }): void {
+    if (!this.backgroundImageMesh) return
+    if (params._resetXY !== undefined) {
+      this.backgroundImageMesh.position.x = 0
+      this.backgroundImageMesh.position.y = 0
+    }
+    if (params.z !== undefined) this.backgroundImageMesh.position.z = params.z
+    if (params.scale !== undefined) this.backgroundImageMesh.scale.setScalar(params.scale)
+    if (params.rotation !== undefined) this.backgroundImageMesh.rotation.z = params.rotation * Math.PI / 180
+    if (params.opacity !== undefined) {
+      (this.backgroundImageMesh.material as THREE.MeshStandardMaterial).opacity = params.opacity
+    }
+  }
+
+  getBackgroundImageMesh(): THREE.Mesh | null {
+    return this.backgroundImageMesh
   }
 
   /**

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
+import * as THREE from 'three'
 import { ParticleEngine } from '../lib/ParticleEngine'
 import { getAllEffects, getEffect, BASE_PARAMS } from '../lib/EffectRegistry'
 import type { EffectId, ModelInfo, ParamDef } from '../types'
@@ -7,6 +8,7 @@ import ModelUploader from './ModelUploader'
 import EffectSelector from './EffectSelector'
 import ActionBar3D from './ActionBar3D'
 import ParamPanel from './ParamPanel'
+import BackgroundPanel from './BackgroundPanel'
 
 function hexToRgb(hex: string): [number, number, number] {
   const r = parseInt(hex.slice(1, 3), 16) / 255
@@ -48,6 +50,8 @@ export default function App3D() {
   const [textValues, setTextValues] = useState<Record<string, string>>({})
 
   const [backgroundColor, setBackgroundColor] = useState('#1a1a2e')
+  const [hasBackgroundImage, setHasBackgroundImage] = useState(false)
+  const [imageParams, setImageParams] = useState({ z: -2, scale: 1, rotation: 0, opacity: 1 })
   const [isLoading, setIsLoading] = useState(false)
   const [samplingProgress, setSamplingProgress] = useState(-1)  // -1 = not sampling
   const [error, setError] = useState<string | null>(null)
@@ -71,6 +75,125 @@ export default function App3D() {
   useEffect(() => {
     engineRef.current?.setBackgroundColor(backgroundColor)
   }, [backgroundColor])
+
+  // Background image handlers
+  const handleImageUpload = useCallback((dataURL: string) => {
+    engineRef.current?.addBackgroundImage(dataURL)
+    setHasBackgroundImage(true)
+    setImageParams({ z: -2, scale: 1, rotation: 0, opacity: 1 })
+  }, [])
+
+  const handleImageRemove = useCallback(() => {
+    engineRef.current?.removeBackgroundImage()
+    setHasBackgroundImage(false)
+  }, [])
+
+  const handleImageParamChange = useCallback((param: string, value: number) => {
+    setImageParams(prev => {
+      const next = { ...prev, [param]: value }
+      engineRef.current?.transformImage(next)
+      return next
+    })
+  }, [])
+
+  // Canvas drag interaction for background image
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas || !hasBackgroundImage) return
+
+    const raycaster = new THREE.Raycaster()
+    const mouse = new THREE.Vector2()
+    let isDragging = false
+    let isShiftDrag = false
+    let startX = 0, startY = 0
+
+    const getHit = (e: MouseEvent) => {
+      const engine = engineRef.current
+      if (!engine) return false
+      const rect = canvas.getBoundingClientRect()
+      mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1
+      mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1
+      raycaster.setFromCamera(mouse, engine.camera)
+      const mesh = engine.getBackgroundImageMesh()
+      if (!mesh) return false
+      return raycaster.intersectObject(mesh).length > 0
+    }
+
+    const onMouseDown = (e: MouseEvent) => {
+      const engine = engineRef.current
+      if (!engine) return
+      if (!getHit(e)) return
+      isDragging = true
+      isShiftDrag = e.shiftKey
+      startX = e.clientX
+      startY = e.clientY
+      engine.controls.enabled = false
+      engine.setUniform('uMouseEnabled', 0)
+      canvas.style.cursor = 'grabbing'
+    }
+
+    const onMouseMove = (e: MouseEvent) => {
+      const engine = engineRef.current
+      if (!engine) return
+      if (!isDragging) {
+        canvas.style.cursor = getHit(e) ? 'grab' : ''
+        return
+      }
+      const dx = e.clientX - startX
+      const dy = e.clientY - startY
+      const mesh = engine.getBackgroundImageMesh()
+      if (!mesh) return
+
+      if (isShiftDrag) {
+        const newZ = mesh.position.z - dy * 0.01
+        setImageParams(prev => {
+          const next = { ...prev, z: Math.max(-10, Math.min(5, newZ)) }
+          engine.transformImage(next)
+          return next
+        })
+      } else {
+        mesh.position.x += dx * 0.005
+        mesh.position.y -= dy * 0.005
+      }
+      startX = e.clientX
+      startY = e.clientY
+    }
+
+    const onMouseUp = () => {
+      const engine = engineRef.current
+      if (!engine) return
+      if (isDragging) {
+        isDragging = false
+        engine.controls.enabled = true
+        engine.setUniform('uMouseEnabled', 1)
+        canvas.style.cursor = ''
+      }
+    }
+
+    const onWheel = (e: WheelEvent) => {
+      const engine = engineRef.current
+      if (!engine) return
+      if (!getHit(e)) return
+      e.preventDefault()
+      setImageParams(prev => {
+        const next = { ...prev, scale: Math.max(0.1, Math.min(5, prev.scale - e.deltaY * 0.001)) }
+        engine.transformImage(next)
+        return next
+      })
+    }
+
+    canvas.addEventListener('mousedown', onMouseDown)
+    canvas.addEventListener('mousemove', onMouseMove)
+    canvas.addEventListener('mouseup', onMouseUp)
+    canvas.addEventListener('wheel', onWheel, { passive: false })
+
+    return () => {
+      canvas.removeEventListener('mousedown', onMouseDown)
+      canvas.removeEventListener('mousemove', onMouseMove)
+      canvas.removeEventListener('mouseup', onMouseUp)
+      canvas.removeEventListener('wheel', onWheel)
+    }
+  }, [hasBackgroundImage])
 
   // Initialize effect-specific params when effect changes
   useEffect(() => {
@@ -298,6 +421,14 @@ export default function App3D() {
             onChange={(e) => setBackgroundColor(e.target.value)}
           />
         </div>
+
+        <BackgroundPanel
+          onImageUpload={handleImageUpload}
+          onImageRemove={handleImageRemove}
+          hasImage={hasBackgroundImage}
+          imageParams={imageParams}
+          onParamChange={handleImageParamChange}
+        />
 
         <EffectSelector
           effects={effects}
