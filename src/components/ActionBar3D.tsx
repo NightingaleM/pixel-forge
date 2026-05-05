@@ -138,11 +138,9 @@ export default function ActionBar3D({
         </div>
       )}
 
-      {isLoading && (
+      {isLoading && samplingProgress < 0 && (
         <div className="loading-indicator">
-          {samplingProgress >= 0
-            ? `${t('app3d.sampling')} ${samplingProgress}%`
-            : t('app3d.processing')}
+          {t('app3d.processing')}
         </div>
       )}
     </div>
