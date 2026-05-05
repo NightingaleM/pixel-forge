@@ -8,6 +8,7 @@ import type { EffectId, ModelInfo, ParamDef } from '../types'
 import ModelUploader from './ModelUploader'
 import EffectSelector from './EffectSelector'
 import ActionBar3D from './ActionBar3D'
+import ProgressDialog from './ProgressDialog'
 import ParamPanel from './ParamPanel'
 import BackgroundPanel from './BackgroundPanel'
 import LightingPanel from './LightingPanel'
@@ -357,6 +358,13 @@ export default function App3D() {
     engineRef.current?.setUniform(uniform, value)
   }, [])
 
+  // Handle cancel sampling
+  const handleCancelSampling = useCallback(() => {
+    engineRef.current?.cancelSampling()
+    setIsLoading(false)
+    setSamplingProgress(-1)
+  }, [])
+
   // Handle base text/color param change
   const handleBaseTextChange = useCallback((uniform: string, value: string) => {
     setBaseTextValues((prev) => ({ ...prev, [uniform]: value }))
@@ -584,6 +592,9 @@ export default function App3D() {
           isParticleMode={activeEffect !== 'none'}
         />
       </div>
+      {isLoading && samplingProgress >= 0 && (
+        <ProgressDialog progress={samplingProgress} onCancel={handleCancelSampling} />
+      )}
     </div>
   )
 }
