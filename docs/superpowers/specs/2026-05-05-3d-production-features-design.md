@@ -49,7 +49,7 @@ PixelForge 的 3D 模式目前是一个粒子效果展示工具，缺少让用�
 
 **交互**:
 - 侧边栏背景色区域下方添加"上传背景图片"按钮
-- 上传后图片以 PlaneGeometry + MeshBasicMaterial 渲染在场景中
+- 上传后图片以 PlaneGeometry + MeshStandardMaterial 渲染在场景中（受光照影响）
 - 图片位于粒子后方（Z 轴负方向），默认 z = -2
 - 图片宽高比保持原始比例，宽度适配视口
 
