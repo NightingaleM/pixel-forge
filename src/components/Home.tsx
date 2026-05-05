@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import Footer from './Footer'
 
 export default function Home() {
   const { t } = useTranslation()
@@ -27,6 +28,8 @@ export default function Home() {
             </div>
           </Link>
         </div>
+
+        <Footer />
       </div>
     </div>
   )
