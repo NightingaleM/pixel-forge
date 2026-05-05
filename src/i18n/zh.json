@@ -324,5 +324,78 @@
       "sdfMargin": "边界距离",
       "bounceStrength": "反弹强度"
     }
+  },
+  "about": {
+    "title": "关于",
+    "description": "PixelForge 是一个基于 WebGL 着色器的在线实时图像艺术风格转换工具。它提供 2D 图像风格化和 3D 粒子动画两种功能，完全在浏览器中运行，无需服务器端处理。",
+    "featuresTitle": "核心功能",
+    "feature2d": "2D 图像风格化 — 包含半调、扩散抖动、波普艺术、光影、素描、点彩、万花筒、交叉排线、动漫光影和文字栅格共 10 种艺术效果。",
+    "feature3d": "3D 粒子动画 — 将 GLTF 模型转换为粒子效果，支持爆散聚合、形状变换、旋转涡流和密度模拟。",
+    "techTitle": "技术栈",
+    "techStack": "基于 React 19、TypeScript、Three.js、WebGL 着色器和 Vite 构建。",
+    "contactTitle": "联系方式",
+    "contactEmail": "placeholder@example.com"
+  },
+  "privacy": {
+    "title": "隐私政策",
+    "lastUpdated": "最后更新：2026 年 5 月",
+    "collectTitle": "我们收集的信息",
+    "collectBody": "PixelForge 完全在您的浏览器中运行。我们不收集、存储或传输任何个人数据。您上传的图片通过 WebGL 在本地处理，不会离开您的设备。",
+    "usageTitle": "我们如何使用信息",
+    "usageBody": "由于不收集或传输任何数据，因此不存在对个人信息的使用。",
+    "cookiesTitle": "Cookie",
+    "cookiesBody": "我们可能使用必要的 Cookie 来存储您的语言偏好设置。不使用任何跟踪 Cookie。",
+    "thirdPartyTitle": "第三方服务",
+    "thirdPartyBody": "PixelForge 不集成任何第三方分析、广告或数据收集服务。",
+    "securityTitle": "数据安全",
+    "securityBody": "所有图像处理均通过 WebGL 在您的浏览器本地完成。您的文件不会被上传到任何服务器。",
+    "rightsTitle": "您的权利",
+    "rightsBody": "由于我们不收集任何个人数据，因此不存在需要访问、修改或删除的数据。",
+    "changesTitle": "政策变更",
+    "changesBody": "我们可能会不时更新本隐私政策。任何变更将在此页面上发布，并附上更新日期。",
+    "contactTitle": "联系我们",
+    "contactBody": "如果您对本隐私政策有任何疑问，请通过 placeholder@example.com 联系我们。"
+  },
+  "terms": {
+    "title": "使用条款",
+    "lastUpdated": "最后更新：2026 年 5 月",
+    "acceptanceTitle": "接受条款",
+    "acceptanceBody": "访问和使用 PixelForge 即表示您接受并同意受这些条款和条件的约束。",
+    "licenseTitle": "使用许可",
+    "licenseBody": "允许将 PixelForge 用于个人和商业目的。此许可不包括修改、分发或再授权本软件的权利。",
+    "userContentTitle": "用户内容",
+    "userContentBody": "您保留对上传的图片和模型的所有权利。PixelForge 在本地处理您的内容，不会存储或传输它。",
+    "limitationsTitle": "限制",
+    "limitationsBody": "PixelForge 按\"原样\"提供，不提供任何形式的保证。我们不保证不间断或无错误的运行。",
+    "disclaimerTitle": "免责声明",
+    "disclaimerBody": "本软件仅供创意和教育目的使用。开发者不对因使用本软件而产生的任何损害承担责任。",
+    "governingLawTitle": "适用法律",
+    "governingLawBody": "这些条款应受适用的当地法律管辖并据其解释。",
+    "changesTitle": "条款变更",
+    "changesBody": "我们保留随时修改这些条款的权利。变更将在发布后立即生效。",
+    "contactTitle": "联系我们",
+    "contactBody": "有关这些条款的问题，请通过 placeholder@example.com 联系我们。"
+  },
+  "help": {
+    "title": "使用说明",
+    "style2dTitle": "2D 图像风格化",
+    "style2dSteps": "1. 在首页点击\"2D 图片风格化\"\n2. 拖拽或点击上传区域上传图片\n3. 从左侧面板选择艺术风格\n4. 使用滑块调整效果参数\n5. 点击下载按钮保存结果",
+    "style3dTitle": "3D 粒子动画",
+    "style3dSteps": "1. 在首页点击\"3D 粒子动画\"\n2. 上传 GLTF 或 GLB 模型文件\n3. 从效果面板选择粒子特效\n4. 调整粒子参数（大小、颜色、速度等）\n5. 使用录制截图面板进行截图或录制视频",
+    "tipsTitle": "使用提示",
+    "tipsBrowser": "推荐使用 Chrome、Edge 或 Firefox 浏览器，并启用硬件加速。",
+    "tipsFormats": "2D 模式支持 JPG、PNG 和 WebP 图片。3D 模式支持 GLTF 和 GLB 模型文件。",
+    "tipsPerformance": "较大的图片或复杂模型可能影响性能。如遇卡顿，请尝试降低图片分辨率或模型复杂度。"
+  },
+  "notFound": {
+    "title": "404",
+    "message": "页面未找到"
+  },
+  "footer": {
+    "about": "关于",
+    "privacy": "隐私政策",
+    "terms": "使用条款",
+    "help": "使用说明",
+    "copyright": "© 2026 PixelForge. 保留所有权利。"
   }
 }
