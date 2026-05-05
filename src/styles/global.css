@@ -901,7 +901,7 @@ body {
 .preset-btn {
   flex: 1;
   padding: 6px 0;
-  background: #1a1a2e;
+  background: #000000;
   border: 1px solid #333;
   border-radius: 4px;
   cursor: pointer;
@@ -923,7 +923,7 @@ body {
 }
 .dir-btn {
   aspect-ratio: 1;
-  background: #1a1a2e;
+  background: #000000;
   border: 1px solid #333;
   border-radius: 3px;
   cursor: pointer;

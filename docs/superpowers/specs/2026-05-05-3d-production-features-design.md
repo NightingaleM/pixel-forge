@@ -28,7 +28,7 @@ PixelForge 的 3D 模式目前是一个粒子效果展示工具，缺少让用�
 **交互**:
 - 侧边栏添加背景色选择器（color input）
 - 支持纯色模式
-- 默认值保持当前 `#1a1a2e`
+- 默认值保持当前 `#000000`
 
 **技术实现**:
 - `App3D.tsx` 中添加 `backgroundColor` state

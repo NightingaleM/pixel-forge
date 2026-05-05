@@ -54,7 +54,7 @@ export default function App3D() {
   const [params, setParams] = useState<Record<string, number>>({})
   const [textValues, setTextValues] = useState<Record<string, string>>({})
 
-  const [backgroundColor, setBackgroundColor] = useState('#1a1a2e')
+  const [backgroundColor, setBackgroundColor] = useState('#000000')
   const [hasBackgroundImage, setHasBackgroundImage] = useState(false)
   const [imageParams, setImageParams] = useState({ z: -2, scale: 1, rotation: 0, opacity: 1 })
   const [imageDragLocked, setImageDragLocked] = useState(true)
@@ -527,7 +527,7 @@ export default function App3D() {
         {/* Recording panel — floating draggable */}
         <ParamPanel
           title={t('app3d.recordingPanelTitle')}
-          defaultPos={{ x: 15, y: 480 }}
+          defaultPos={{ x: 15, y: 768 }}
           defaultCollapsed={true}
         >
           <RecordingControls engineRef={engineRef} />

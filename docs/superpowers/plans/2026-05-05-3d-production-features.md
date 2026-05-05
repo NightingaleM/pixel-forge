@@ -59,7 +59,7 @@ setBackgroundColor(color: string): void {
 In `src/components/App3D.tsx`, add state in the state declaration area (after existing state declarations around line 44):
 
 ```typescript
-const [backgroundColor, setBackgroundColor] = useState('#1a1a2e')
+const [backgroundColor, setBackgroundColor] = useState('#000000')
 ```
 
 Add effect to sync color to engine, after the engine init useEffect:
@@ -98,7 +98,7 @@ Add to `src/i18n/en.json` and `src/i18n/zh.json` under the `app3d` key:
 
 - [ ] **Step 4: Verify and commit**
 
-Open the app, confirm color picker changes the 3D scene background color. Default should be `#1a1a2e`.
+Open the app, confirm color picker changes the 3D scene background color. Default should be `#000000`.
 
 ```bash
 git add -A && git commit -m "feat(3d): add custom background color picker"
