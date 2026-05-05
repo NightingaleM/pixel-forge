@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ShaderRenderer } from '../lib/ShaderRenderer'
 import { styles, getStyle } from '../lib/StyleRegistry'
@@ -274,6 +275,7 @@ function App2D() {
   return (
     <div className="app-container">
       <div className="left-sidebar">
+        <Link to="/" className="sidebar-home-btn">← {t('common.backToHome')}</Link>
         <StyleSelector styles={styles} activeId={activeStyle} onSelect={handleStyleChange} />
       </div>
       <div className="center-area">

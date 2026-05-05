@@ -6,8 +6,8 @@ import type { EffectDef, EffectId, ParamDef } from '../types'
 export const BASE_PARAMS: ParamDef[] = [
   { name: 'base.baseSize', uniform: 'uBaseSize', min: 0.005, max: 0.05, step: 0.001, default: 0.02 },
   { type: 'toggle', name: 'base.mouseEnabled', uniform: 'uMouseEnabled', default: 1 },
-  { name: 'base.mouseRadius', uniform: 'uMouseRadius', min: 0.05, max: 0.5, step: 0.01, default: 0.15 },
-  { name: 'base.mouseStrength', uniform: 'uMouseStrength', min: 0.1, max: 2.0, step: 0.01, default: 0.5 },
+  { name: 'base.mouseRadius', uniform: 'uMouseRadius', min: 0.01, max: 1, step: 0.005, default: 0.2 },
+  { name: 'base.mouseStrength', uniform: 'uMouseStrength', min: 0.01, max: 2.0, step: 0.005, default: 0.1 },
   { type: 'toggle', name: 'base.useCustomColor', uniform: 'uUseCustomColor', default: 0 },
   { type: 'color', name: 'base.particleColor', uniform: 'uColor', default: '#ffffff' },
   { type: 'select', name: 'base.shapeType', uniform: 'uShapeType', options: [

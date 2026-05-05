@@ -5,7 +5,8 @@
     "random": "随机",
     "cancel": "取消",
     "close": "关闭",
-    "loading": "加载中..."
+    "loading": "加载中...",
+    "backToHome": "返回首页"
   },
   "home": {
     "subtitle": "图片风格化 & 3D 粒子动画",

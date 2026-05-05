@@ -5,7 +5,8 @@
     "random": "Random",
     "cancel": "Cancel",
     "close": "Close",
-    "loading": "Loading..."
+    "loading": "Loading...",
+    "backToHome": "Back to Home"
   },
   "home": {
     "subtitle": "Image Stylization & 3D Particle Animation",

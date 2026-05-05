@@ -97,7 +97,7 @@ export default function BackgroundPanel({
             <div key={s.key} className="param-row">
               <div className="param-header">
                 <span className="param-label">{s.label}</span>
-                <span className="param-value">{Number.isInteger(s.value) ? s.value : s.value.toFixed(2)}</span>
+                <span className="param-value">{Number.isInteger(s.value) && Number.isInteger(s.step) ? s.value : s.value.toFixed(Math.max(0, Math.ceil(-Math.log10(s.step))))}</span>
               </div>
               <input
                 type="range" className="param-slider"

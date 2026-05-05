@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import * as THREE from 'three'
 import { ParticleEngine } from '../lib/ParticleEngine'
@@ -464,6 +465,7 @@ export default function App3D() {
   return (
     <div className="app-3d">
       <div className="app-3d-sidebar">
+        <Link to="/" className="sidebar-home-btn">← {t('common.backToHome')}</Link>
         <EffectSelector
           effects={effects}
           activeId={activeEffect}

@@ -15,8 +15,10 @@ interface ParamPanelProps {
   defaultCollapsed?: boolean
 }
 
-function formatValue(value: number): string {
-  return Number.isInteger(value) ? value.toString() : value.toFixed(2)
+function formatValue(value: number, step?: number): string {
+  if (Number.isInteger(value) && Number.isInteger(step)) return value.toString()
+  const precision = step ? Math.max(0, Math.ceil(-Math.log10(step))) : 2
+  return value.toFixed(precision)
 }
 
 function renderParam(
@@ -117,7 +119,7 @@ function renderParam(
             </span>
           )}
         </span>
-        <span className="param-value">{formatValue(values[param.uniform] ?? param.default)}</span>
+        <span className="param-value">{formatValue(values[param.uniform] ?? param.default, param.step)}</span>
       </div>
       <input
         type="range"
