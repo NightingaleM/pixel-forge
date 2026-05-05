@@ -700,6 +700,27 @@ body {
   background: #F0F0F0;
 }
 
+/* --- Progress Bar --- */
+
+.progress-bar-track {
+  border: 2px solid #000;
+  height: 16px;
+  margin-bottom: 4px;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: #000;
+  transition: width 0.15s ease;
+}
+
+.progress-bar-text {
+  margin: 0 0 16px;
+  font-size: 12px;
+  color: #666;
+  text-align: right;
+}
+
 /* ============================================================
    3D Page Styles
    ============================================================ */
