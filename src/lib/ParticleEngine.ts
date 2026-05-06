@@ -28,6 +28,9 @@ export class ParticleEngine {
 
   // Particle system
   particles: THREE.Points | null = null
+  private _oldParticles: THREE.Points | null = null
+  private _currentSamplingType: SamplingType | null = null
+  private _hasTargetPositions = false
   animationId: number | null = null
   canvas: HTMLCanvasElement
   clock: THREE.Clock
@@ -630,7 +633,7 @@ export class ParticleEngine {
       await this.volumetricSampleAsync(count, positions, colors, normals, sizes, randoms, onProgress)
     }
 
-    this.buildParticleSystem(count, positions, colors, normals, sizes, randoms, targetPositions)
+    this.buildParticleSystem(count, positions, colors, normals, sizes, randoms, targetPositions, type)
   }
 
   /**
@@ -644,6 +647,7 @@ export class ParticleEngine {
     sizes: number[],
     randoms: number[],
     targetPositions: number[],
+    samplingType?: SamplingType,
   ): void {
     const geometry = new THREE.BufferGeometry()
 
@@ -665,11 +669,11 @@ export class ParticleEngine {
     this.velocityData = new Float32Array(count * 3)
 
     this.modelGeometry = geometry
+    this._currentSamplingType = samplingType ?? null
+    this._hasTargetPositions = targetPositions.length > 0
 
-    if (this.particles) {
-      this.scene.remove(this.particles)
-      this.particles.geometry.dispose()
-    }
+    // Keep old particles visible during transition for seamless switching
+    this._oldParticles = this.particles
 
     const tempMaterial = new THREE.PointsMaterial({
       color: 0xffffff,
@@ -677,6 +681,7 @@ export class ParticleEngine {
       sizeAttenuation: true,
     })
     this.particles = new THREE.Points(geometry, tempMaterial)
+    this.particles.visible = false
     this.particles.frustumCulled = false
     this.scene.add(this.particles)
 
@@ -822,7 +827,7 @@ export class ParticleEngine {
           // Create SDF 3D texture (guard against missing data from older worker)
           if (this.sdfTexture) this.sdfTexture.dispose()
           if (sdfData && sdfData.length > 0) {
-            this.sdfTexture = new THREE.Data3DTexture(sdfData, 32, 32, 32)
+            this.sdfTexture = new THREE.Data3DTexture(sdfData, 20, 20, 20)
             this.sdfTexture.format = THREE.RedFormat
             this.sdfTexture.type = THREE.FloatType
             this.sdfTexture.minFilter = THREE.LinearFilter
@@ -834,7 +839,7 @@ export class ParticleEngine {
           }
 
           // Store SDF coordinate mapping (bbox min + 1/size)
-          const res = 32
+          const res = 20
           const cellX = size.x / res
           const cellY = size.y / res
           const cellZ = size.z / res
@@ -889,7 +894,7 @@ export class ParticleEngine {
         indices: indicesArray,
         center: { x: center.x, y: center.y, z: center.z },
         size: { x: size.x, y: size.y, z: size.z },
-        resolution: 32,
+        resolution: 20,
       }, [positionsArray.buffer, ...(indicesArray ? [indicesArray.buffer] : [])])
     })
   }
@@ -902,6 +907,32 @@ export class ParticleEngine {
     if (this._samplingReject) {
       this._samplingReject(new DOMException('Aborted', 'AbortError'))
       this._samplingReject = null
+    }
+  }
+
+  /**
+   * Check if current particles can be reused for a new effect.
+   * Avoids re-sampling when switching between same-type effects.
+   */
+  canReuseParticles(samplingType: SamplingType, needsTargetPositions: boolean, particleCount: number): boolean {
+    if (!this.particles || !this.particles.visible) return false
+    if (this._currentSamplingType !== samplingType) return false
+    if (this.particleCount !== particleCount) return false
+    if (needsTargetPositions && !this._hasTargetPositions) return false
+    return true
+  }
+
+  /**
+   * Dispose old particles kept for seamless transition.
+   * Called after new material is successfully applied.
+   */
+  private disposeOldParticles(): void {
+    if (this._oldParticles) {
+      this.scene.remove(this._oldParticles)
+      this._oldParticles.geometry.dispose()
+      const mat = this._oldParticles.material
+      if (mat && 'dispose' in mat) mat.dispose()
+      this._oldParticles = null
     }
   }
 
@@ -1004,7 +1035,11 @@ export class ParticleEngine {
 
       if (this.particles) {
         this.particles.material = material
+        this.particles.visible = true
       }
+
+      // Now that new particles are ready, remove old ones
+      this.disposeOldParticles()
 
     } catch (error) {
       console.error('Failed to apply material:', error)

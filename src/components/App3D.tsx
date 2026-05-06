@@ -313,12 +313,19 @@ export default function App3D() {
           }
 
           if (effectDef) {
-            await engine.sampleParticles(particleCount, effectDef.samplingType, (p) => {
-              setSamplingProgress(p)
-            })
-          }
+            // Skip re-sampling when switching between same-type effects
+            const canReuse = engine.canReuseParticles(
+              effectDef.samplingType,
+              !!effectDef.requiresTargetModel,
+              particleCount,
+            )
 
-          if (effectDef) {
+            if (!canReuse) {
+              await engine.sampleParticles(particleCount, effectDef.samplingType, (p) => {
+                setSamplingProgress(p)
+              })
+            }
+
             await engine.applyMaterial(effectDef)
 
             // Apply base params
