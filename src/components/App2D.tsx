@@ -18,7 +18,7 @@ function initParams(styleId: StyleId): Record<string, number> {
   if (!styleDef) return {}
   const result: Record<string, number> = {}
   for (const p of styleDef.params) {
-    if (p.type === 'text') continue
+    if (p.type === 'text' || p.type === 'color') continue
     result[p.uniform] = p.default
   }
   return result
@@ -157,7 +157,7 @@ function App2D() {
       if (!styleDef) { setParams(initParams(id)); return }
       const randomParams: Record<string, number> = {}
       for (const p of styleDef.params) {
-        if (p.type === 'text') continue
+        if (p.type !== 'number') continue
         if (SKIP_RANDOM_UNIFORMS.includes(p.uniform)) {
           randomParams[p.uniform] = 0
           continue
@@ -214,7 +214,7 @@ function App2D() {
     if (!styleDef) return
     const randomParams: Record<string, number> = {}
     for (const p of styleDef.params) {
-      if (p.type === 'text') continue
+      if (p.type !== 'number') continue
       if (SKIP_RANDOM_UNIFORMS.includes(p.uniform)) continue
       const range = p.max - p.min
       const raw = p.min + Math.random() * range

@@ -7,7 +7,7 @@ interface ActionBar3DProps {
   onResetView: () => void
   particleCount: number
   onParticleCountChange: (count: number) => void
-  modelInfo: ModelInfo | null
+  modelInfo?: ModelInfo | null
   isLoading?: boolean
   samplingProgress?: number
   isParticleMode?: boolean
@@ -37,7 +37,7 @@ export default function ActionBar3D({
   onResetView,
   particleCount,
   onParticleCountChange,
-  modelInfo,
+  modelInfo: _modelInfo,
   isLoading = false,
   samplingProgress = -1,
   isParticleMode = true,

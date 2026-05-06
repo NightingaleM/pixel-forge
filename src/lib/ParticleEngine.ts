@@ -417,8 +417,8 @@ export class ParticleEngine {
         // Normalize the cloned GLTF scene to match particle geometry scale
         this.normalizeScene(gltfScene)
         this.originalMesh = gltfScene
-        this.originalMesh.visible = false
-        this.scene.add(this.originalMesh)
+        gltfScene.visible = false
+        this.scene.add(gltfScene)
 
         // Extract model info
         const positionAttribute = this.modelGeometry.getAttribute('position')
