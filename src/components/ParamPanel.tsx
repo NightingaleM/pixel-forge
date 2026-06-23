@@ -9,6 +9,8 @@ interface ParamPanelProps {
   textValues?: Record<string, string>
   onChange?: (uniform: string, value: number) => void
   onTextChange?: (uniform: string, value: string) => void
+  fontValues?: Record<string, FontFace | null | undefined>
+  onFontChange?: (uniform: string, font: FontFace | null) => void
   onClose?: () => void
   defaultPos?: { x: number; y: number }
   children?: ReactNode
@@ -27,6 +29,8 @@ function renderParam(
   textValues: Record<string, string>,
   onChange: (u: string, v: number) => void,
   onTextChange: (u: string, v: string) => void,
+  onFontChange: (u: string, f: FontFace | null) => void,
+  fontValues: Record<string, FontFace | null | undefined>,
 ) {
   if (param.type === 'text') {
     return (
@@ -107,8 +111,41 @@ function renderParam(
   }
 
   if (param.type === 'font') {
-    // Placeholder — the real font-upload control is added in a later task.
-    return null
+    const current = fontValues[param.uniform]
+    const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0]
+      if (!file) {
+        onFontChange(param.uniform, null)
+        return
+      }
+      file.arrayBuffer().then((buf) => {
+        const family = file.name.replace(/\.[^.]+$/, '')
+        const face = new FontFace(family, buf)
+        face.load().then(() => {
+          document.fonts.add(face)
+          onFontChange(param.uniform, face)
+        }).catch(() => onFontChange(param.uniform, null))
+      })
+    }
+    return (
+      <div key={param.uniform} className="param-row">
+        <div className="param-header">
+          <span className="param-label">
+            {param.name}
+            {param.description && (
+              <span className="param-tooltip-wrap">
+                <span className="param-tooltip-icon">?</span>
+                <span className="param-tooltip-text">{param.description}</span>
+              </span>
+            )}
+          </span>
+        </div>
+        <label className="param-font-upload">
+          <input type="file" accept=".ttf,.otf,.woff,.woff2" onChange={handleFile} />
+          <span className="param-font-name">{current ? current.family : ''}</span>
+        </label>
+      </div>
+    )
   }
 
   // Default: number slider
@@ -141,7 +178,7 @@ function renderParam(
   )
 }
 
-function ParamPanel({ title, description, params, values, textValues, onChange, onTextChange, onClose, defaultPos, children, defaultCollapsed }: ParamPanelProps) {
+function ParamPanel({ title, description, params, values, textValues, onChange, onTextChange, fontValues, onFontChange, onClose, defaultPos, children, defaultCollapsed }: ParamPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState(defaultPos ?? { x: typeof window !== 'undefined' ? window.innerWidth - 320 : 600, y: 35 })
   const [collapsed, setCollapsed] = useState(defaultCollapsed ?? false)
@@ -190,7 +227,15 @@ function ParamPanel({ title, description, params, values, textValues, onChange, 
       </div>
       {!collapsed && (
         <div className="param-panel-body">
-          {children ?? params?.map((p) => renderParam(p, values ?? {}, textValues ?? {}, onChange ?? (() => {}), onTextChange ?? (() => {})))}
+          {children ?? params?.map((p) => renderParam(
+            p,
+            values ?? {},
+            textValues ?? {},
+            onChange ?? (() => {}),
+            onTextChange ?? (() => {}),
+            onFontChange ?? (() => {}),
+            fontValues ?? {},
+          ))}
         </div>
       )}
     </div>

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ShaderRenderer } from '../lib/ShaderRenderer'
+import { AsciiCanvasRenderer } from '../lib/AsciiCanvasRenderer'
 import { styles, getStyle } from '../lib/StyleRegistry'
 import type { StyleId } from '../types'
 import ImageUploader from './ImageUploader'
@@ -53,19 +54,43 @@ function App2D() {
   const [showCloseDialog, setShowCloseDialog] = useState(false)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const rendererRef = useRef<ShaderRenderer | null>(null)
+  const asciiRendererRef = useRef<AsciiCanvasRenderer | null>(null)
+  const [fontParams, setFontParams] = useState<Record<string, FontFace | null>>({})
 
   // ---------------------------------------------------------------------------
   // Render pipeline
   // ---------------------------------------------------------------------------
 
   const renderWithStyle = useCallback(
-    async (styleId: StyleId, currentParams: Record<string, number>, currentTextParams: Record<string, string>) => {
+    async (styleId: StyleId, currentParams: Record<string, number>, currentTextParams: Record<string, string>, currentFontParams: Record<string, FontFace | null>) => {
       const canvas = canvasRef.current
+      if (!canvas) return
       const renderer = rendererRef.current
-      if (!canvas || !renderer) return
 
       const styleDef = getStyle(styleId)
       if (!styleDef) return
+
+      // ----- canvas2d branch (ASCII) — must return BEFORE the WebGL text-texture block -----
+      if (styleDef.renderMode === 'canvas2d') {
+        if (!image) return
+        if (!asciiRendererRef.current) asciiRendererRef.current = new AsciiCanvasRenderer()
+        const fp = currentFontParams['uFont'] ?? null
+        asciiRendererRef.current.render(canvas, image, {
+          charset: currentTextParams['uCharset'] ?? '',
+          caseMode: currentParams['uCaseMode'] ?? 0,
+          charColor: currentTextParams['uCharColor'] ?? '#00ff66',
+          showBg: currentParams['uShowBg'] ?? 1,
+          charScale: currentParams['uCharScale'] ?? 1.0,
+          cellSize: currentParams['uCellSize'] ?? 14,
+          randomScale: currentParams['uRandomScale'] ?? 0,
+          bgFilter: currentParams['uBgFilter'] ?? 0.12,
+        }, fp)
+        return
+      }
+      // ----- end canvas2d branch -----
+
+      // shader branch: ASCII already returned; renderer required here
+      if (!renderer) return
 
       // Handle text params: generate text textures
       const textTextures: WebGLTexture[] = []
@@ -110,7 +135,7 @@ function App2D() {
         if (gl) gl.deleteTexture(tex)
       }
     },
-    [],
+    [image],
   )
 
   // ---------------------------------------------------------------------------
@@ -166,6 +191,7 @@ function App2D() {
         const raw = p.min + Math.random() * range
         randomParams[p.uniform] = Math.round(raw / p.step) * p.step
       }
+      setFontParams({})
       setParams(randomParams)
     },
     [],
@@ -176,9 +202,12 @@ function App2D() {
   // ---------------------------------------------------------------------------
 
   useEffect(() => {
-    if (!image || !rendererRef.current) return
-    renderWithStyle(activeStyle, params, textParams)
-  }, [image, activeStyle, params, textParams, renderWithStyle])
+    if (!image) return
+    const styleDef = getStyle(activeStyle)
+    // ASCII uses a lazy AsciiCanvasRenderer; shader styles need rendererRef.
+    if (styleDef?.renderMode !== 'canvas2d' && !rendererRef.current) return
+    renderWithStyle(activeStyle, params, textParams, fontParams)
+  }, [image, activeStyle, params, textParams, fontParams, renderWithStyle])
 
   // ---------------------------------------------------------------------------
   // Cleanup
@@ -190,6 +219,7 @@ function App2D() {
         rendererRef.current.destroy()
         rendererRef.current = null
       }
+      asciiRendererRef.current = null
     }
   }, [])
 
@@ -203,6 +233,10 @@ function App2D() {
 
   const handleTextChange = useCallback((uniform: string, value: string) => {
     setTextParams((prev) => ({ ...prev, [uniform]: value }))
+  }, [])
+
+  const handleFontChange = useCallback((uniform: string, font: FontFace | null) => {
+    setFontParams((prev) => ({ ...prev, [uniform]: font }))
   }, [])
 
   const handleReset = useCallback(() => {
@@ -312,11 +346,23 @@ function App2D() {
         <ParamPanel
           title={t(currentStyle.label)}
           description={t(currentStyle.description)}
-          params={currentStyle.params.map(p => ({ ...p, name: t(p.name), description: p.description ? t(p.description) : undefined }))}
+          params={currentStyle.params.map(p => {
+            if (p.type === 'select') {
+              return {
+                ...p,
+                name: t(p.name),
+                description: p.description ? t(p.description) : undefined,
+                options: p.options.map(o => ({ ...o, label: t(o.label) })),
+              }
+            }
+            return { ...p, name: t(p.name), description: p.description ? t(p.description) : undefined }
+          })}
           values={params}
           textValues={textParams}
           onChange={handleParamChange}
           onTextChange={handleTextChange}
+          fontValues={fontParams}
+          onFontChange={handleFontChange}
         />
       )}
       {showCloseDialog && (
