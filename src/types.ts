@@ -1,4 +1,4 @@
-export type StyleId = 'halftone' | 'diffusion' | 'popart' | 'lightshadow' | 'sketch' | 'pointillism' | 'kaleidoscope' | 'crosshatch' | 'animelight' | 'textraster'
+export type StyleId = 'halftone' | 'diffusion' | 'popart' | 'lightshadow' | 'sketch' | 'pointillism' | 'kaleidoscope' | 'crosshatch' | 'animelight' | 'textraster' | 'ascii'
 
 export interface NumberParamDef {
   type?: 'number'
@@ -44,7 +44,14 @@ export interface SelectParamDef {
   description?: string
 }
 
-export type ParamDef = NumberParamDef | TextParamDef | ToggleParamDef | ColorParamDef | SelectParamDef
+export interface FontParamDef {
+  type: 'font'
+  name: string
+  uniform: string
+  description?: string
+}
+
+export type ParamDef = NumberParamDef | TextParamDef | ToggleParamDef | ColorParamDef | SelectParamDef | FontParamDef
 
 export interface ShaderPass {
   fragSource: string
@@ -58,6 +65,7 @@ export interface StyleDefinition {
   shaderImports: (() => Promise<string>)[]  // 函数数组，每个返回一个 fragment shader 源码
   params: ParamDef[]
   isMultiPass?: boolean
+  renderMode?: 'shader' | 'canvas2d'  // 默认 'shader'
 }
 
 // ---------------------------------------------------------------------------

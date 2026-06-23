@@ -106,6 +106,11 @@ function renderParam(
     )
   }
 
+  if (param.type === 'font') {
+    // Placeholder — the real font-upload control is added in a later task.
+    return null
+  }
+
   // Default: number slider
   return (
     <div key={param.uniform} className="param-row">
