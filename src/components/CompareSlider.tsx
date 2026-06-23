@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect, type RefObject } from 'react'
 import { useTranslation } from 'react-i18next'
+import ZoomControl from './ZoomControl'
 
 interface CompareSliderProps {
   canvasRef: RefObject<HTMLCanvasElement | null>
@@ -7,6 +8,8 @@ interface CompareSliderProps {
   compareMode: boolean
   onToggleCompare: () => void
   onClose: () => void
+  zoom: number
+  onZoom: (z: number) => void
 }
 
 function CompareSlider({
@@ -15,6 +18,8 @@ function CompareSlider({
   compareMode,
   onToggleCompare,
   onClose,
+  zoom,
+  onZoom,
 }: CompareSliderProps) {
   const { t } = useTranslation()
   const [sliderPosition, setSliderPosition] = useState(0.5)
@@ -99,33 +104,37 @@ function CompareSlider({
         onMouseDown={handleMouseDown}
         onTouchStart={handleTouchStart}
       >
-        <canvas ref={canvasRef} />
+        <div className="canvas-scaler" style={{ transform: `scale(${zoom})`, transformOrigin: 'top left' }}>
+          <canvas ref={canvasRef} />
 
-        {compareMode && originalImage && (
-          <img
-            src={originalImage.src}
-            alt="Original"
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100%',
-              height: '100%',
-              pointerEvents: 'none',
-              clipPath: `inset(0 ${clipInsetPercent}% 0 0)`,
-            }}
-          />
-        )}
+          {compareMode && originalImage && (
+            <img
+              src={originalImage.src}
+              alt="Original"
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                pointerEvents: 'none',
+                clipPath: `inset(0 ${clipInsetPercent}% 0 0)`,
+              }}
+            />
+          )}
 
-        {compareMode && (
-          <div
-            className="compare-divider"
-            style={{
-              left: `${sliderPosition * 100}%`,
-            }}
-          />
-        )}
+          {compareMode && (
+            <div
+              className="compare-divider"
+              style={{
+                left: `${sliderPosition * 100}%`,
+              }}
+            />
+          )}
+        </div>
       </div>
+
+      <ZoomControl zoom={zoom} onZoom={onZoom} />
 
       <button
         className={`compare-toggle${compareMode ? ' active' : ''}`}
