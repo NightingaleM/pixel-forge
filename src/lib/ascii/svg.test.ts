@@ -21,6 +21,7 @@ describe('matrixToSvg', () => {
     expect(svg).toContain('font-size="14.00"')
     expect(svg).toContain('fill="#00ff66"')
     expect(svg).toContain('>A<')
+    expect(svg).toContain('dominant-baseline="hanging"')
   })
 
   it('escapes XML special characters in chars', () => {
