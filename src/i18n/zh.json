@@ -17,7 +17,8 @@
   },
   "uploader": {
     "dragOrClick": "拖拽图片到此处或点击上传",
-    "dragFileOrClick": "拖拽文件到此处或点击上传"
+    "dragFileOrClick": "拖拽文件到此处或点击上传",
+    "sizeHint": "避免卡顿，图像建议控制在 2K 分辨率内"
   },
   "modelUploader": {
     "defaultLabel": "上传 GLTF/GLB 模型",

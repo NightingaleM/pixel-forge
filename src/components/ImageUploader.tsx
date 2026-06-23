@@ -56,7 +56,10 @@ function ImageUploader({ onImageLoad }: ImageUploaderProps) {
         style={{ display: 'none' }}
         onChange={handleInputChange}
       />
-      <span>{t('uploader.dragOrClick')}</span>
+      <div className="upload-zone-content">
+        <span>{t('uploader.dragOrClick')}</span>
+        <p className="upload-hint">{t('uploader.sizeHint')}</p>
+      </div>
     </div>
   )
 }

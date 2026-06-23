@@ -17,7 +17,8 @@
   },
   "uploader": {
     "dragOrClick": "Drag image here or click to upload",
-    "dragFileOrClick": "Drag file here or click to upload"
+    "dragFileOrClick": "Drag file here or click to upload",
+    "sizeHint": "For best performance, keep images under 2K resolution."
   },
   "modelUploader": {
     "defaultLabel": "Upload GLTF/GLB Model",
