@@ -274,6 +274,31 @@
       "colorStrengthDesc": "Character foreground color intensity",
       "angle": "Grid Rotation",
       "angleDesc": "Overall grid rotation angle"
+    },
+    "ascii": {
+      "label": "ASCII Art",
+      "desc": "Convert an image into ASCII character art using a custom character set, with adjustable density, color and background filtering.",
+      "charset": "Character Set",
+      "charsetDesc": "Any mix of CJK, letters, digits and symbols. Characters are sorted by ink density automatically.",
+      "font": "Custom Font",
+      "fontDesc": "Upload TTF / WOFF / OTF. Falls back to monospace if none.",
+      "caseMode": "Letter Case",
+      "caseModeDesc": "Applies to ASCII letters only.",
+      "caseKeep": "Keep",
+      "caseUpper": "UPPERCASE",
+      "caseLower": "lowercase",
+      "charColor": "Character Color",
+      "charColorDesc": "Fill color of every character.",
+      "showBg": "Show Original Background",
+      "showBgDesc": "Overlay the original image beneath the characters.",
+      "charScale": "Character Size",
+      "charScaleDesc": "Character size relative to its cell.",
+      "cellSize": "Density / Spacing",
+      "cellSizeDesc": "Cell size in pixels — smaller means denser characters.",
+      "randomScale": "Random Scale",
+      "randomScaleDesc": "Random per-character scaling for depth. 0 disables.",
+      "bgFilter": "Background Filter",
+      "bgFilterDesc": "Skip flat low-contrast regions; higher skips more."
     }
   },
   "base": {
@@ -397,5 +422,10 @@
     "terms": "Terms of Service",
     "help": "Help",
     "copyright": "© 2026 PixelForge. All rights reserved."
+  },
+  "export": {
+    "png": "PNG",
+    "jpg": "JPG",
+    "svg": "SVG"
   }
 }

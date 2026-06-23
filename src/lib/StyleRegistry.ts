@@ -197,6 +197,32 @@ export const styles: StyleDefinition[] = [
       { name: 'style.textraster.angle', uniform: 'uAngle',          min: 0,   max: 360, step: 1,    default: 0,   description: 'style.textraster.angleDesc' },
     ],
   },
+
+  // ---------------------------------------------------------------------------
+  // ASCII Art (canvas2d)
+  // ---------------------------------------------------------------------------
+  {
+    id: 'ascii',
+    label: 'style.ascii.label',
+    description: 'style.ascii.desc',
+    shaderImports: [],
+    renderMode: 'canvas2d',
+    params: [
+      { name: 'style.ascii.charset', uniform: 'uCharset', type: 'text' as const, textDefault: '哇真的是你啊!@#$%^&*+/=三:.', description: 'style.ascii.charsetDesc' },
+      { name: 'style.ascii.font', uniform: 'uFont', type: 'font' as const, description: 'style.ascii.fontDesc' },
+      { name: 'style.ascii.caseMode', uniform: 'uCaseMode', type: 'select' as const, options: [
+        { label: 'style.ascii.caseKeep', value: 0 },
+        { label: 'style.ascii.caseUpper', value: 1 },
+        { label: 'style.ascii.caseLower', value: 2 },
+      ], default: 0, description: 'style.ascii.caseModeDesc' },
+      { name: 'style.ascii.charColor', uniform: 'uCharColor', type: 'color' as const, default: '#00ff66', description: 'style.ascii.charColorDesc' },
+      { name: 'style.ascii.showBg', uniform: 'uShowBg', type: 'toggle' as const, default: 1, description: 'style.ascii.showBgDesc' },
+      { name: 'style.ascii.charScale', uniform: 'uCharScale', min: 0.5, max: 1.5, step: 0.05, default: 1.0, description: 'style.ascii.charScaleDesc' },
+      { name: 'style.ascii.cellSize', uniform: 'uCellSize', min: 6, max: 40, step: 1, default: 14, description: 'style.ascii.cellSizeDesc' },
+      { name: 'style.ascii.randomScale', uniform: 'uRandomScale', min: 0, max: 1, step: 0.05, default: 0, description: 'style.ascii.randomScaleDesc' },
+      { name: 'style.ascii.bgFilter', uniform: 'uBgFilter', min: 0, max: 0.5, step: 0.01, default: 0.12, description: 'style.ascii.bgFilterDesc' },
+    ],
+  },
 ]
 
 /**
