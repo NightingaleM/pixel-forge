@@ -257,19 +257,46 @@ function App2D() {
     setParams(randomParams)
   }, [activeStyle])
 
-  const handleDownload = useCallback(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    canvas.toBlob((blob) => {
-      if (!blob) return
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${activeStyle}_${Date.now()}.png`
-      a.click()
-      URL.revokeObjectURL(url)
-    }, 'image/png')
+  const downloadBlob = useCallback((blob: Blob | null, ext: string) => {
+    if (!blob) return
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${activeStyle}_${Date.now()}.${ext}`
+    a.click()
+    URL.revokeObjectURL(url)
   }, [activeStyle])
+
+  const handleDownloadPng = useCallback(() => {
+    canvasRef.current?.toBlob((b) => downloadBlob(b, 'png'), 'image/png')
+  }, [downloadBlob])
+
+  const handleDownloadJpg = useCallback(() => {
+    // JPG has no alpha: composite onto black if background is off.
+    const styleDef = getStyle(activeStyle)
+    const showBg = params['uShowBg'] ?? 1
+    if (styleDef?.renderMode === 'canvas2d' && showBg !== 1) {
+      const src = canvasRef.current
+      if (!src) return
+      const tmp = document.createElement('canvas')
+      tmp.width = src.width; tmp.height = src.height
+      const ctx = tmp.getContext('2d')
+      if (!ctx) return
+      ctx.fillStyle = '#000'
+      ctx.fillRect(0, 0, tmp.width, tmp.height)
+      ctx.drawImage(src, 0, 0)
+      tmp.toBlob((b) => downloadBlob(b, 'jpg'), 'image/jpeg')
+      return
+    }
+    canvasRef.current?.toBlob((b) => downloadBlob(b, 'jpg'), 'image/jpeg')
+  }, [activeStyle, params, downloadBlob])
+
+  const handleDownloadSvg = useCallback(() => {
+    const family = fontParams['uFont']?.family ?? 'monospace'
+    const svg = asciiRendererRef.current?.exportSvg(family)
+    if (!svg) return
+    downloadBlob(new Blob([svg], { type: 'image/svg+xml' }), 'svg')
+  }, [fontParams, downloadBlob])
 
   const handleClose = useCallback(() => {
     setImage(null)
@@ -337,7 +364,10 @@ function App2D() {
         </div>
       </div>
       <ActionBar
-        onDownload={handleDownload}
+        onDownloadPng={handleDownloadPng}
+        onDownloadJpg={handleDownloadJpg}
+        onDownloadSvg={handleDownloadSvg}
+        renderMode={currentStyle?.renderMode}
         onReset={handleReset}
         onRandom={handleRandom}
         imageInfo={imageInfo}
