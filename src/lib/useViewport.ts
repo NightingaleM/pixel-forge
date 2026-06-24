@@ -31,7 +31,7 @@ export function clampZoom(z: number, min = MIN_ZOOM, max = MAX_ZOOM): number {
 
 /**
  * 以 wrapper 内锚点 (mx, my) 为中心缩放到 newZoom，使该内容点保持在光标下。
- * newZoom 会被 clamp。注意：返回值的 panX/panY 未做边界 clamp（交给 clampPan）。
+ * newZoom 会被 clamp；pan 不做边界限制——图片可随意拖动（即便全部展示）。
  *
  * 推导：缩放前锚点对应内容世界坐标 world = (anchor - pan) / zoom；
  * 缩放后为保持压在光标下：anchor = pan' + world * newZoom'
@@ -54,26 +54,6 @@ export function zoomAtCursor(
   }
 }
 
-/**
- * 限制内容不拖出视口：
- *  - 内容（content*zoom）大于视口：pan ∈ [viewSize - scaledSize, 0]
- *  - 内容小于等于视口：居中 pan = (viewSize - scaledSize) / 2
- * content 为缩放前尺寸；scaledSize = content * zoom。
- */
-export function clampPan(viewport: Viewport, view: Size, content: Size): Viewport {
-  const { zoom, panX, panY } = viewport
-  return {
-    zoom,
-    panX: clampAxis(panX, view.w, content.w * zoom),
-    panY: clampAxis(panY, view.h, content.h * zoom),
-  }
-}
-
-function clampAxis(pan: number, viewSize: number, scaledSize: number): number {
-  if (scaledSize <= viewSize) return (viewSize - scaledSize) / 2
-  return Math.min(0, Math.max(viewSize - scaledSize, pan))
-}
-
 export interface UseViewportResult {
   viewport: Viewport
   /** 仅在非 compare 模式挂到 wrapper 的 onMouseDown。 */
@@ -88,11 +68,9 @@ export interface UseViewportResult {
 
 /**
  * @param viewportEl 视口元素 ref（.canvas-wrapper），用于读取尺寸、挂 wheel 监听
- * @param getContentSize 返回内容缩放前尺寸（用 offsetWidth/offsetHeight），无则 null
  */
 export function useViewport(
   viewportEl: React.RefObject<HTMLElement | null>,
-  getContentSize: () => Size | null,
   opts: { min?: number; max?: number } = {},
 ): UseViewportResult {
   const { min = MIN_ZOOM, max = MAX_ZOOM } = opts
@@ -100,38 +78,21 @@ export function useViewport(
   const [isPanning, setIsPanning] = useState(false)
 
   // 用 ref 持有最新 viewport，供 window 级事件读取，避免 stale closure。
-  // 在 effect 中同步（而非 render 期间直接写 .current），避免违反
-  // react-hooks/refs 规则（render 期间访问 ref 会破坏 concurrent/strict-mode）。
+  // 在 effect 中同步（而非 render 期间直接写 .current），避免违反 react-hooks/refs。
   const viewportRef = useRef(viewport)
-  const getContentSizeRef = useRef(getContentSize)
-  const elRef = useRef<HTMLElement | null>(null)
   useEffect(() => {
     viewportRef.current = viewport
   }, [viewport])
-  useEffect(() => {
-    getContentSizeRef.current = getContentSize
-  }, [getContentSize])
+
   // 中转外部 ref 到本地 ref：react-hooks v7 的 preserve-manual-memoization
-  // 对“参数传入的 ref”(viewportEl) 不豁免、对“本地 useRef”豁免，故经 elRef 中转，
-  // 使空依赖回调与 React Compiler 推断一致。
+  // 对“参数传入的 ref”(viewportEl) 不豁免、对“本地 useRef”豁免，故经 elRef 中转。
+  const elRef = useRef<HTMLElement | null>(null)
   useEffect(() => {
     elRef.current = viewportEl.current
   })
 
-  // clampWithSize：所有外部捕获值通过 ref 读取，故可空依赖（[]）保持引用稳定。
-  // 这是 react-hooks v7 (React Compiler lint) 下与手动 memo 共存的标准模式：
-  // ref.current 读取不计入依赖，Compiler 推断与手动依赖数组一致。
-  const clampWithSize = useCallback((vp: Viewport): Viewport => {
-    const el = elRef.current
-    const content = getContentSizeRef.current()
-    if (!el || !content) return vp
-    const rect = el.getBoundingClientRect()
-    return clampPan(vp, { w: rect.width, h: rect.height }, content)
-  }, [])
-
   // --- 滚轮缩放：原生非 passive 以便 preventDefault ---
   // 注：el 在 effect 运行时读取（containerRef 是静态 div，不会运行时替换）。
-  // 若将来 wrapper 元素被动态替换，需在此 effect 依赖中追踪并重绑监听。
   useEffect(() => {
     const el = elRef.current
     if (!el) return
@@ -141,14 +102,13 @@ export function useViewport(
       const anchor: Point = { x: e.clientX - rect.left, y: e.clientY - rect.top }
       const cur = viewportRef.current
       const factor = e.deltaY < 0 ? ZOOM_FACTOR : 1 / ZOOM_FACTOR
-      const next = zoomAtCursor(cur, anchor, cur.zoom * factor, min, max)
-      setViewport(clampWithSize(next))
+      setViewport(zoomAtCursor(cur, anchor, cur.zoom * factor, min, max))
     }
     el.addEventListener('wheel', handleWheel, { passive: false })
     return () => el.removeEventListener('wheel', handleWheel)
-  }, [clampWithSize, min, max])
+  }, [min, max])
 
-  // --- 拖动平移：window 级 mousemove/mouseup ---
+  // --- 拖动平移：window 级 mousemove/mouseup（pan 自由，不限制边界）---
   const dragStart = useRef<Point | null>(null)
   const startPan = useRef<Point | null>(null)
 
@@ -167,8 +127,7 @@ export function useViewport(
       const dx = e.clientX - dragStart.current.x
       const dy = e.clientY - dragStart.current.y
       const vp = viewportRef.current
-      const next = { ...vp, panX: startPan.current.x + dx, panY: startPan.current.y + dy }
-      setViewport(clampWithSize(next))
+      setViewport({ ...vp, panX: startPan.current.x + dx, panY: startPan.current.y + dy })
     }
     const handleUp = () => {
       if (dragStart.current) {
@@ -183,7 +142,7 @@ export function useViewport(
       window.removeEventListener('mousemove', handleMove)
       window.removeEventListener('mouseup', handleUp)
     }
-  }, [clampWithSize])
+  }, [])
 
   const setZoom = useCallback(
     (z: number) => {
@@ -195,14 +154,14 @@ export function useViewport(
       }
       const rect = el.getBoundingClientRect()
       const anchor: Point = { x: rect.width / 2, y: rect.height / 2 }
-      setViewport(clampWithSize(zoomAtCursor(viewportRef.current, anchor, target, min, max)))
+      setViewport(zoomAtCursor(viewportRef.current, anchor, target, min, max))
     },
-    [clampWithSize, min, max],
+    [min, max],
   )
 
   const reset = useCallback(() => {
-    setViewport(clampWithSize({ zoom: 1, panX: 0, panY: 0 }))
-  }, [clampWithSize])
+    setViewport({ zoom: 1, panX: 0, panY: 0 })
+  }, [])
 
   return { viewport, panHandlers: { onMouseDown }, setZoom, reset, isPanning }
 }

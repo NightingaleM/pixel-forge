@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { clampZoom, zoomAtCursor, clampPan } from './useViewport'
+import { clampZoom, zoomAtCursor } from './useViewport'
 
 describe('clampZoom', () => {
   it('returns value inside range unchanged', () => {
@@ -39,32 +39,5 @@ describe('zoomAtCursor', () => {
   it('clamps newZoom to [min, max]', () => {
     const next = zoomAtCursor({ zoom: 1, panX: 0, panY: 0 }, { x: 0, y: 0 }, 999)
     expect(next.zoom).toBe(16)
-  })
-})
-
-describe('clampPan', () => {
-  it('clamps pan to 0 when content is larger and pan goes positive', () => {
-    // zoom=2, content 100x100 → scaled 200 > view 100；panX=50 越上界 → 0
-    const r = clampPan({ zoom: 2, panX: 50, panY: 0 }, { w: 100, h: 100 }, { w: 100, h: 100 })
-    expect(r.panX).toBe(0)
-    expect(r.panY).toBe(0)
-  })
-  it('keeps a valid in-range pan unchanged', () => {
-    // panX=-50 在 [100-200, 0]=[-100,0] 内
-    const r = clampPan({ zoom: 2, panX: -50, panY: -50 }, { w: 100, h: 100 }, { w: 100, h: 100 })
-    expect(r.panX).toBe(-50)
-    expect(r.panY).toBe(-50)
-  })
-  it('clamps pan to lower bound (view - scaled)', () => {
-    // panX=-999 → 收敛到 100-200 = -100
-    const r = clampPan({ zoom: 2, panX: -999, panY: -999 }, { w: 100, h: 100 }, { w: 100, h: 100 })
-    expect(r.panX).toBe(-100)
-    expect(r.panY).toBe(-100)
-  })
-  it('centers content when smaller than viewport (zoom<1)', () => {
-    // zoom=0.5, content 100 → scaled 50 < view 100 → 居中 (100-50)/2=25
-    const r = clampPan({ zoom: 0.5, panX: 0, panY: 0 }, { w: 100, h: 100 }, { w: 100, h: 100 })
-    expect(r.panX).toBe(25)
-    expect(r.panY).toBe(25)
   })
 })

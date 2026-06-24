@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect, type RefObject } from 'react'
+import { useState, useRef, useEffect, type RefObject } from 'react'
 import { useTranslation } from 'react-i18next'
 import ZoomControl from './ZoomControl'
 import { useViewport, type Size } from '../lib/useViewport'
@@ -24,63 +24,68 @@ function CompareSlider({
 }: CompareSliderProps) {
   const { t } = useTranslation()
   const [sliderPosition, setSliderPosition] = useState(0.5)
+  const [contentSize, setContentSize] = useState<Size | null>(null)
   const dragging = useRef(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  // 内容（缩放前）尺寸：offset* 不受 CSS transform 影响。
-  // 用普通函数（非 useCallback）：它读取参数 ref（canvasRef/asciiCanvasRef），
-  // 若包进 useCallback 会触发 preserve-manual-memoization；useViewport 内部已用
-  // ref 同步此函数，故无需手动 memo。
-  const getContentSize = (): Size | null => {
+  // 内容（缩放前）尺寸：由 ResizeObserver 在 effect 中读 canvas.offsetWidth 并存入
+  // state——绝不在 render 期间访问 ref（react-hooks/refs）。ShaderRenderer 会异步把
+  // canvas 默认 300×150 改为图片适配尺寸，RO 能捕捉该变化。
+  useEffect(() => {
     const canvas = renderMode === 'canvas2d' ? asciiCanvasRef.current : canvasRef.current
-    if (!canvas) return null
-    return { w: canvas.offsetWidth, h: canvas.offsetHeight }
+    if (!canvas) return
+    const update = () => {
+      const w = canvas.offsetWidth
+      const h = canvas.offsetHeight
+      const next = w === 0 || h === 0 ? null : { w, h }
+      setContentSize((prev) => (prev && next && prev.w === next.w && prev.h === next.h ? prev : next))
+    }
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(canvas)
+    return () => ro.disconnect()
+  }, [renderMode, asciiCanvasRef, canvasRef])
+
+  const { viewport, panHandlers, setZoom, reset, isPanning } = useViewport(containerRef)
+
+  // compare 分割线位置 = canvas 内容坐标比例 [0,1]（非视口比例），这样放大后分割线/
+  // clipPath（在缩放的 canvas-scaler 内）仍与鼠标对齐。读本地 ref + state，普通函数即可。
+  const getPositionFromEvent = (clientX: number): number => {
+    const container = containerRef.current
+    if (!container) return 0.5
+    const rect = container.getBoundingClientRect()
+    const contentW = contentSize?.w || rect.width
+    const ratio = (clientX - rect.left - viewport.panX) / (viewport.zoom * contentW)
+    return Math.min(1, Math.max(0, ratio))
   }
 
-  const { viewport, panHandlers, setZoom, reset, isPanning } = useViewport(containerRef, getContentSize)
+  // window 级 compare 拖动通过 ref 读最新 getPositionFromEvent，使监听只绑一次。
+  const getPositionFromEventRef = useRef(getPositionFromEvent)
+  useEffect(() => {
+    getPositionFromEventRef.current = getPositionFromEvent
+  })
 
-  const getPositionFromEvent = useCallback(
-    (clientX: number): number => {
-      const container = containerRef.current
-      if (!container) return 0.5
-      const rect = container.getBoundingClientRect()
-      const ratio = (clientX - rect.left) / rect.width
-      return Math.min(1, Math.max(0, ratio))
-    },
-    [],
-  )
+  const handleCompareMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault()
+    dragging.current = true
+    setSliderPosition(getPositionFromEvent(e.clientX))
+  }
 
-  // compare 分隔条拖动（仅 compare 模式）。
-  const handleCompareMouseDown = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault()
-      dragging.current = true
-      setSliderPosition(getPositionFromEvent(e.clientX))
-    },
-    [getPositionFromEvent],
-  )
+  const handleCompareTouchStart = (e: React.TouchEvent) => {
+    dragging.current = true
+    setSliderPosition(getPositionFromEvent(e.touches[0].clientX))
+  }
 
-  const handleCompareTouchStart = useCallback(
-    (e: React.TouchEvent) => {
-      dragging.current = true
-      setSliderPosition(getPositionFromEvent(e.touches[0].clientX))
-    },
-    [getPositionFromEvent],
-  )
-
-  // compare 模式下的 window 级拖动（mousemove/touchmove/mouseup）。
-  // 非 compare 模式不会进入：dragging.current 只在 handleCompareMouseDown 置 true，
-  // 而 handleCompareMouseDown 仅在 compareMode 时由 onWrapperMouseDown 调用。
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!dragging.current) return
       e.preventDefault()
-      setSliderPosition(getPositionFromEvent(e.clientX))
+      setSliderPosition(getPositionFromEventRef.current(e.clientX))
     }
     const handleTouchMove = (e: TouchEvent) => {
       if (!dragging.current) return
       e.preventDefault()
-      setSliderPosition(getPositionFromEvent(e.touches[0].clientX))
+      setSliderPosition(getPositionFromEventRef.current(e.touches[0].clientX))
     }
     const handleEnd = () => {
       dragging.current = false
@@ -95,17 +100,15 @@ function CompareSlider({
       window.removeEventListener('mouseup', handleEnd)
       window.removeEventListener('touchend', handleEnd)
     }
-  }, [getPositionFromEvent])
+  }, [])
 
-  const onWrapperMouseDown = useCallback(
-    (e: React.MouseEvent) => {
-      if (compareMode) handleCompareMouseDown(e)
-      else panHandlers.onMouseDown(e)
-    },
-    [compareMode, handleCompareMouseDown, panHandlers],
-  )
+  const onWrapperMouseDown = (e: React.MouseEvent) => {
+    if (compareMode) handleCompareMouseDown(e)
+    else panHandlers.onMouseDown(e)
+  }
 
   const cursor = compareMode ? 'ew-resize' : isPanning ? 'grabbing' : 'grab'
+  const contentW = contentSize?.w ?? 0
   const clipInsetPercent = (1 - sliderPosition) * 100
 
   return (
@@ -139,6 +142,7 @@ function CompareSlider({
                 left: 0,
                 width: '100%',
                 height: '100%',
+                objectFit: 'contain',
                 pointerEvents: 'none',
                 clipPath: `inset(0 ${clipInsetPercent}% 0 0)`,
               }}
@@ -146,7 +150,7 @@ function CompareSlider({
           )}
 
           {compareMode && (
-            <div className="compare-divider" style={{ left: `${sliderPosition * 100}%` }} />
+            <div className="compare-divider" style={{ left: `${sliderPosition * contentW}px` }} />
           )}
         </div>
       </div>
