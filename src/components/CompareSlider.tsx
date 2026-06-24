@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect, type RefObject } from 'react'
 import { useTranslation } from 'react-i18next'
 import ZoomControl from './ZoomControl'
+import { useViewport, type Size } from '../lib/useViewport'
 
 interface CompareSliderProps {
   canvasRef: RefObject<HTMLCanvasElement | null>
@@ -10,8 +11,6 @@ interface CompareSliderProps {
   compareMode: boolean
   onToggleCompare: () => void
   onClose: () => void
-  zoom: number
-  onZoom: (z: number) => void
 }
 
 function CompareSlider({
@@ -22,67 +21,74 @@ function CompareSlider({
   compareMode,
   onToggleCompare,
   onClose,
-  zoom,
-  onZoom,
 }: CompareSliderProps) {
   const { t } = useTranslation()
   const [sliderPosition, setSliderPosition] = useState(0.5)
   const dragging = useRef(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
+  // 内容（缩放前）尺寸：offset* 不受 CSS transform 影响。
+  // 用普通函数（非 useCallback）：它读取参数 ref（canvasRef/asciiCanvasRef），
+  // 若包进 useCallback 会触发 preserve-manual-memoization；useViewport 内部已用
+  // ref 同步此函数，故无需手动 memo。
+  const getContentSize = (): Size | null => {
+    const canvas = renderMode === 'canvas2d' ? asciiCanvasRef.current : canvasRef.current
+    if (!canvas) return null
+    return { w: canvas.offsetWidth, h: canvas.offsetHeight }
+  }
+
+  const { viewport, panHandlers, setZoom, reset, isPanning } = useViewport(containerRef, getContentSize)
+
   const getPositionFromEvent = useCallback(
     (clientX: number): number => {
       const container = containerRef.current
       if (!container) return 0.5
       const rect = container.getBoundingClientRect()
-      const x = clientX - rect.left
-      const ratio = x / rect.width
+      const ratio = (clientX - rect.left) / rect.width
       return Math.min(1, Math.max(0, ratio))
     },
     [],
   )
 
-  const handleMouseDown = useCallback(
+  // compare 分隔条拖动（仅 compare 模式）。
+  const handleCompareMouseDown = useCallback(
     (e: React.MouseEvent) => {
-      if (!compareMode) return
       e.preventDefault()
       dragging.current = true
       setSliderPosition(getPositionFromEvent(e.clientX))
     },
-    [compareMode, getPositionFromEvent],
+    [getPositionFromEvent],
   )
 
-  const handleTouchStart = useCallback(
+  const handleCompareTouchStart = useCallback(
     (e: React.TouchEvent) => {
-      if (!compareMode) return
       dragging.current = true
       setSliderPosition(getPositionFromEvent(e.touches[0].clientX))
     },
-    [compareMode, getPositionFromEvent],
+    [getPositionFromEvent],
   )
 
+  // compare 模式下的 window 级拖动（mousemove/touchmove/mouseup）。
+  // 非 compare 模式不会进入：dragging.current 只在 handleCompareMouseDown 置 true，
+  // 而 handleCompareMouseDown 仅在 compareMode 时由 onWrapperMouseDown 调用。
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!dragging.current) return
       e.preventDefault()
       setSliderPosition(getPositionFromEvent(e.clientX))
     }
-
     const handleTouchMove = (e: TouchEvent) => {
       if (!dragging.current) return
       e.preventDefault()
       setSliderPosition(getPositionFromEvent(e.touches[0].clientX))
     }
-
     const handleEnd = () => {
       dragging.current = false
     }
-
     window.addEventListener('mousemove', handleMouseMove)
     window.addEventListener('touchmove', handleTouchMove, { passive: false })
     window.addEventListener('mouseup', handleEnd)
     window.addEventListener('touchend', handleEnd)
-
     return () => {
       window.removeEventListener('mousemove', handleMouseMove)
       window.removeEventListener('touchmove', handleTouchMove)
@@ -91,32 +97,37 @@ function CompareSlider({
     }
   }, [getPositionFromEvent])
 
+  const onWrapperMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      if (compareMode) handleCompareMouseDown(e)
+      else panHandlers.onMouseDown(e)
+    },
+    [compareMode, handleCompareMouseDown, panHandlers],
+  )
+
+  const cursor = compareMode ? 'ew-resize' : isPanning ? 'grabbing' : 'grab'
   const clipInsetPercent = (1 - sliderPosition) * 100
 
   return (
     <div className="compare-container">
-      <button
-        className="close-btn"
-        onClick={onClose}
-        title={t('compare.closeImage')}
-      >
-        x
-      </button>
+      <button className="close-btn" onClick={onClose} title={t('compare.closeImage')}>x</button>
       <div
         className="canvas-wrapper"
         ref={containerRef}
-        onMouseDown={handleMouseDown}
-        onTouchStart={handleTouchStart}
+        onMouseDown={onWrapperMouseDown}
+        onTouchStart={compareMode ? handleCompareTouchStart : undefined}
+        onDoubleClick={reset}
+        style={{ cursor }}
       >
-        <div className="canvas-scaler" style={{ transform: `scale(${zoom})`, transformOrigin: 'top left' }}>
-          <canvas
-            ref={canvasRef}
-            style={{ display: renderMode === 'canvas2d' ? 'none' : 'block' }}
-          />
-          <canvas
-            ref={asciiCanvasRef}
-            style={{ display: renderMode === 'canvas2d' ? 'block' : 'none' }}
-          />
+        <div
+          className="canvas-scaler"
+          style={{
+            transform: `translate(${viewport.panX}px, ${viewport.panY}px) scale(${viewport.zoom})`,
+            transformOrigin: '0 0',
+          }}
+        >
+          <canvas ref={canvasRef} style={{ display: renderMode === 'canvas2d' ? 'none' : 'block' }} />
+          <canvas ref={asciiCanvasRef} style={{ display: renderMode === 'canvas2d' ? 'block' : 'none' }} />
 
           {compareMode && originalImage && (
             <img
@@ -135,17 +146,12 @@ function CompareSlider({
           )}
 
           {compareMode && (
-            <div
-              className="compare-divider"
-              style={{
-                left: `${sliderPosition * 100}%`,
-              }}
-            />
+            <div className="compare-divider" style={{ left: `${sliderPosition * 100}%` }} />
           )}
         </div>
       </div>
 
-      <ZoomControl zoom={zoom} onZoom={onZoom} />
+      <ZoomControl zoom={viewport.zoom} onZoom={setZoom} />
 
       <button
         className={`compare-toggle${compareMode ? ' active' : ''}`}
