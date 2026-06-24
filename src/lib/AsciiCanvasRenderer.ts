@@ -62,7 +62,10 @@ export class AsciiCanvasRenderer {
     fontFace: FontFace | null,
   ): void {
     const ctx = canvas.getContext('2d')
-    if (!ctx) return
+    if (!ctx) {
+      console.warn('[ASCII] render: getContext("2d") returned null — canvas is likely already locked to a WebGL context')
+      return
+    }
 
     // Limit processing resolution to MAX_PROCESS_SIZE on the long edge.
     const scale = Math.min(1, MAX_PROCESS_SIZE / Math.max(image.naturalWidth, image.naturalHeight))
@@ -83,7 +86,11 @@ export class AsciiCanvasRenderer {
     const charset = this.applyCase(params.charset, params.caseMode)
     const fontSize = Math.max(4, Math.round(params.cellSize))
     const ramp = this.buildRamp(ctx, charset, fontSize, font)
-    if (ramp.length === 0) return
+    if (ramp.length === 0) {
+      console.warn('[ASCII] render: empty density ramp (charset has no measurable characters)')
+      return
+    }
+    console.log('[ASCII] render start', { w, h, fontSize, rampLen: ramp.length, charsetLen: charset.length })
 
     ctx.clearRect(0, 0, w, h)
     if (params.showBg === 1) ctx.drawImage(image, 0, 0, w, h)
@@ -117,6 +124,7 @@ export class AsciiCanvasRenderer {
     this.lastMatrix = cells
     this.lastWidth = w
     this.lastHeight = h
+    console.log('[ASCII] render done', { cells: cells.length })
   }
 
   exportSvg(fontFamily: string): string {

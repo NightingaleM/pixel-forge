@@ -54,6 +54,7 @@ function App2D() {
   const [showCloseDialog, setShowCloseDialog] = useState(false)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const rendererRef = useRef<ShaderRenderer | null>(null)
+  const asciiCanvasRef = useRef<HTMLCanvasElement>(null)
   const asciiRendererRef = useRef<AsciiCanvasRenderer | null>(null)
   const [fontParams, setFontParams] = useState<Record<string, FontFace | null>>({})
   const [zoom, setZoom] = useState(1)
@@ -72,11 +73,21 @@ function App2D() {
       if (!styleDef) return
 
       // ----- canvas2d branch (ASCII) — must return BEFORE the WebGL text-texture block -----
+      // ASCII renders to a SEPARATE canvas (asciiCanvasRef). canvasRef is locked to a WebGL
+      // context by ShaderRenderer, and a single canvas element cannot host both contexts.
       if (styleDef.renderMode === 'canvas2d') {
-        if (!image) return
+        const aCanvas = asciiCanvasRef.current
+        if (!image) {
+          console.warn('[ASCII] renderWithStyle skipped: no image')
+          return
+        }
+        if (!aCanvas) {
+          console.warn('[ASCII] renderWithStyle skipped: asciiCanvas not mounted')
+          return
+        }
         if (!asciiRendererRef.current) asciiRendererRef.current = new AsciiCanvasRenderer()
         const fp = currentFontParams['uFont'] ?? null
-        asciiRendererRef.current.render(canvas, image, {
+        asciiRendererRef.current.render(aCanvas, image, {
           charset: currentTextParams['uCharset'] ?? '',
           caseMode: currentParams['uCaseMode'] ?? 0,
           charColor: currentTextParams['uCharColor'] ?? '#00ff66',
@@ -268,16 +279,23 @@ function App2D() {
     URL.revokeObjectURL(url)
   }, [activeStyle])
 
+  // Pick the canvas the active style actually renders to:
+  // shader styles -> canvasRef (WebGL), ASCII -> asciiCanvasRef (2D).
+  const getExportCanvas = useCallback(() => {
+    const styleDef = getStyle(activeStyle)
+    return styleDef?.renderMode === 'canvas2d' ? asciiCanvasRef.current : canvasRef.current
+  }, [activeStyle])
+
   const handleDownloadPng = useCallback(() => {
-    canvasRef.current?.toBlob((b) => downloadBlob(b, 'png'), 'image/png')
-  }, [downloadBlob])
+    getExportCanvas()?.toBlob((b) => downloadBlob(b, 'png'), 'image/png')
+  }, [getExportCanvas, downloadBlob])
 
   const handleDownloadJpg = useCallback(() => {
     // JPG has no alpha: composite onto black if background is off.
     const styleDef = getStyle(activeStyle)
     const showBg = params['uShowBg'] ?? 1
     if (styleDef?.renderMode === 'canvas2d' && showBg !== 1) {
-      const src = canvasRef.current
+      const src = getExportCanvas()
       if (!src) return
       const tmp = document.createElement('canvas')
       tmp.width = src.width; tmp.height = src.height
@@ -289,8 +307,8 @@ function App2D() {
       tmp.toBlob((b) => downloadBlob(b, 'jpg'), 'image/jpeg')
       return
     }
-    canvasRef.current?.toBlob((b) => downloadBlob(b, 'jpg'), 'image/jpeg')
-  }, [activeStyle, params, downloadBlob])
+    getExportCanvas()?.toBlob((b) => downloadBlob(b, 'jpg'), 'image/jpeg')
+  }, [activeStyle, params, getExportCanvas, downloadBlob])
 
   const handleDownloadSvg = useCallback(() => {
     const family = fontParams['uFont']?.family ?? 'monospace'
@@ -344,6 +362,8 @@ function App2D() {
         {image ? (
           <CompareSlider
             canvasRef={canvasRef}
+            asciiCanvasRef={asciiCanvasRef}
+            renderMode={currentStyle?.renderMode}
             originalImage={image}
             compareMode={compareMode}
             onToggleCompare={() => setCompareMode((prev) => !prev)}

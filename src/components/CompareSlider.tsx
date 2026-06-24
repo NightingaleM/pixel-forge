@@ -4,6 +4,8 @@ import ZoomControl from './ZoomControl'
 
 interface CompareSliderProps {
   canvasRef: RefObject<HTMLCanvasElement | null>
+  asciiCanvasRef: RefObject<HTMLCanvasElement | null>
+  renderMode?: 'shader' | 'canvas2d'
   originalImage: HTMLImageElement | null
   compareMode: boolean
   onToggleCompare: () => void
@@ -14,6 +16,8 @@ interface CompareSliderProps {
 
 function CompareSlider({
   canvasRef,
+  asciiCanvasRef,
+  renderMode,
   originalImage,
   compareMode,
   onToggleCompare,
@@ -105,7 +109,14 @@ function CompareSlider({
         onTouchStart={handleTouchStart}
       >
         <div className="canvas-scaler" style={{ transform: `scale(${zoom})`, transformOrigin: 'top left' }}>
-          <canvas ref={canvasRef} />
+          <canvas
+            ref={canvasRef}
+            style={{ display: renderMode === 'canvas2d' ? 'none' : 'block' }}
+          />
+          <canvas
+            ref={asciiCanvasRef}
+            style={{ display: renderMode === 'canvas2d' ? 'block' : 'none' }}
+          />
 
           {compareMode && originalImage && (
             <img
