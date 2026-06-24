@@ -711,7 +711,7 @@ git commit -m "feat(ascii): add AsciiCanvasRenderer (canvas2d render shell)"
     shaderImports: [],
     renderMode: 'canvas2d',
     params: [
-      { name: 'style.ascii.charset', uniform: 'uCharset', type: 'text' as const, textDefault: '哇真的是你啊!@#$%^&*+/=三:.', description: 'style.ascii.charsetDesc' },
+      { name: 'style.ascii.charset', uniform: 'uCharset', type: 'text' as const, textDefault: '天青色等烟雨，而我在等你~\LoveU', description: 'style.ascii.charsetDesc' },
       { name: 'style.ascii.font', uniform: 'uFont', type: 'font' as const, description: 'style.ascii.fontDesc' },
       { name: 'style.ascii.caseMode', uniform: 'uCaseMode', type: 'select' as const, options: [
         { label: 'style.ascii.caseKeep', value: 0 },

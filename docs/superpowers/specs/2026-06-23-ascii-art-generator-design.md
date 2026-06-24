@@ -134,7 +134,7 @@ export interface FontParamDef {
 
 | 参数 | ParamDef 类型 | uniform | 范围 / 默认 | 说明 |
 |---|---|---|---|---|
-| 字符集 | `text` | `uCharset` | 默认 `哇真的是你啊!@#$%^&*+/=三:.` | 支持中英文/符号自由输入 |
+| 字符集 | `text` | `uCharset` | 默认 `天青色等烟雨，而我在等你~\LoveU` | 支持中英文/符号自由输入 |
 | 自定义字体 | `font`（新） | `uFont` | 默认无（系统等宽） | 上传 TTF/WOFF/OTF |
 | 大小写转换 | `select` | `uCaseMode` | 0 保持 / 1 大写 / 2 小写，默认 0 | 仅作用于英文字母 |
 | 字符颜色 | `color` | `uCharColor` | 默认 `#00ff66`（荧光绿） | 字符填充色 |
