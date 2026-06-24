@@ -130,6 +130,8 @@ export function useViewport(
   }, [])
 
   // --- 滚轮缩放：原生非 passive 以便 preventDefault ---
+  // 注：el 在 effect 运行时读取（containerRef 是静态 div，不会运行时替换）。
+  // 若将来 wrapper 元素被动态替换，需在此 effect 依赖中追踪并重绑监听。
   useEffect(() => {
     const el = elRef.current
     if (!el) return
