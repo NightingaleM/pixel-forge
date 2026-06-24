@@ -8,7 +8,7 @@ interface ZoomControlProps {
   step?: number
 }
 
-function ZoomControl({ zoom, onZoom, min = 0.2, max = 4, step = 0.2 }: ZoomControlProps) {
+function ZoomControl({ zoom, onZoom, min = 0.2, max = 16, step = 0.2 }: ZoomControlProps) {
   const { t } = useTranslation()
   const clamp = (z: number) => Math.min(max, Math.max(min, z))
   return (

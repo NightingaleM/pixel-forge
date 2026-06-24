@@ -57,7 +57,6 @@ function App2D() {
   const asciiCanvasRef = useRef<HTMLCanvasElement>(null)
   const asciiRendererRef = useRef<AsciiCanvasRenderer | null>(null)
   const [fontParams, setFontParams] = useState<Record<string, FontFace | null>>({})
-  const [zoom, setZoom] = useState(1)
 
   // ---------------------------------------------------------------------------
   // Render pipeline
@@ -368,8 +367,6 @@ function App2D() {
             compareMode={compareMode}
             onToggleCompare={() => setCompareMode((prev) => !prev)}
             onClose={() => setShowCloseDialog(true)}
-            zoom={zoom}
-            onZoom={setZoom}
           />
         ) : (
           <ImageUploader onImageLoad={handleImageLoad} />
