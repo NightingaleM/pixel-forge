@@ -90,7 +90,6 @@ export class AsciiCanvasRenderer {
       console.warn('[ASCII] render: empty density ramp (charset has no measurable characters)')
       return
     }
-    console.log('[ASCII] render start', { w, h, fontSize, rampLen: ramp.length, charsetLen: charset.length })
 
     ctx.clearRect(0, 0, w, h)
     if (params.showBg === 1) ctx.drawImage(image, 0, 0, w, h)
@@ -124,7 +123,6 @@ export class AsciiCanvasRenderer {
     this.lastMatrix = cells
     this.lastWidth = w
     this.lastHeight = h
-    console.log('[ASCII] render done', { cells: cells.length })
   }
 
   exportSvg(fontFamily: string): string {
