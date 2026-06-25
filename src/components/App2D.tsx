@@ -1,13 +1,15 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ShaderRenderer } from '../lib/ShaderRenderer'
 import { AsciiCanvasRenderer } from '../lib/AsciiCanvasRenderer'
 import { styles, getStyle } from '../lib/StyleRegistry'
+import { encodeSeed, decodeSeed } from '../lib/seedCodec'
 import type { StyleId } from '../types'
 import ImageUploader from './ImageUploader'
 import StyleSelector from './StyleSelector'
 import ParamPanel from './ParamPanel'
+import { SeedBar } from './SeedBar'
 import ActionBar from './ActionBar'
 import { CompareSlider } from './CompareSlider'
 import ConfirmDialog from './ConfirmDialog'
@@ -351,6 +353,24 @@ function App2D() {
 
   const currentStyle = getStyle(activeStyle)
 
+  const seed = useMemo(
+    () => currentStyle ? encodeSeed(activeStyle, params, currentStyle) : '',
+    [activeStyle, params, currentStyle],
+  )
+
+  const handleApplySeed = useCallback((code: string): boolean => {
+    if (!image) return false
+    const decoded = decodeSeed(code)
+    if (!decoded) return false
+    const def = getStyle(decoded.styleId)
+    if (!def) return false
+    setActiveStyle(decoded.styleId)
+    setParams(decoded.params)
+    setTextParams(initTextParams(decoded.styleId))
+    setFontParams({})
+    return true
+  }, [image])
+
   return (
     <div className="app-container">
       <div className="left-sidebar">
@@ -413,6 +433,7 @@ function App2D() {
           onTextChange={handleTextChange}
           fontValues={fontParams}
           onFontChange={handleFontChange}
+          top={<SeedBar seed={seed} onApply={handleApplySeed} />}
         />
       )}
       {showCloseDialog && (
