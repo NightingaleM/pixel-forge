@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { encodeB62, decodeB62 } from './seedCodec'
+import {
+  encodeB62, decodeB62,
+  paramCount, paramIndex, valueOfIndex,
+  encodeSeed, decodeSeed, SEED_VERSION,
+  SEED_ALPHABET,
+} from './seedCodec'
+import { styles, getStyle } from './StyleRegistry'
+import type { NumberParamDef, StyleDefinition, StyleId } from '../types'
 
 describe('encodeB62 / decodeB62', () => {
   const CASES: [bigint, string][] = [
@@ -30,9 +37,6 @@ describe('encodeB62 / decodeB62', () => {
   })
 })
 
-import { paramCount, paramIndex, valueOfIndex } from './seedCodec'
-import type { NumberParamDef } from '../types'
-
 const p: NumberParamDef = { name: 't', uniform: 'uT', min: 0, max: 10, step: 2, default: 0 }
 
 describe('档位与索引', () => {
@@ -54,10 +58,6 @@ describe('档位与索引', () => {
     expect(valueOfIndex(p, 3)).toBe(6)
   })
 })
-
-import { encodeSeed, decodeSeed, SEED_VERSION } from './seedCodec'
-import { styles, getStyle } from './StyleRegistry'
-import type { StyleDefinition, StyleId } from '../types'
 
 function numericParams(def: StyleDefinition, pick: (p: NumberParamDef) => number): Record<string, number> {
   const o: Record<string, number> = {}
@@ -124,8 +124,6 @@ describe('encodeSeed / decodeSeed', () => {
     expect(decodeSeed(padded)?.params).toEqual(params)
   })
 })
-
-import { SEED_ALPHABET } from './seedCodec'
 
 describe('decodeSeed 容错', () => {
   it('空串与长度<2 → null', () => {
