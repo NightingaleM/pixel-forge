@@ -1,3 +1,6 @@
+import type { NumberParamDef, StyleDefinition, StyleId } from '../types'
+import { styles } from './StyleRegistry'
+
 const ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
 export const SEED_ALPHABET = ALPHABET   // 导出供测试构造越界序号（Task 4）
 const CHAR_TO_VAL: Record<string, number> = (() => {
@@ -30,8 +33,6 @@ export function decodeB62(s: string): bigint | null {
   return n
 }
 
-import type { NumberParamDef } from '../types'
-
 /** 合法档位数 = floor((max-min)/step) + 1. */
 export function paramCount(p: NumberParamDef): number {
   return Math.floor((p.max - p.min) / p.step) + 1
@@ -56,9 +57,6 @@ export function valueOfIndex(p: NumberParamDef, idx: number): number {
   const f = Math.pow(10, decimals)
   return Math.round(raw * f) / f
 }
-
-import type { StyleDefinition, StyleId } from '../types'
-import { styles } from './StyleRegistry'
 
 export const SEED_VERSION = 0   // 对应字符 '0'（ALPHABET[0]）
 
