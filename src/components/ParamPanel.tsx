@@ -14,6 +14,7 @@ interface ParamPanelProps {
   onClose?: () => void
   defaultPos?: { x: number; y: number }
   children?: ReactNode
+  top?: ReactNode
   defaultCollapsed?: boolean
 }
 
@@ -178,7 +179,7 @@ function renderParam(
   )
 }
 
-function ParamPanel({ title, description, params, values, textValues, onChange, onTextChange, fontValues, onFontChange, onClose, defaultPos, children, defaultCollapsed }: ParamPanelProps) {
+function ParamPanel({ title, description, params, values, textValues, onChange, onTextChange, fontValues, onFontChange, onClose, defaultPos, children, top, defaultCollapsed }: ParamPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState(defaultPos ?? { x: typeof window !== 'undefined' ? window.innerWidth - 320 : 600, y: 35 })
   const [collapsed, setCollapsed] = useState(defaultCollapsed ?? false)
@@ -227,6 +228,7 @@ function ParamPanel({ title, description, params, values, textValues, onChange, 
       </div>
       {!collapsed && (
         <div className="param-panel-body">
+          {top}
           {children ?? params?.map((p) => renderParam(
             p,
             values ?? {},
