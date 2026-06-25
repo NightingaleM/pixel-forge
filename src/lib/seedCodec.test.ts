@@ -54,3 +54,73 @@ describe('档位与索引', () => {
     expect(valueOfIndex(p, 3)).toBe(6)
   })
 })
+
+import { encodeSeed, decodeSeed, SEED_VERSION } from './seedCodec'
+import { styles, getStyle } from './StyleRegistry'
+import type { StyleDefinition, StyleId } from '../types'
+
+function numericParams(def: StyleDefinition, pick: (p: NumberParamDef) => number): Record<string, number> {
+  const o: Record<string, number> = {}
+  for (const p of def.params) {
+    if (p.type === undefined || p.type === 'number') o[p.uniform] = pick(p as NumberParamDef)
+  }
+  return o
+}
+
+describe('encodeSeed / decodeSeed', () => {
+  it('SEED_VERSION = 0', () => {
+    expect(SEED_VERSION).toBe(0)
+  })
+
+  it('默认值往返（每个特效）', () => {
+    for (const def of styles) {
+      const defaults = numericParams(def, (p) => p.default)
+      const code = encodeSeed(def.id, defaults, def)
+      const decoded = decodeSeed(code)
+      expect(decoded).not.toBeNull()
+      expect(decoded!.styleId).toBe(def.id)
+      expect(decoded!.params).toEqual(defaults)
+    }
+  })
+
+  it('全 max 往返（每个特效，最易触发码长不足）', () => {
+    for (const def of styles) {
+      const maxed = numericParams(def, (p) => p.max)
+      const code = encodeSeed(def.id, maxed, def)
+      expect(code.length).toBeLessThanOrEqual(13)
+      const decoded = decodeSeed(code)
+      expect(decoded).not.toBeNull()
+      expect(decoded!.params).toEqual(maxed)
+    }
+  })
+
+  it('全 max 码长等于 spec 表（抽样强校验打包正确性）', () => {
+    const maxOf = (id: StyleId) => {
+      const def = getStyle(id)!
+      return encodeSeed(id, numericParams(def, (p) => p.max), def).length
+    }
+    expect(maxOf('ascii')).toBe(6)
+    expect(maxOf('halftone')).toBe(8)
+    expect(maxOf('kaleidoscope')).toBe(11)
+    expect(maxOf('animelight')).toBe(13)
+  })
+
+  it('全 min 往返（参数码为空，仅 2 位前缀）', () => {
+    for (const def of styles) {
+      const mined = numericParams(def, (p) => p.min)
+      const code = encodeSeed(def.id, mined, def)
+      expect(code.length).toBe(2)
+      const decoded = decodeSeed(code)
+      expect(decoded).not.toBeNull()
+      expect(decoded!.params).toEqual(mined)
+    }
+  })
+
+  it('前导零等价：补零后解码结果相同', () => {
+    const def = getStyle('halftone')!
+    const params = numericParams(def, (p) => p.default)
+    const code = encodeSeed('halftone', params, def)
+    const padded = code.slice(0, 2) + '000' + code.slice(2)
+    expect(decodeSeed(padded)?.params).toEqual(params)
+  })
+})
