@@ -124,3 +124,43 @@ describe('encodeSeed / decodeSeed', () => {
     expect(decodeSeed(padded)?.params).toEqual(params)
   })
 })
+
+import { SEED_ALPHABET } from './seedCodec'
+
+describe('decodeSeed 容错', () => {
+  it('空串与长度<2 → null', () => {
+    expect(decodeSeed('')).toBeNull()
+    expect(decodeSeed('0')).toBeNull()
+  })
+  it('含非 base62 字符 → null', () => {
+    expect(decodeSeed('0a!zzz')).toBeNull()
+    expect(decodeSeed('0a-xx')).toBeNull()
+    expect(decodeSeed('0a 中')).toBeNull()
+  })
+  it('版本号非 0 → null', () => {
+    expect(decodeSeed('1ahalftone')).toBeNull()
+  })
+  it('特效序号越界 → null', () => {
+    const over = SEED_ALPHABET[styles.length]
+    expect(decodeSeed('0' + over)).toBeNull()
+  })
+  it('解包余数非 0（码过长）→ null', () => {
+    const def = getStyle('ascii')!
+    const code = encodeSeed('ascii', {}, def)
+    expect(decodeSeed(code + 'Z')).toBeNull()
+  })
+  it('registry 改版：旧码在新（收窄 max）registry 下 → null', () => {
+    const def = getStyle('halftone')!
+    const maxed = numericParams(def, (p) => p.max)
+    const code = encodeSeed('halftone', maxed, def)
+    const newDef: StyleDefinition = {
+      ...def,
+      params: def.params.map((p) =>
+        p.uniform === 'uCellSize' && (p.type === undefined || p.type === 'number')
+          ? { ...p, max: 6 } as NumberParamDef
+          : p,
+      ),
+    }
+    expect(decodeSeed(code, [newDef])).toBeNull()
+  })
+})
