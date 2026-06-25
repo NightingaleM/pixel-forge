@@ -268,6 +268,45 @@ body {
   flex: 1;
 }
 
+.seed-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+.seed-bar-label { font-size: 12px; color: #666; }
+.seed-bar-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  user-select: all;
+  flex: 1;
+  min-width: 60px;
+}
+.seed-bar--edit { flex-wrap: wrap; }
+.seed-bar-input {
+  flex: 1;
+  min-width: 80px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  padding: 2px 4px;
+}
+.seed-bar-btn {
+  font-size: 12px;
+  padding: 2px 8px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: #f5f5f5;
+  cursor: pointer;
+  border-radius: 3px;
+}
+.seed-bar-btn:hover { background: #eaeaea; }
+.seed-bar-btn--primary { background: #00ff66; border-color: #00cc52; color: #003314; }
+.seed-bar-error { width: 100%; color: #c00; font-size: 11px; }
+
 /* --- Parameter Row --- */
 
 .param-row {
