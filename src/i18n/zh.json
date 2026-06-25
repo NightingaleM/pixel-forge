@@ -428,5 +428,17 @@
     "png": "PNG",
     "jpg": "JPG",
     "svg": "SVG"
+  },
+  "seed": {
+    "label": "种子",
+    "copy": "复制",
+    "copied": "已复制",
+    "copyFailed": "复制失败，请手动选中复制",
+    "edit": "编辑",
+    "apply": "应用",
+    "cancel": "取消",
+    "placeholder": "粘贴种子码…",
+    "invalid": "种子码无效",
+    "hint": "复制当前配置或粘贴他人种子码以复现"
   }
 }

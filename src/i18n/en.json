@@ -428,5 +428,17 @@
     "png": "PNG",
     "jpg": "JPG",
     "svg": "SVG"
+  },
+  "seed": {
+    "label": "Seed",
+    "copy": "Copy",
+    "copied": "Copied",
+    "copyFailed": "Copy failed, select manually",
+    "edit": "Edit",
+    "apply": "Apply",
+    "cancel": "Cancel",
+    "placeholder": "Paste seed code…",
+    "invalid": "Invalid seed code",
+    "hint": "Copy current config or paste a seed to reproduce"
   }
 }
