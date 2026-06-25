@@ -29,3 +29,22 @@ export function decodeB62(s: string): bigint | null {
   }
   return n
 }
+
+import type { NumberParamDef } from '../types'
+
+/** 合法档位数 = floor((max-min)/step) + 1. */
+export function paramCount(p: NumberParamDef): number {
+  return Math.floor((p.max - p.min) / p.step) + 1
+}
+
+/** value → 档位索引，编码侧 clamp 到 [0, count-1]（容错越界值）. */
+export function paramIndex(p: NumberParamDef, value: number): number {
+  const count = paramCount(p)
+  const raw = Math.round((value - p.min) / p.step)
+  return Math.max(0, Math.min(count - 1, raw))
+}
+
+/** 档位索引 → value（解码侧用，不 clamp，越界由 decodeSeed 判失败）. */
+export function valueOfIndex(p: NumberParamDef, idx: number): number {
+  return p.min + idx * p.step
+}
