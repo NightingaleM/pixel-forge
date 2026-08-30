@@ -231,3 +231,26 @@ export const styles: StyleDefinition[] = [
 export function getStyle(id: StyleId): StyleDefinition | undefined {
   return styles.find(s => s.id === id)
 }
+
+/** 风格的全部数值型参数（number/toggle/select）默认值；未知 styleId 返回 {}。 */
+export function defaultParams(styleId: StyleId): Record<string, number> {
+  const def = getStyle(styleId)
+  if (!def) return {}
+  const out: Record<string, number> = {}
+  for (const p of def.params) {
+    if (p.type === 'text' || p.type === 'color' || p.type === 'font') continue
+    out[p.uniform] = p.default
+  }
+  return out
+}
+
+/** 风格的全部 text 参数默认值；未知 styleId 返回 {}。 */
+export function defaultTextParams(styleId: StyleId): Record<string, string> {
+  const def = getStyle(styleId)
+  if (!def) return {}
+  const out: Record<string, string> = {}
+  for (const p of def.params) {
+    if (p.type === 'text') out[p.uniform] = p.textDefault
+  }
+  return out
+}

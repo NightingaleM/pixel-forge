@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ShaderRenderer } from '../lib/ShaderRenderer'
 import { AsciiCanvasRenderer } from '../lib/AsciiCanvasRenderer'
-import { styles, getStyle } from '../lib/StyleRegistry'
+import { styles, getStyle, defaultParams, defaultTextParams } from '../lib/StyleRegistry'
 import { encodeSeed, decodeSeed } from '../lib/seedCodec'
 import type { StyleId } from '../types'
 import ImageUploader from './ImageUploader'
@@ -16,29 +16,6 @@ import ConfirmDialog from './ConfirmDialog'
 
 const SKIP_RANDOM_UNIFORMS = ['uCenterX', 'uCenterY', 'uRotation', 'uAngle']
 
-function initParams(styleId: StyleId): Record<string, number> {
-  const styleDef = getStyle(styleId)
-  if (!styleDef) return {}
-  const result: Record<string, number> = {}
-  for (const p of styleDef.params) {
-    if (p.type === 'text' || p.type === 'color' || p.type === 'font') continue
-    result[p.uniform] = p.default
-  }
-  return result
-}
-
-function initTextParams(styleId: StyleId): Record<string, string> {
-  const styleDef = getStyle(styleId)
-  if (!styleDef) return {}
-  const result: Record<string, string> = {}
-  for (const p of styleDef.params) {
-    if (p.type === 'text') {
-      result[p.uniform] = p.textDefault
-    }
-  }
-  return result
-}
-
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return bytes + ' B'
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
@@ -49,8 +26,8 @@ function App2D() {
   const { t } = useTranslation()
   const [image, setImage] = useState<HTMLImageElement | null>(null)
   const [activeStyle, setActiveStyle] = useState<StyleId>('halftone')
-  const [params, setParams] = useState<Record<string, number>>(() => initParams('halftone'))
-  const [textParams, setTextParams] = useState<Record<string, string>>(() => initTextParams('halftone'))
+  const [params, setParams] = useState<Record<string, number>>(() => defaultParams('halftone'))
+  const [textParams, setTextParams] = useState<Record<string, string>>(() => defaultTextParams('halftone'))
   const [compareMode, setCompareMode] = useState(false)
   const [imageInfo, setImageInfo] = useState<{ width: number; height: number; size: string } | null>(null)
   const [showCloseDialog, setShowCloseDialog] = useState(false)
@@ -190,9 +167,9 @@ function App2D() {
   const handleStyleChange = useCallback(
     (id: StyleId) => {
       setActiveStyle(id)
-      setTextParams(initTextParams(id))
+      setTextParams(defaultTextParams(id))
       const styleDef = getStyle(id)
-      if (!styleDef) { setParams(initParams(id)); return }
+      if (!styleDef) { setParams(defaultParams(id)); return }
       const randomParams: Record<string, number> = {}
       for (const p of styleDef.params) {
         if (p.type === 'text' || p.type === 'color' || p.type === 'toggle' || p.type === 'select' || p.type === 'font') continue
@@ -253,7 +230,7 @@ function App2D() {
   }, [])
 
   const handleReset = useCallback(() => {
-    setParams(initParams(activeStyle))
+    setParams(defaultParams(activeStyle))
   }, [activeStyle])
 
   const handleRandom = useCallback(() => {
@@ -366,7 +343,7 @@ function App2D() {
     if (!def) return false
     setActiveStyle(decoded.styleId)
     setParams(decoded.params)
-    setTextParams(initTextParams(decoded.styleId))
+    setTextParams(defaultTextParams(decoded.styleId))
     setFontParams({})
     return true
   }, [image])
