@@ -381,8 +381,9 @@ function App2D() {
     setPresets(loadPresets())
   }, [])
 
-  // 默认预设名：当前风格名 + 保存时刻（HH:mm）
-  const presetDefaultName = useMemo(() => {
+  // 默认预设名：当前风格名 + 保存时刻（HH:mm）。
+  // 返回函数在点击保存时才取当前时间，避免 useMemo 缓存把时间冻结在风格激活时刻
+  const presetDefaultName = useCallback(() => {
     if (!currentStyle) return ''
     const d = new Date()
     const p = (n: number) => String(n).padStart(2, '0')

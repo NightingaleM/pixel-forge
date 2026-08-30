@@ -362,43 +362,44 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 8px;
   border: 1px solid rgba(0, 0, 0, 0.12);
   margin-bottom: 6px;
-  cursor: pointer;
 }
 .preset-item:hover {
   background: #f0f0f0;
   border-color: #000;
 }
 .preset-item-info { flex: 1; min-width: 0; }
-/* info 部分是原生 button（键盘可达），重置按钮默认样式以融入条目 */
+/* info 部分是原生 button（键盘可达），重置按钮默认样式以融入条目；
+   padding 移到 button 上，使点击区铺满整行 */
 .preset-item-apply {
   border: none;
   background: none;
   font: inherit;
   text-align: left;
   cursor: pointer;
-  padding: 0;
+  padding: 6px 8px;
 }
 .preset-item-name {
+  display: block;
   font-size: 12px;
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.preset-item-sub { font-size: 11px; color: #999; }
+.preset-item-sub { display: block; font-size: 11px; color: #999; }
 .preset-item-delete {
   background: none;
   border: none;
   color: #999;
   width: 20px;
-  height: 20px;
+  margin-right: 8px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  align-self: stretch;
   padding: 0;
   flex-shrink: 0;
 }

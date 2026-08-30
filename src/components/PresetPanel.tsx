@@ -59,16 +59,16 @@ export default function PresetPanel({ presets, onApply, onDelete, onClose }: Pre
                 onClick={() => onApply(e)}
                 title={t('preset.apply')}
               >
-                <div className="preset-item-name">{e.name}</div>
-                <div className="preset-item-sub">
+                <span className="preset-item-name">{e.name}</span>
+                <span className="preset-item-sub">
                   {t(getStyle(e.styleId)?.label ?? e.styleId)} · {formatTime(e.createdAt)}
-                </div>
+                </span>
               </button>
               <button
                 className="preset-item-delete"
                 title={t('preset.delete')}
                 aria-label={t('preset.delete')}
-                onClick={(ev) => { ev.stopPropagation(); onDelete(e.id) }}
+                onClick={() => onDelete(e.id)}
               >
                 <TrashIcon />
               </button>

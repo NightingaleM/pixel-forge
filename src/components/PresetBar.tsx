@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 
 interface PresetBarProps {
-  defaultName: string
+  defaultName: () => string
   onSave: (name: string) => boolean
   onToggleList: () => void
   listOpen: boolean
@@ -34,7 +34,7 @@ export default function PresetBar({ defaultName, onSave, onToggleList, listOpen,
   const [savedFlash, setSavedFlash] = useState(false)
 
   const start = useCallback(() => {
-    setDraft(defaultName)
+    setDraft(defaultName())
     setFailed(false)
     setEditing(true)
   }, [defaultName])
@@ -45,7 +45,7 @@ export default function PresetBar({ defaultName, onSave, onToggleList, listOpen,
   }, [])
 
   const confirm = useCallback(() => {
-    const name = draft.trim() || defaultName
+    const name = draft.trim() || defaultName()
     if (onSave(name)) {
       setEditing(false)
       setFailed(false)
