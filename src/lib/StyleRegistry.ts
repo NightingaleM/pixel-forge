@@ -244,13 +244,14 @@ export function defaultParams(styleId: StyleId): Record<string, number> {
   return out
 }
 
-/** 风格的全部 text 参数默认值；未知 styleId 返回 {}。 */
+/** 风格的全部 text/color 参数默认值（color 的值按约定存放于 textParams）；未知 styleId 返回 {}。 */
 export function defaultTextParams(styleId: StyleId): Record<string, string> {
   const def = getStyle(styleId)
   if (!def) return {}
   const out: Record<string, string> = {}
   for (const p of def.params) {
     if (p.type === 'text') out[p.uniform] = p.textDefault
+    else if (p.type === 'color') out[p.uniform] = p.default
   }
   return out
 }

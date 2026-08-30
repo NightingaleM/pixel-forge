@@ -24,11 +24,12 @@ describe('defaultParams / defaultTextParams', () => {
     }
   })
 
-  it('collects text defaults for every style', () => {
+  it('collects text/color defaults for every style', () => {
     for (const s of styles) {
       const tp = defaultTextParams(s.id)
       for (const def of s.params) {
         if (def.type === 'text') expect(tp[def.uniform]).toBe(def.textDefault)
+        else if (def.type === 'color') expect(tp[def.uniform]).toBe(def.default)
         else expect(tp[def.uniform]).toBeUndefined()
       }
     }
