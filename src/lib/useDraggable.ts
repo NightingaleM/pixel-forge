@@ -15,8 +15,11 @@ export function useDraggable(defaultPos?: DragPos) {
   const offset = useRef({ x: 0, y: 0 })
 
   const onHeaderMouseDown = useCallback((e: React.MouseEvent) => {
+    if (!ref.current) return
+    // 标题栏内按钮（折叠/关闭/随机等）按下不应触发拖动
+    if ((e.target as HTMLElement).closest('button')) return
     dragging.current = true
-    const rect = ref.current!.getBoundingClientRect()
+    const rect = ref.current.getBoundingClientRect()
     offset.current = { x: e.clientX - rect.left, y: e.clientY - rect.top }
     e.preventDefault()
   }, [])

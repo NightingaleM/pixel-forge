@@ -335,6 +335,66 @@ body {
   flex-wrap: wrap;
 }
 
+/* --- Preset Panel (draggable floating list) --- */
+
+.preset-panel {
+  position: fixed;
+  z-index: 1000;
+  background: #FFF;
+  border: 2px solid #000;
+  width: 260px;
+  max-height: 50vh;
+  display: flex;
+  flex-direction: column;
+}
+.preset-panel-body {
+  padding: 8px;
+  overflow-y: auto;
+  flex: 1;
+}
+.preset-panel-empty {
+  font-size: 12px;
+  color: #999;
+  padding: 12px 8px;
+  text-align: center;
+}
+.preset-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  margin-bottom: 6px;
+  cursor: pointer;
+}
+.preset-item:hover {
+  background: #f0f0f0;
+  border-color: #000;
+}
+.preset-item-info { flex: 1; min-width: 0; }
+.preset-item-name {
+  font-size: 12px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.preset-item-sub { font-size: 11px; color: #999; }
+.preset-item-delete {
+  background: none;
+  border: none;
+  color: #999;
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  flex-shrink: 0;
+}
+.preset-item-delete:hover { color: #c00; }
+
 /* --- Parameter Row --- */
 
 .param-row {
