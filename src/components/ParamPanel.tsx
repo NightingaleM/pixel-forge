@@ -1,4 +1,5 @@
-import { useRef, useState, useCallback, useEffect, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
+import { useDraggable } from '../lib/useDraggable'
 import type { ParamDef } from '../types'
 
 interface ParamPanelProps {
@@ -180,39 +181,12 @@ function renderParam(
 }
 
 function ParamPanel({ title, description, params, values, textValues, onChange, onTextChange, fontValues, onFontChange, onClose, defaultPos, children, top, defaultCollapsed }: ParamPanelProps) {
-  const panelRef = useRef<HTMLDivElement>(null)
-  const [pos, setPos] = useState(defaultPos ?? { x: typeof window !== 'undefined' ? window.innerWidth - 320 : 600, y: 35 })
+  const { ref: panelRef, pos, onHeaderMouseDown } = useDraggable(defaultPos)
   const [collapsed, setCollapsed] = useState(defaultCollapsed ?? false)
-  const dragging = useRef(false)
-  const offset = useRef({ x: 0, y: 0 })
-
-  const onMouseDown = useCallback((e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest('.param-panel-body')) return
-    dragging.current = true
-    const rect = panelRef.current!.getBoundingClientRect()
-    offset.current = { x: e.clientX - rect.left, y: e.clientY - rect.top }
-    e.preventDefault()
-  }, [])
-
-  useEffect(() => {
-    const onMouseMove = (e: MouseEvent) => {
-      if (!dragging.current) return
-      const x = Math.max(0, Math.min(window.innerWidth - 100, e.clientX - offset.current.x))
-      const y = Math.max(0, Math.min(window.innerHeight - 40, e.clientY - offset.current.y))
-      setPos({ x, y })
-    }
-    const onMouseUp = () => { dragging.current = false }
-    window.addEventListener('mousemove', onMouseMove)
-    window.addEventListener('mouseup', onMouseUp)
-    return () => {
-      window.removeEventListener('mousemove', onMouseMove)
-      window.removeEventListener('mouseup', onMouseUp)
-    }
-  }, [])
 
   return (
     <div className="param-panel" ref={panelRef} style={{ left: pos.x, top: pos.y }}>
-      <div className="param-panel-header" onMouseDown={onMouseDown}>
+      <div className="param-panel-header" onMouseDown={onHeaderMouseDown}>
         <div className="param-panel-title-row">
           <div className="param-panel-title">{title}</div>
           <div className="param-panel-actions">
