@@ -26,7 +26,7 @@
 - 风格记忆：App2D 内 `useRef` 会话级缓存
 - 预设存取：新建 `src/lib/presetStore.ts` 纯逻辑模块（可注入 Storage，可单测）
 - 拖动复用：ParamPanel 现有拖动逻辑抽成 `src/lib/useDraggable.ts` hook，ParamPanel 与新建 PresetPanel 共用
-- ParamPanel 仅新增可选 prop `onRandom`，向后兼容（App3D 的 8 处调用不受影响）
+- ParamPanel 仅新增可选 prop `onRandom`，向后兼容（App3D 的 6 处调用不受影响）
 
 被否决的备选：B（全部内联在 App2D，localStorage 不可测、拖动代码双份）、C（引入全局状态管理，远超需求，YAGNI）。
 
@@ -62,6 +62,8 @@ const handleStyleChange = (id: StyleId) => {
 - 删除现有 `handleStyleChange` 中的随机参数生成代码；`SKIP_RANDOM_UNIFORMS` 常量只剩 `handleRandom` 一个使用方，随代码整理就近放置。
 - 「首次点击 = 默认值」复用现成的 `initParams` / `initTextParams`；toggle/select/color 回到各自 default（比旧随机逻辑覆盖更完整，属预期行为改进）。
 - 采用「无条件快照最后状态」而非「检测用户是否手动修改过」：点过「随机」再切走，回来也保留随机结果。语义为「每个风格记住你最后离开时的样子」，实现无边界情况。
+- 实现注意：快照读取当前 `params` / `textParams`，`handleStyleChange` 的 `useCallback` 依赖数组需相应加入这两项（现有实现依赖为 `[]`）。
+- `handleApplySeed`（应用种子码）同样写入 `styleMemoryRef`：种子码应用后切换风格再回来，应保留种子状态（与 `handleApplyPreset` 行为一致）。
 
 ## 2. 随机按钮（需求 2）
 
@@ -131,7 +133,7 @@ ParamPanel 改为内部使用该 hook（对外行为不变）；PresetPanel 复�
   ```ts
   setActiveStyle(entry.styleId)
   setParams(以 initParams(entry.styleId) 为底，entry.params 覆盖风格定义中存在的 uniform)
-  setTextParams(以 initTextParams 为底，entry.textParams 覆盖)
+  setTextParams(以 initTextParams 为底，entry.textParams 覆盖风格定义中存在的 uniform)
   setFontParams({})
   styleMemoryRef.current[entry.styleId] = { params: 新params, textParams: 新textParams }  // 与需求 1 记忆一致
   ```
