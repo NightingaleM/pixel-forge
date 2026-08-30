@@ -372,6 +372,15 @@ body {
   border-color: #000;
 }
 .preset-item-info { flex: 1; min-width: 0; }
+/* info 部分是原生 button（键盘可达），重置按钮默认样式以融入条目 */
+.preset-item-apply {
+  border: none;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  padding: 0;
+}
 .preset-item-name {
   font-size: 12px;
   font-weight: 600;

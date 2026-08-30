@@ -53,13 +53,17 @@ export default function PresetPanel({ presets, onApply, onDelete, onClose }: Pre
         <div className="preset-panel-body">
           {presets.length === 0 && <div className="preset-panel-empty">{t('preset.empty')}</div>}
           {presets.map((e) => (
-            <div key={e.id} className="preset-item" onClick={() => onApply(e)} title={t('preset.apply')}>
-              <div className="preset-item-info">
+            <div key={e.id} className="preset-item">
+              <button
+                className="preset-item-info preset-item-apply"
+                onClick={() => onApply(e)}
+                title={t('preset.apply')}
+              >
                 <div className="preset-item-name">{e.name}</div>
                 <div className="preset-item-sub">
                   {t(getStyle(e.styleId)?.label ?? e.styleId)} · {formatTime(e.createdAt)}
                 </div>
-              </div>
+              </button>
               <button
                 className="preset-item-delete"
                 title={t('preset.delete')}

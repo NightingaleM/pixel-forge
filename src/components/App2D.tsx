@@ -5,10 +5,13 @@ import { ShaderRenderer } from '../lib/ShaderRenderer'
 import { AsciiCanvasRenderer } from '../lib/AsciiCanvasRenderer'
 import { styles, getStyle, defaultParams, defaultTextParams } from '../lib/StyleRegistry'
 import { encodeSeed, decodeSeed } from '../lib/seedCodec'
+import { loadPresets, savePreset, removePreset, mergeWithDefaults, type PresetEntry } from '../lib/presetStore'
 import type { StyleId } from '../types'
 import ImageUploader from './ImageUploader'
 import StyleSelector from './StyleSelector'
 import ParamPanel from './ParamPanel'
+import PresetBar from './PresetBar'
+import PresetPanel from './PresetPanel'
 import { SeedBar } from './SeedBar'
 import ActionBar from './ActionBar'
 import { CompareSlider } from './CompareSlider'
@@ -32,6 +35,9 @@ function App2D() {
   const [compareMode, setCompareMode] = useState(false)
   const [imageInfo, setImageInfo] = useState<{ width: number; height: number; size: string } | null>(null)
   const [showCloseDialog, setShowCloseDialog] = useState(false)
+  // 本地预设（localStorage 持久化，见 lib/presetStore）
+  const [presets, setPresets] = useState<PresetEntry[]>(() => loadPresets())
+  const [showPresetPanel, setShowPresetPanel] = useState(false)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const rendererRef = useRef<ShaderRenderer | null>(null)
   const asciiCanvasRef = useRef<HTMLCanvasElement>(null)
@@ -346,6 +352,43 @@ function App2D() {
     return true
   }, [image])
 
+  // ---------------------------------------------------------------------------
+  // Preset handlers（localStorage 持久化预设）
+  // ---------------------------------------------------------------------------
+
+  const handleSavePreset = useCallback((name: string): boolean => {
+    const entry = savePreset({ name, styleId: activeStyle, params, textParams })
+    if (!entry) return false
+    setPresets(loadPresets())
+    return true
+  }, [activeStyle, params, textParams])
+
+  // 应用预设：以风格默认值为底合并（容忍风格定义后续增删参数的旧预设），
+  // 并写入会话级风格记忆，避免切走再切回时丢掉预设状态
+  const handleApplyPreset = useCallback((entry: PresetEntry) => {
+    const def = getStyle(entry.styleId)
+    if (!def) return
+    const merged = mergeWithDefaults(def, entry.params, entry.textParams)
+    styleMemoryRef.current[entry.styleId] = merged
+    setActiveStyle(entry.styleId)
+    setParams(merged.params)
+    setTextParams(merged.textParams)
+    setFontParams({})
+  }, [])
+
+  const handleDeletePreset = useCallback((id: string) => {
+    removePreset(id)
+    setPresets(loadPresets())
+  }, [])
+
+  // 默认预设名：当前风格名 + 保存时刻（HH:mm）
+  const presetDefaultName = useMemo(() => {
+    if (!currentStyle) return ''
+    const d = new Date()
+    const p = (n: number) => String(n).padStart(2, '0')
+    return `${t(currentStyle.label)} ${p(d.getHours())}:${p(d.getMinutes())}`
+  }, [currentStyle, t])
+
   return (
     <div className="app-container">
       <div className="left-sidebar">
@@ -409,7 +452,26 @@ function App2D() {
           fontValues={fontParams}
           onFontChange={handleFontChange}
           onRandom={handleRandom}
-          top={<SeedBar seed={seed} onApply={handleApplySeed} />}
+          top={
+            <>
+              <SeedBar seed={seed} onApply={handleApplySeed} />
+              <PresetBar
+                defaultName={presetDefaultName}
+                onSave={handleSavePreset}
+                onToggleList={() => setShowPresetPanel((v) => !v)}
+                listOpen={showPresetPanel}
+                count={presets.length}
+              />
+            </>
+          }
+        />
+      )}
+      {image && currentStyle && showPresetPanel && (
+        <PresetPanel
+          presets={presets}
+          onApply={handleApplyPreset}
+          onDelete={handleDeletePreset}
+          onClose={() => setShowPresetPanel(false)}
         />
       )}
       {showCloseDialog && (
