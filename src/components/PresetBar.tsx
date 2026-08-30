@@ -63,11 +63,12 @@ export default function PresetBar({ defaultName, onSave, onToggleList, listOpen,
           className="seed-bar-input"
           value={draft}
           placeholder={t('preset.namePlaceholder')}
+          aria-label={t('preset.namePlaceholder')}
           autoFocus
           onFocus={(e) => e.target.select()}
           onChange={(e) => { setDraft(e.target.value); setFailed(false) }}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') confirm()
+            if (e.key === 'Enter' && !e.nativeEvent.isComposing) confirm()
             if (e.key === 'Escape') cancel()
           }}
         />
