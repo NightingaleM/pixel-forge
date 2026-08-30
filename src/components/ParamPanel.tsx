@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useDraggable } from '../lib/useDraggable'
 import type { ParamDef } from '../types'
 
@@ -12,6 +13,7 @@ interface ParamPanelProps {
   onTextChange?: (uniform: string, value: string) => void
   fontValues?: Record<string, FontFace | null | undefined>
   onFontChange?: (uniform: string, font: FontFace | null) => void
+  onRandom?: () => void
   onClose?: () => void
   defaultPos?: { x: number; y: number }
   children?: ReactNode
@@ -180,7 +182,8 @@ function renderParam(
   )
 }
 
-function ParamPanel({ title, description, params, values, textValues, onChange, onTextChange, fontValues, onFontChange, onClose, defaultPos, children, top, defaultCollapsed }: ParamPanelProps) {
+function ParamPanel({ title, description, params, values, textValues, onChange, onTextChange, fontValues, onFontChange, onRandom, onClose, defaultPos, children, top, defaultCollapsed }: ParamPanelProps) {
+  const { t } = useTranslation()
   const { ref: panelRef, pos, onHeaderMouseDown } = useDraggable(defaultPos)
   const [collapsed, setCollapsed] = useState(defaultCollapsed ?? false)
 
@@ -190,6 +193,23 @@ function ParamPanel({ title, description, params, values, textValues, onChange, 
         <div className="param-panel-title-row">
           <div className="param-panel-title">{title}</div>
           <div className="param-panel-actions">
+            {onRandom && (
+              <button
+                className="param-panel-random"
+                onClick={onRandom}
+                title={t('common.random')}
+                aria-label={t('common.random')}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <rect x="3" y="3" width="18" height="18" rx="3" />
+                  <circle cx="8.5" cy="8.5" r="1.3" fill="currentColor" stroke="none" />
+                  <circle cx="15.5" cy="8.5" r="1.3" fill="currentColor" stroke="none" />
+                  <circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none" />
+                  <circle cx="8.5" cy="15.5" r="1.3" fill="currentColor" stroke="none" />
+                  <circle cx="15.5" cy="15.5" r="1.3" fill="currentColor" stroke="none" />
+                </svg>
+              </button>
+            )}
             <button className="param-panel-collapse" onClick={() => setCollapsed(c => !c)}>
               {collapsed ? '▸' : '▾'}
             </button>
