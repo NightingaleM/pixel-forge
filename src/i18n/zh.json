@@ -440,5 +440,16 @@
     "placeholder": "粘贴种子码…",
     "invalid": "种子码无效",
     "hint": "复制当前配置或粘贴他人种子码以复现"
+  },
+  "preset": {
+    "save": "保存配置",
+    "confirm": "保存",
+    "namePlaceholder": "配置名称…",
+    "saveFailed": "保存失败（存储不可用）",
+    "saved": "已保存",
+    "list": "我的配置",
+    "empty": "暂无保存的配置，调整参数后点「保存配置」",
+    "apply": "应用",
+    "delete": "删除"
   }
 }

@@ -440,5 +440,16 @@
     "placeholder": "Paste seed code…",
     "invalid": "Invalid seed code",
     "hint": "Copy current config or paste a seed to reproduce"
+  },
+  "preset": {
+    "save": "Save Preset",
+    "confirm": "Save",
+    "namePlaceholder": "Preset name…",
+    "saveFailed": "Save failed (storage unavailable)",
+    "saved": "Saved",
+    "list": "My Presets",
+    "empty": "No presets yet — tweak params and click \"Save Preset\"",
+    "apply": "Apply",
+    "delete": "Delete"
   }
 }
