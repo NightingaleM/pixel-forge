@@ -14,6 +14,7 @@ import ActionBar from './ActionBar'
 import { CompareSlider } from './CompareSlider'
 import ConfirmDialog from './ConfirmDialog'
 
+// 这些 uniform 随机会产生不可用结果（居中/旋转类），随机时保持不动
 const SKIP_RANDOM_UNIFORMS = ['uCenterX', 'uCenterY', 'uRotation', 'uAngle']
 
 function formatFileSize(bytes: number): string {
@@ -36,6 +37,11 @@ function App2D() {
   const asciiCanvasRef = useRef<HTMLCanvasElement>(null)
   const asciiRendererRef = useRef<AsciiCanvasRenderer | null>(null)
   const [fontParams, setFontParams] = useState<Record<string, FontFace | null>>({})
+  // 会话级风格记忆：每个风格最后一次离开时的参数状态（刷新即失，不持久化）
+  const styleMemoryRef = useRef<Partial<Record<StyleId, {
+    params: Record<string, number>
+    textParams: Record<string, string>
+  }>>>({})
 
   // ---------------------------------------------------------------------------
   // Render pipeline
@@ -166,25 +172,16 @@ function App2D() {
 
   const handleStyleChange = useCallback(
     (id: StyleId) => {
-      setActiveStyle(id)
-      setTextParams(defaultTextParams(id))
-      const styleDef = getStyle(id)
-      if (!styleDef) { setParams(defaultParams(id)); return }
-      const randomParams: Record<string, number> = {}
-      for (const p of styleDef.params) {
-        if (p.type === 'text' || p.type === 'color' || p.type === 'toggle' || p.type === 'select' || p.type === 'font') continue
-        if (SKIP_RANDOM_UNIFORMS.includes(p.uniform)) {
-          randomParams[p.uniform] = 0
-          continue
-        }
-        const range = p.max - p.min
-        const raw = p.min + Math.random() * range
-        randomParams[p.uniform] = Math.round(raw / p.step) * p.step
-      }
+      // 无条件快照当前风格状态：默认/随机/手动调整的最后状态一视同仁
+      styleMemoryRef.current[activeStyle] = { params, textParams }
+      // 目标风格：有记忆用记忆（用户最后一次离开时的样子），无记忆用默认值
+      const memo = styleMemoryRef.current[id]
+      setParams(memo?.params ?? defaultParams(id))
+      setTextParams(memo?.textParams ?? defaultTextParams(id))
       setFontParams({})
-      setParams(randomParams)
+      setActiveStyle(id)
     },
-    [],
+    [activeStyle, params, textParams],
   )
 
   // ---------------------------------------------------------------------------
@@ -345,6 +342,7 @@ function App2D() {
     setParams(decoded.params)
     setTextParams(defaultTextParams(decoded.styleId))
     setFontParams({})
+    styleMemoryRef.current[decoded.styleId] = { params: decoded.params, textParams: defaultTextParams(decoded.styleId) }
     return true
   }, [image])
 
@@ -410,6 +408,7 @@ function App2D() {
           onTextChange={handleTextChange}
           fontValues={fontParams}
           onFontChange={handleFontChange}
+          onRandom={handleRandom}
           top={<SeedBar seed={seed} onApply={handleApplySeed} />}
         />
       )}
