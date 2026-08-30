@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import {
   loadPresets, savePreset, removePreset, mergeWithDefaults, setPresetStorage,
 } from './presetStore'
@@ -32,6 +32,12 @@ describe('loadPresets', () => {
     setPresetStorage(s)
     expect(loadPresets()).toEqual([])
   })
+  it('returns [] for non-array JSON', () => {
+    const s = new MemoryStorage()
+    s.setItem('pixel-forge.presets.v1', '{}')
+    setPresetStorage(s)
+    expect(loadPresets()).toEqual([])
+  })
   it('drops invalid entries, keeps valid ones', () => {
     const s = new MemoryStorage()
     s.setItem('pixel-forge.presets.v1', JSON.stringify([
@@ -43,19 +49,26 @@ describe('loadPresets', () => {
     expect(loadPresets().map((e) => e.id)).toEqual(['a'])
   })
   it('sorts by createdAt descending', () => {
-    vi.useFakeTimers()
-    vi.setSystemTime(1000)
-    savePreset(HALFTONE)
-    vi.setSystemTime(2000)
-    savePreset(HALFTONE)
-    vi.useRealTimers()
-    const list = loadPresets()
-    expect(list).toHaveLength(2)
-    expect(list[0].createdAt).toBeGreaterThanOrEqual(list[1].createdAt)
+    const s = new MemoryStorage()
+    s.setItem('pixel-forge.presets.v1', JSON.stringify([
+      { id: 'old', name: 'a', styleId: 'halftone', params: {}, textParams: {}, createdAt: 5 },
+      { id: 'new', name: 'b', styleId: 'halftone', params: {}, textParams: {}, createdAt: 9 },
+    ]))
+    setPresetStorage(s)
+    expect(loadPresets().map((e) => e.id)).toEqual(['new', 'old'])
   })
   it('returns [] when storage throws', () => {
     setPresetStorage(new ThrowingStorage())
     expect(loadPresets()).toEqual([])
+  })
+})
+
+describe('no storage', () => {
+  it('returns safe defaults when storage is null', () => {
+    setPresetStorage(null)
+    expect(loadPresets()).toEqual([])
+    expect(savePreset(HALFTONE)).toBeNull()
+    expect(removePreset('x')).toBe(false)
   })
 })
 

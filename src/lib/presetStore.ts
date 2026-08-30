@@ -17,11 +17,19 @@ const STORAGE_KEY = 'pixel-forge.presets.v1'
 interface StorageLike {
   getItem(key: string): string | null
   setItem(key: string, value: string): void
+  // 与浏览器 Storage 接口对齐，便于注入实现互换（当前实现未用到删除）
   removeItem(key: string): void
 }
 
-// 默认 window.localStorage；测试通过 setPresetStorage 注入内存实现（node 环境无 window）
-let storage: StorageLike | null = typeof window !== 'undefined' ? window.localStorage : null
+// 默认 window.localStorage；测试通过 setPresetStorage 注入内存实现（node 环境无 window）。
+// 注意：阻止所有 cookie 的 Chrome / 某些 webview 中访问 localStorage getter 会抛
+// SecurityError，且此处是模块加载时执行——必须捕获，否则页面 import 即崩溃。
+let storage: StorageLike | null = null
+try {
+  storage = typeof window !== 'undefined' ? window.localStorage : null
+} catch {
+  storage = null
+}
 
 export function setPresetStorage(s: StorageLike | null): void {
   storage = s
@@ -34,8 +42,8 @@ function isValidEntry(raw: unknown): raw is PresetEntry {
     && typeof e.name === 'string'
     && typeof e.styleId === 'string'
     && styles.some((s) => s.id === e.styleId)
-    && typeof e.params === 'object' && e.params !== null
-    && typeof e.textParams === 'object' && e.textParams !== null
+    && typeof e.params === 'object' && e.params !== null && !Array.isArray(e.params)
+    && typeof e.textParams === 'object' && e.textParams !== null && !Array.isArray(e.textParams)
     && typeof e.createdAt === 'number'
 }
 
