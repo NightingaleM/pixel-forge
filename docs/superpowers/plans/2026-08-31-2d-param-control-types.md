@@ -97,7 +97,7 @@ export function snapToStep(
 - [ ] **Step 4: 跑测试确认通过**
 
 Run: `npx vitest run src/lib/paramValue.test.ts`
-Expected: PASS（7 个用例全绿）
+Expected: PASS（6 个用例全绿）
 
 - [ ] **Step 5: Commit**
 
@@ -544,7 +544,7 @@ select 分支中替换：
 - [ ] **Step 6: 验证**
 
 Run: `npx tsc -b --pretty false && npx vitest run && npx eslint src/components/ParamPanel.tsx src/lib/paramValue.ts`
-Expected: tsc 无输出；vitest 全绿（新增 7 用例 + 既有 76）；eslint exit 0
+Expected: tsc 无输出；vitest 全绿（新增 6 用例 + 既有 76 = 82）；eslint exit 0
 
 - [ ] **Step 7: Commit**
 
@@ -562,7 +562,7 @@ git commit -m "feat(ui): 滑条数值内联编辑 + toggle/select 分支补描�
 - [ ] **Step 1: 全量测试**
 
 Run: `npx vitest run`
-Expected: 全绿（既有 76 + 新增 7 = 83）
+Expected: 全绿（既有 76 + 新增 6 = 82）
 
 - [ ] **Step 2: lint 全仓（确认不新增基线错误）**
 
