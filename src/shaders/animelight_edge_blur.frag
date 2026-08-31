@@ -4,7 +4,6 @@ varying vec2 vUv;
 
 uniform sampler2D uImage;
 uniform vec2 uResolution;
-uniform float uEdgeWidth;
 uniform float uEdgeThreshold;
 uniform float uGlowRadius;
 
@@ -13,15 +12,16 @@ void main() {
   vec3 color = texture2D(uImage, vUv).rgb;
   float lum = dot(color, vec3(0.299, 0.587, 0.114));
 
-  // Sobel edge detection
-  float tl = dot(texture2D(uImage, vUv + vec2(-1.0, -1.0) * texel * uEdgeWidth).rgb, vec3(0.299, 0.587, 0.114));
-  float t  = dot(texture2D(uImage, vUv + vec2( 0.0, -1.0) * texel * uEdgeWidth).rgb, vec3(0.299, 0.587, 0.114));
-  float tr = dot(texture2D(uImage, vUv + vec2( 1.0, -1.0) * texel * uEdgeWidth).rgb, vec3(0.299, 0.587, 0.114));
-  float l  = dot(texture2D(uImage, vUv + vec2(-1.0,  0.0) * texel * uEdgeWidth).rgb, vec3(0.299, 0.587, 0.114));
-  float r  = dot(texture2D(uImage, vUv + vec2( 1.0,  0.0) * texel * uEdgeWidth).rgb, vec3(0.299, 0.587, 0.114));
-  float bl = dot(texture2D(uImage, vUv + vec2(-1.0,  1.0) * texel * uEdgeWidth).rgb, vec3(0.299, 0.587, 0.114));
-  float b  = dot(texture2D(uImage, vUv + vec2( 0.0,  1.0) * texel * uEdgeWidth).rgb, vec3(0.299, 0.587, 0.114));
-  float br = dot(texture2D(uImage, vUv + vec2( 1.0,  1.0) * texel * uEdgeWidth).rgb, vec3(0.299, 0.587, 0.114));
+  // Sobel edge detection at fixed 1px spacing (line width is controlled by
+  // dilating the mask in the composite pass, not by the sampling distance here)
+  float tl = dot(texture2D(uImage, vUv + vec2(-1.0, -1.0) * texel).rgb, vec3(0.299, 0.587, 0.114));
+  float t  = dot(texture2D(uImage, vUv + vec2( 0.0, -1.0) * texel).rgb, vec3(0.299, 0.587, 0.114));
+  float tr = dot(texture2D(uImage, vUv + vec2( 1.0, -1.0) * texel).rgb, vec3(0.299, 0.587, 0.114));
+  float l  = dot(texture2D(uImage, vUv + vec2(-1.0,  0.0) * texel).rgb, vec3(0.299, 0.587, 0.114));
+  float r  = dot(texture2D(uImage, vUv + vec2( 1.0,  0.0) * texel).rgb, vec3(0.299, 0.587, 0.114));
+  float bl = dot(texture2D(uImage, vUv + vec2(-1.0,  1.0) * texel).rgb, vec3(0.299, 0.587, 0.114));
+  float b  = dot(texture2D(uImage, vUv + vec2( 0.0,  1.0) * texel).rgb, vec3(0.299, 0.587, 0.114));
+  float br = dot(texture2D(uImage, vUv + vec2( 1.0,  1.0) * texel).rgb, vec3(0.299, 0.587, 0.114));
 
   float gx = -tl - 2.0 * l - bl + tr + 2.0 * r + br;
   float gy = -tl - 2.0 * t - tr + bl + 2.0 * b + br;

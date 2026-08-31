@@ -36,6 +36,10 @@ export class ShaderRenderer {
   private maxTextureSize: number;
   private imageWidth: number = 0;
   private imageHeight: number = 0;
+  // Natural size of the uploaded texture. The texture is uploaded from the
+  // source image as-is (never resized), so this can differ from imageWidth/Height.
+  private srcTexWidth: number = 0;
+  private srcTexHeight: number = 0;
 
   // Cached uniform locations for current program
   private uniformCache: Map<string, WebGLUniformLocation> = new Map();
@@ -103,6 +107,11 @@ export class ShaderRenderer {
 
     this.imageWidth = width;
     this.imageHeight = height;
+
+    // The texture below is uploaded from the raw image element, so record its
+    // natural size separately from the fitted canvas size.
+    this.srcTexWidth = image.naturalWidth || image.width;
+    this.srcTexHeight = image.naturalHeight || image.height;
 
     // Resize the canvas to match
     this.canvas.width = width;
@@ -303,6 +312,13 @@ export class ShaderRenderer {
     for (let i = 0; i < passes.length; i++) {
       const pass = passes[i];
       const isLast = i === passes.length - 1;
+      // uResolution must describe this pass's INPUT texture: pass 0 reads the
+      // full-res source image, later passes read the FBO textures. Only the
+      // renderer knows these sizes, so inject before caller uniforms (which may
+      // still override). Without this, uResolution defaults to (0,0) and any
+      // texel-based sampling (1.0 / uResolution) collapses to inf/NaN.
+      const inputW = i === 0 ? this.srcTexWidth : width;
+      const inputH = i === 0 ? this.srcTexHeight : height;
 
       if (isLast) {
         // Render final pass to the canvas (not FBO)
@@ -322,6 +338,7 @@ export class ShaderRenderer {
         const uOriginalLoc = gl.getUniformLocation(this.program!, 'uOriginal');
         if (uOriginalLoc) gl.uniform1i(uOriginalLoc, 1);
 
+        this.setUniform('uResolution', [inputW, inputH]);
         for (const [name, value] of Object.entries(pass.uniforms)) {
           this.setUniform(name, value);
         }
@@ -350,6 +367,7 @@ export class ShaderRenderer {
         const uOriginalLoc2 = gl.getUniformLocation(this.program!, 'uOriginal');
         if (uOriginalLoc2) gl.uniform1i(uOriginalLoc2, 1);
 
+        this.setUniform('uResolution', [inputW, inputH]);
         for (const [name, value] of Object.entries(pass.uniforms)) {
           this.setUniform(name, value);
         }
@@ -442,6 +460,8 @@ export class ShaderRenderer {
     this.uniformCache.clear();
     this.imageWidth = 0;
     this.imageHeight = 0;
+    this.srcTexWidth = 0;
+    this.srcTexHeight = 0;
   }
 
   /**

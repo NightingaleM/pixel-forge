@@ -38,15 +38,27 @@ vec3 hue2rgb(float h) {
 }
 
 vec3 hsv2rgb(vec3 c) {
-  vec3 rgb = hue2rgb(c.x);
-  return rgb * c.z;
+  vec3 rgb = hue2rgb(c.x) * c.z;
+  // Mix toward neutral gray (v,v,v) by saturation — hue2rgb alone is fully saturated
+  return mix(vec3(c.z), rgb, c.y);
 }
 
 void main() {
   vec3 origColor = texture2D(uOriginal, vUv).rgb;
   vec2 pass1 = texture2D(uImage, vUv).rg;
   float glowIntensity = pass1.r;
-  float edgeIntensity = pass1.g;
+
+  // Dilate the edge mask (max filter) so uEdgeWidth maps to real line width
+  // (radius = uEdgeWidth * 0.5 px). Pass-1 Sobel samples at fixed 1px spacing.
+  vec2 texel = 1.0 / uResolution;
+  float spread = uEdgeWidth / 4.0;
+  float edgeIntensity = 0.0;
+  for (int dx = -2; dx <= 2; dx++) {
+    for (int dy = -2; dy <= 2; dy++) {
+      float e = texture2D(uImage, vUv + vec2(float(dx), float(dy)) * spread * texel).g;
+      edgeIntensity = max(edgeIntensity, e);
+    }
+  }
 
   vec3 hsv = rgb2hsv(origColor);
   hsv.y = min(hsv.y * uSaturation, 1.0);
