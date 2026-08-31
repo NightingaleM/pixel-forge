@@ -8,7 +8,7 @@
 
 **Tech Stack:** React 19 + TypeScript + WebGL 1(GLSL ES 1.0)+ vitest。spec: `docs/superpowers/specs/2026-08-31-animelight-godray-volumetric-design.md`
 
-**基准线:** eslint 基线 11 个预先存在错误(全在 3D 文件),验收标准是不新增;`tsc -b` 通过;`npx vitest run` 66 个测试全过(参数表变更后 seedCodec 有 1 处断言需按新值更新,见 Task 2)。
+**基准线:** eslint 基线 11 个预先存在错误(全在 3D 文件),验收标准是不新增;`tsc -b` 通过;`npx vitest run` 66 个测试全过(参数表变更后 seedCodec 有两处码长断言需按新值更新,见 Task 2)。
 
 ---
 
@@ -129,7 +129,7 @@ git commit -m "feat(lib): findBrightestPoint——缩略图最亮点检测,返�
 - Modify: `src/shaders/animelight_composite.frag`(godRay 段,当前约 75-93 行)
 - Modify: `src/lib/StyleRegistry.ts`(animelight 参数表,当前约 172-179 行)
 - Modify: `src/i18n/zh.json` / `src/i18n/en.json`(animelight 段)
-- Test: `src/lib/seedCodec.test.ts`(仅当 105 行断言因码长变化失败时更新)
+- Test: `src/lib/seedCodec.test.ts`(两处码长断言按 Step 4 预期值更新)
 
 - [ ] **Step 1: 替换 composite shader 的 godRay 段**
 
