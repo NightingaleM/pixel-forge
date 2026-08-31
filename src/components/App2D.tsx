@@ -5,6 +5,7 @@ import { ShaderRenderer } from '../lib/ShaderRenderer'
 import { AsciiCanvasRenderer } from '../lib/AsciiCanvasRenderer'
 import { styles, getStyle, defaultParams, defaultTextParams } from '../lib/StyleRegistry'
 import { encodeSeed, decodeSeed } from '../lib/seedCodec'
+import { findBrightestPoint } from '../lib/brightPoint'
 import { loadPresets, savePreset, removePreset, mergeWithDefaults, type PresetEntry } from '../lib/presetStore'
 import type { StyleId } from '../types'
 import ImageUploader from './ImageUploader'
@@ -34,6 +35,8 @@ function App2D() {
   const [textParams, setTextParams] = useState<Record<string, string>>(() => defaultTextParams('halftone'))
   const [compareMode, setCompareMode] = useState(false)
   const [imageInfo, setImageInfo] = useState<{ width: number; height: number; size: string } | null>(null)
+  // 体积光自动光源:图片最亮点的 UV 坐标(检测失败为 null)
+  const [brightest, setBrightest] = useState<{ x: number; y: number } | null>(null)
   const [showCloseDialog, setShowCloseDialog] = useState(false)
   // 本地预设（localStorage 持久化，见 lib/presetStore）
   const [presets, setPresets] = useState<PresetEntry[]>(() => loadPresets())
@@ -114,6 +117,16 @@ function App2D() {
         mergedParams['uAtlasCount'] = atlasCount
       }
 
+      // 体积光自动光源:animelight 开启自动时用检测到的最亮点覆盖光源参数。
+      // 守卫必须用 === 1 而非 !== 0:其他风格(如 kaleidoscope 也有 uCenterX/Y,
+      // 范围 -1..1)的 params 里没有 uGodRayAuto,undefined !== 0 为 true 会跨风格
+      // 污染它们的光源/中心参数。animelight 的 uGodRayAuto 由 defaultParams 与
+      // mergeWithDefaults 保证始终存在,=== 1 判断足够。
+      if (currentParams['uGodRayAuto'] === 1 && brightest) {
+        mergedParams['uCenterX'] = brightest.x
+        mergedParams['uCenterY'] = brightest.y
+      }
+
       const shaderSources = await Promise.all(styleDef.shaderImports.map((fn) => fn()))
 
       if (styleDef.isMultiPass && shaderSources.length > 1) {
@@ -137,7 +150,7 @@ function App2D() {
         if (gl) gl.deleteTexture(tex)
       }
     },
-    [image],
+    [image, brightest],
   )
 
   // ---------------------------------------------------------------------------
@@ -170,6 +183,28 @@ function App2D() {
     }
 
     rendererRef.current.loadImage(image)
+  }, [image])
+
+  // ---------------------------------------------------------------------------
+  // Effect: detect brightest point (auto light source for volumetric god rays)
+  // ---------------------------------------------------------------------------
+
+  useEffect(() => {
+    if (!image) return
+    const THUMB = 32
+    try {
+      const c = document.createElement('canvas')
+      c.width = THUMB
+      c.height = THUMB
+      const ctx = c.getContext('2d', { willReadFrequently: true })
+      if (!ctx) throw new Error('no 2d context')
+      ctx.drawImage(image, 0, 0, THUMB, THUMB)
+      setBrightest(findBrightestPoint(ctx.getImageData(0, 0, THUMB, THUMB).data, THUMB, THUMB))
+    } catch {
+      // 跨域图片等导致 getImageData 失败:回落默认光源位置
+      console.warn('[animelight] brightest point detection failed, using default light source')
+      setBrightest(null)
+    }
   }, [image])
 
   // ---------------------------------------------------------------------------
@@ -221,7 +256,15 @@ function App2D() {
   // ---------------------------------------------------------------------------
 
   const handleParamChange = useCallback((uniform: string, value: number) => {
-    setParams((prev) => ({ ...prev, [uniform]: value }))
+    setParams((prev) => {
+      const next = { ...prev, [uniform]: value }
+      // 拖动光源位置 = 用户接管,自动检测让位。判断用 === 1 而非 !== 0:
+      // 其他风格(如 kaleidoscope)拖自己的 uCenterX/Y 时不写入无关的 uGodRayAuto 键
+      if ((uniform === 'uCenterX' || uniform === 'uCenterY') && next['uGodRayAuto'] === 1) {
+        next['uGodRayAuto'] = 0
+      }
+      return next
+    })
   }, [])
 
   const handleTextChange = useCallback((uniform: string, value: string) => {
@@ -332,6 +375,12 @@ function App2D() {
   // ---------------------------------------------------------------------------
 
   const currentStyle = getStyle(activeStyle)
+
+  // 自动模式下 X/Y 滑块显示检测值(仅显示层,state 不动,避免渲染 effect 循环)
+  const panelValues = useMemo(() => {
+    if (activeStyle !== 'animelight' || params['uGodRayAuto'] === 0 || !brightest) return params
+    return { ...params, uCenterX: brightest.x, uCenterY: brightest.y }
+  }, [activeStyle, params, brightest])
 
   const seed = useMemo(
     () => currentStyle ? encodeSeed(activeStyle, params, currentStyle) : '',
@@ -446,7 +495,7 @@ function App2D() {
             }
             return { ...p, name: t(p.name), description: p.description ? t(p.description) : undefined }
           })}
-          values={params}
+          values={panelValues}
           textValues={textParams}
           onChange={handleParamChange}
           onTextChange={handleTextChange}

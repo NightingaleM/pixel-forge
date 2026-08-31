@@ -84,6 +84,8 @@ void main() {
     vec2 lightPos = vec2(uCenterX, uCenterY);
     vec2 delta = (vUv - lightPos) * 0.9 / 32.0;
     vec2 sampleUv = vUv;
+    // 0.9: march covers 90% of the path to the source; 2/32 (below) normalizes
+    // the 32 weighted samples, x2 for visible beam strength.
     float decay = mix(0.85, 0.99, uGodRayLength);
     float illum = 1.0;
     float accum = 0.0;
