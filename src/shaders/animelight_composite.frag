@@ -9,7 +9,11 @@ uniform float uSaturation;
 uniform float uEdgeWidth;
 uniform float uEdgeThreshold;
 uniform float uGodRayStrength;
-uniform float uGodRayAngle;
+uniform float uGodRayLength;
+uniform float uGodRayThreshold;
+uniform float uGodRayColor;
+uniform float uCenterX;
+uniform float uCenterY;
 uniform float uGlowRadius;
 uniform float uHueShift;
 uniform float uContrast;
@@ -74,20 +78,23 @@ void main() {
   color = mix(color, vec3(0.0), edgeIntensity * 0.9);
 
   if (uGodRayStrength > 0.01) {
-    float godRayAngle = uGodRayAngle * 3.14159265 / 180.0;
-    vec2 godDir = normalize(vec2(cos(godRayAngle), sin(godRayAngle)));
-    vec2 centered = vUv - 0.5;
-    float projection = dot(centered, godDir);
-    float perpDist = length(centered - godDir * projection);
-
-    float beam = sin(projection * 30.0) * 0.5 + 0.5;
-    beam = smoothstep(0.3, 0.7, beam);
-    float beamMask = smoothstep(0.3, 0.0, perpDist);
-
-    vec3 rayColor = vec3(1.0, 0.9, 0.6);
-    float lum = dot(origColor, vec3(0.299, 0.587, 0.114));
-    float rayStrength = beam * beamMask * uGodRayStrength * smoothstep(0.3, 0.6, lum);
-    color += rayColor * rayStrength * 0.5;
+    // Volumetric light scattering (GPU Gems 3 Ch.13, simplified): march from
+    // this pixel toward the light source, accumulating thresholded luminance
+    // with distance decay — beams follow the bright parts of the image.
+    vec2 lightPos = vec2(uCenterX, uCenterY);
+    vec2 delta = (vUv - lightPos) * 0.9 / 32.0;
+    vec2 sampleUv = vUv;
+    float decay = mix(0.85, 0.99, uGodRayLength);
+    float illum = 1.0;
+    float accum = 0.0;
+    for (int i = 0; i < 32; i++) {
+      sampleUv -= delta;
+      float lum = dot(texture2D(uOriginal, sampleUv).rgb, vec3(0.299, 0.587, 0.114));
+      accum += smoothstep(uGodRayThreshold, uGodRayThreshold + 0.1, lum) * illum;
+      illum *= decay;
+    }
+    vec3 rayColor = hsv2rgb(vec3(uGodRayColor / 360.0, 0.6, 1.0));
+    color += rayColor * accum * uGodRayStrength * (2.0 / 32.0);
   }
 
   gl_FragColor = vec4(clamp(color, 0.0, 1.0), 1.0);

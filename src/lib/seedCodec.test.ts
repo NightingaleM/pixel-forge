@@ -87,7 +87,7 @@ describe('encodeSeed / decodeSeed', () => {
     for (const def of styles) {
       const maxed = numericParams(def, (p) => p.max)
       const code = encodeSeed(def.id, maxed, def)
-      expect(code.length).toBeLessThanOrEqual(13)
+      expect(code.length).toBeLessThanOrEqual(17)
       const decoded = decodeSeed(code)
       expect(decoded).not.toBeNull()
       expect(decoded!.params).toEqual(maxed)
@@ -102,7 +102,7 @@ describe('encodeSeed / decodeSeed', () => {
     expect(maxOf('ascii')).toBe(6)
     expect(maxOf('halftone')).toBe(8)
     expect(maxOf('kaleidoscope')).toBe(11)
-    expect(maxOf('animelight')).toBe(13)
+    expect(maxOf('animelight')).toBe(17)
   })
 
   it('全 min 往返（参数码为空，仅 2 位前缀）', () => {
