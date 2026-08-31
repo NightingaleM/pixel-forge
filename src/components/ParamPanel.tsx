@@ -152,7 +152,7 @@ function renderParam(
     return (
       <div key={param.uniform} className="param-row">
         <div className="param-header">
-          <span className="param-label">{param.name}</span>
+          <ParamLabel name={param.name} description={param.description} />
         </div>
         <input
           type="color"

@@ -47,4 +47,13 @@ describe('defaultParams / defaultTextParams', () => {
       }
     }
   })
+
+  it('color 参数 default 为合法 #RRGGBB hex', () => {
+    for (const s of styles) {
+      for (const def of s.params) {
+        if (def.type !== 'color') continue
+        expect(def.default, `${s.id}.${def.uniform}`).toMatch(/^#[0-9a-fA-F]{6}$/)
+      }
+    }
+  })
 })
