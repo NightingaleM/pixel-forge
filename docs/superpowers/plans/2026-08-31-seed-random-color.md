@@ -24,25 +24,44 @@
 
 (a) import 行的 `encodeSeed` 处不变，但文件顶部加 `import { defaultTextParams } from './StyleRegistry'`（若未引入）。
 
-(b) `describe('encodeSeed / decodeSeed')` 内，`全 max 码长等于 spec 表` 用例的 animelight 断言与注释更新：
+(b) `describe('encodeSeed / decodeSeed')` 内，`全 max 码长等于 spec 表` 用例更新为（maxOf 第 4 参传 color 全白，ascii 快照 6→10、animelight 16→20 均为实测推导值，见注释）：
 
 ```ts
-    expect(maxOf('animelight')).toBe(21)  // color 档回归编码：+2^24 因子 ≈ +4~5 字符（实测校准，见注释）
+    const maxOf = (id: StyleId) => {
+      const def = getStyle(id)!
+      const colors: Record<string, string> = {}
+      for (const p of def.params) if (p.type === 'color') colors[p.uniform] = '#FFFFFF'
+      return encodeSeed(id, numericParams(def, (p) => p.max), def, colors).length
+    }
+    expect(maxOf('ascii')).toBe(10)        // 档积 787185 × 2^24 ≈ 1.32e13 → 8 字符载荷 + 2 前缀（uCharColor 纳入编码）
+    expect(maxOf('halftone')).toBe(8)
+    expect(maxOf('kaleidoscope')).toBe(11)
+    expect(maxOf('animelight')).toBe(20)   // 实际档积 1.0136e24 × 2^24 ≈ 1.70e31 < 62^18 → 18 载荷 + 2 前缀
 ```
 
-（执行时先按 21 跑；若实测差 1，以实测值填入并在行尾注释记录推导。该用例的 maxOf 需同时传 color 全值：见 (c) 的 helper。）
-
-同时给该 describe 新增 helper 与用例（放在 `前导零等价` 用例之后）：
+(c) `全 min 往返` 用例（108-117 行）更新——color 风格默认色非黑会破坏「空载荷、码长 2」假设，需传全黑色表：
 
 ```ts
-  function colorParamsOf(def: StyleDefinition): Record<string, string> {
-    const o: Record<string, string> = {}
-    for (const p of def.params) {
-      if (p.type === 'color') o[p.uniform] = p.default
+  it('全 min 往返（参数码为空，仅 2 位前缀）', () => {
+    for (const def of styles) {
+      const mined = numericParams(def, (p) => p.min)
+      const black: Record<string, string> = {}
+      for (const p of def.params) if (p.type === 'color') black[p.uniform] = '#000000'
+      const code = encodeSeed(def.id, mined, def, black)
+      expect(code.length).toBe(2)
+      const decoded = decodeSeed(code)
+      expect(decoded).not.toBeNull()
+      expect(decoded!.params).toEqual(mined)
+      for (const [u, hex] of Object.entries(black)) {
+        expect(decoded!.colorParams[u]).toBe(hex)
+      }
     }
-    return o
-  }
+  })
+```
 
+同时给该 describe 新增用例（放在 `前导零等价` 用例之后）：
+
+```ts
   it('color 参数参与编码：往返还原（解码统一小写）', () => {
     const def = getStyle('sketch')!
     const params = numericParams(def, (p) => p.default)
@@ -80,7 +99,7 @@
   })
 ```
 
-(c) `全 max 往返` 用例（86-95 行）的码长上限放宽：`expect(code.length).toBeLessThanOrEqual(17)` → `toBeLessThanOrEqual(21)`（color 全值档位 +4~5 字符）。
+(d) `全 max 往返` 用例（86-95 行）的码长上限放宽：`expect(code.length).toBeLessThanOrEqual(17)` → `toBeLessThanOrEqual(21)`（实测最长 animelight=20，留 1 余量；该用例 color 无 max 概念，encodeSeed 不传第 4 参取 default 色，不影响 numeric 断言）。
 
 - [ ] **Step 2: 跑测试确认失败**
 
@@ -105,14 +124,15 @@ export function encodeSeed(
   const seedable = seedableListOf(def)
   let big = 0n
   for (const p of seedable) {
-    if (isNumeric(p)) {
+    if (p.type === 'color') {
+      // color 档：hex → 24-bit index，radix 2^24 覆盖 #000000..#FFFFFF 全值域。
+      // 用显式 type 判断而非 else：seedable 联合含 text/font（无 default 属性），else 分支过不了 tsc
+      const hex = textParams[p.uniform] ?? p.default
+      big = big * 16777216n + BigInt(parseInt(hex.slice(1), 16))
+    } else if (isNumeric(p)) {
       const count = BigInt(paramCount(p))
       const idx = BigInt(paramIndex(p, params[p.uniform] ?? p.default))
       big = big * count + idx
-    } else {
-      // color 档：hex → 24-bit index，radix 2^24 覆盖 #000000..#FFFFFF 全值域
-      const hex = textParams[p.uniform] ?? p.default
-      big = big * 16777216n + BigInt(parseInt(hex.slice(1), 16))
     }
   }
   const version = ALPHABET[SEED_VERSION]
@@ -220,7 +240,7 @@ merge 行改为：
     })
 ```
 
-- [ ] **Step 3: 随机按钮支持 color**（handleRandom，约 294-301 行的 skip 循环）
+- [ ] **Step 3: 随机按钮支持 color**（handleRandom，约 305-320 行，skip 循环在 312-318——注意 294-303 是 handleReset，勿改错函数）
 
 在循环中 `p.type === 'color'` 不再 continue，改为收集随机色并在循环后合并写入（与 randomParams 同步）：
 
