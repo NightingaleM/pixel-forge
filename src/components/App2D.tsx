@@ -293,6 +293,13 @@ function App2D() {
 
   const handleReset = useCallback(() => {
     setParams(defaultParams(activeStyle))
+    // color 参数走 textParams 数据流，重置时一并恢复默认色；
+    // text 类型（如 ascii 字符集）保持既有豁免不被重置
+    const colorDefaults: Record<string, string> = {}
+    for (const p of getStyle(activeStyle)?.params ?? []) {
+      if (p.type === 'color') colorDefaults[p.uniform] = p.default
+    }
+    setTextParams((prev) => ({ ...prev, ...colorDefaults }))
   }, [activeStyle])
 
   const handleRandom = useCallback(() => {
