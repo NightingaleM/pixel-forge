@@ -8,16 +8,10 @@ uniform float uContrast;
 uniform float uThreshold;
 uniform float uLightDir;
 uniform float uGlowIntensity;
-uniform float uGlowColor;
+uniform float uGlowColorR;
+uniform float uGlowColorG;
+uniform float uGlowColorB;
 uniform float uShadowDepth;
-
-vec3 hue2rgb(float h) {
-  h = fract(h);
-  float r = abs(h * 6.0 - 3.0) - 1.0;
-  float g = 2.0 - abs(h * 6.0 - 2.0);
-  float b = 2.0 - abs(h * 6.0 - 4.0);
-  return clamp(vec3(r, g, b), 0.0, 1.0);
-}
 
 void main() {
   vec3 color = texture2D(uOriginal, vUv).rgb;
@@ -25,10 +19,7 @@ void main() {
 
   float glowStrength = blurred * (1.0 - uThreshold) * 2.0 * uGlowIntensity;
 
-  vec3 glowTint = vec3(1.0);
-  if (uGlowColor > 0.5) {
-    glowTint = mix(vec3(1.0), hue2rgb(uGlowColor / 360.0), 0.5);
-  }
+  vec3 glowTint = vec3(uGlowColorR, uGlowColorG, uGlowColorB);
   vec3 glow = glowTint * glowStrength;
 
   float rad = uLightDir * 3.14159265 / 180.0;

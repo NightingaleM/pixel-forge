@@ -6,6 +6,7 @@ import { AsciiCanvasRenderer } from '../lib/AsciiCanvasRenderer'
 import { styles, getStyle, defaultParams, defaultTextParams } from '../lib/StyleRegistry'
 import { encodeSeed, decodeSeed } from '../lib/seedCodec'
 import { findBrightestPoint } from '../lib/brightPoint'
+import { hexToRgb } from '../lib/paramValue'
 import { loadPresets, savePreset, removePreset, mergeWithDefaults, type PresetEntry } from '../lib/presetStore'
 import type { StyleId } from '../types'
 import ImageUploader from './ImageUploader'
@@ -115,6 +116,17 @@ function App2D() {
       if (textTextures.length > 0) {
         renderer.bindTexture(textTextures[0], 2)
         mergedParams['uAtlasCount'] = atlasCount
+      }
+
+      // color 参数（色板 hex）拆 R/G/B 并入数字 uniform——shader 端声明 uXxxR/G/B，
+      // 模式同 ParticleEngine 的 3D color 处理。setUniform 对未声明 uniform 静默跳过，
+      // 故 multi-pass 中非 composite pass 自动忽略，无副作用。
+      for (const p of styleDef.params) {
+        if (p.type !== 'color') continue
+        const [r, g, b] = hexToRgb(currentTextParams[p.uniform] ?? p.default)
+        mergedParams[`${p.uniform}R`] = r
+        mergedParams[`${p.uniform}G`] = g
+        mergedParams[`${p.uniform}B`] = b
       }
 
       // 体积光自动光源:animelight 开启自动时用检测到的最亮点覆盖光源参数。

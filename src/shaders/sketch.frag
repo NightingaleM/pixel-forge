@@ -9,17 +9,11 @@ uniform float uSensitivity;
 uniform float uDetail;
 uniform float uHatching;
 uniform float uBgColor;
-uniform float uLineColor;     // 0-360 hue, 0 = black
+uniform float uLineColorR;
+uniform float uLineColorG;
+uniform float uLineColorB;
 uniform float uHatchDensity;  // 1-10, hatching frequency multiplier
 uniform float uEdgeMethod;    // 0=Sobel, 1=Prewitt
-
-vec3 hue2rgb(float h) {
-  h = fract(h);
-  float r = abs(h * 6.0 - 3.0) - 1.0;
-  float g = 2.0 - abs(h * 6.0 - 2.0);
-  float b = 2.0 - abs(h * 6.0 - 4.0);
-  return clamp(vec3(r, g, b), 0.0, 1.0);
-}
 
 void main() {
   vec2 texel = 1.0 / uResolution;
@@ -138,11 +132,8 @@ void main() {
     bg = vec3(0.102, 0.227, 0.361); // #1A3A5C
   }
 
-  // 8. Line color (0 = black, >0 = hue-based color)
-  vec3 lineColor = vec3(0.0);
-  if (uLineColor > 0.5) {
-    lineColor = hue2rgb(uLineColor / 360.0);
-  }
+  // 8. Line color (color picker RGB; black = black lines)
+  vec3 lineColor = vec3(uLineColorR, uLineColorG, uLineColorB);
 
   vec3 result = mix(bg, lineColor, 1.0 - line);
 

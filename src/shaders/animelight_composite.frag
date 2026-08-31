@@ -11,7 +11,9 @@ uniform float uEdgeThreshold;
 uniform float uGodRayStrength;
 uniform float uGodRayLength;
 uniform float uGodRayThreshold;
-uniform float uGodRayColor;
+uniform float uGodRayColorR;
+uniform float uGodRayColorG;
+uniform float uGodRayColorB;
 uniform float uCenterX;
 uniform float uCenterY;
 uniform float uGlowRadius;
@@ -95,7 +97,7 @@ void main() {
       accum += smoothstep(uGodRayThreshold, uGodRayThreshold + 0.1, lum) * illum;
       illum *= decay;
     }
-    vec3 rayColor = hsv2rgb(vec3(uGodRayColor / 360.0, 0.6, 1.0));
+    vec3 rayColor = vec3(uGodRayColorR, uGodRayColorG, uGodRayColorB);
     color += rayColor * accum * uGodRayStrength * (2.0 / 32.0);
   }
 

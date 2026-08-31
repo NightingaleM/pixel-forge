@@ -102,7 +102,7 @@ describe('encodeSeed / decodeSeed', () => {
     expect(maxOf('ascii')).toBe(6)
     expect(maxOf('halftone')).toBe(8)
     expect(maxOf('kaleidoscope')).toBe(11)
-    expect(maxOf('animelight')).toBe(17)
+    expect(maxOf('animelight')).toBe(16)  // uGodRayColor 改 color 参数后不参与种子编码，码长 -1
   })
 
   it('全 min 往返（参数码为空，仅 2 位前缀）', () => {
