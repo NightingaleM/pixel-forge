@@ -18,3 +18,11 @@ export function snapToStep(
   const decimals = Math.max(0, Math.ceil(-Math.log10(step)))
   return parseFloat(snapped.toFixed(decimals))
 }
+
+/** '#RRGGBB' → [r,g,b]（0..1 浮点，供 shader uniform）；非法输入返回 [0,0,0]。 */
+export function hexToRgb(hex: string): [number, number, number] {
+  const m = /^#?([0-9a-fA-F]{6})$/.exec(hex)
+  if (!m) return [0, 0, 0]
+  const n = parseInt(m[1], 16)
+  return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255]
+}
