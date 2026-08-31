@@ -31,7 +31,7 @@
 | 参数 | 现 default（hue°） | 新 default hex | 换算依据（各 shader 原公式） |
 |---|---|---|---|
 | `style.sketch.lineColor` / `uLineColor` | 27 | `#FF7300` | `hue2rgb(27/360)` = (1.0, 0.45, 0.0) → 255,115,0 |
-| `style.lightshadow.glowColor` / `uGlowColor` | 0 | `#FF8080` | 原渲染 `mix(白,红,0.5)` = (1.0, 0.5, 0.5) → 255,128,128 |
+| `style.lightshadow.glowColor` / `uGlowColor` | 0 | `#FFFFFF` | default hue=0 时哨兵 `if (uGlowColor > 0.5)` 为 false，原默认渲染即纯白光晕 (1,1,1) |
 | `style.animelight.godRayColor` / `uGodRayColor` | 17 | `#FF9166` | 特制 `hsv2rgb(17/360, 0.6, 1)` = (1.0, 0.57, 0.4) → 255,145,102 |
 
 三处 shader 的 `hue2rgb` 为同一三角波实现：`r=|h*6-3|-1, g=2-|h*6-2|, b=2-|h*6-4|`（clamp 0..1）；animelight 的 `hsv2rgb` 为 `mix(vec3(V), hue2rgb(H)*V, S)`。hex 取整用 Math.round。
@@ -71,7 +71,7 @@ color 分支是 renderParam 中唯一未挂 tooltip 的分支（ascii `charColor
 ## 7. 手动验收标准
 
 1. sketch：线条颜色显示色板（默认 #FF7300），默认渲染与改造前逐像素一致；选黑色 → 黑线（原哨兵效果）
-2. lightshadow：光晕颜色色板（默认 #FF8080），默认渲染一致；选白 → 白光晕；选深色 → 深色光晕（新能力）
+2. lightshadow：光晕颜色色板（默认 #FFFFFF，即原哨兵 0 的白光晕），默认渲染一致；选深色 → 深色光晕（新能力）
 3. animelight：神光颜色色板（默认 #FF9166），默认渲染一致
 4. 饱和度/明度可调：选淡蓝/暗红等非纯色生效
 5. 随机按钮不动这 3 个颜色；预设保存/载入颜色完整还原
