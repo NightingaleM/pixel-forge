@@ -190,7 +190,11 @@ function App2D() {
   // ---------------------------------------------------------------------------
 
   useEffect(() => {
-    if (!image) return
+    if (!image) {
+      // 图片关闭/切换时清空,保证 brightest 始终属于当前 image
+      setBrightest(null)
+      return
+    }
     const THUMB = 32
     try {
       const c = document.createElement('canvas')
@@ -282,7 +286,10 @@ function App2D() {
   const handleRandom = useCallback(() => {
     const styleDef = getStyle(activeStyle)
     if (!styleDef) return
-    const randomParams: Record<string, number> = {}
+    // 以当前参数为底:toggle / skip 类参数保留现值,不再被整体替换丢弃
+    // (此前全量替换会让 animelight 的 uGodRayAuto、kaleidoscope 的 uCenterX 等
+    //  从 state 消失,自动光源静默失效)
+    const randomParams: Record<string, number> = { ...params }
     for (const p of styleDef.params) {
       if (p.type === 'text' || p.type === 'color' || p.type === 'toggle' || p.type === 'select' || p.type === 'font') continue
       if (SKIP_RANDOM_UNIFORMS.includes(p.uniform)) continue
@@ -291,7 +298,7 @@ function App2D() {
       randomParams[p.uniform] = Math.round(raw / p.step) * p.step
     }
     setParams(randomParams)
-  }, [activeStyle])
+  }, [activeStyle, params])
 
   const downloadBlob = useCallback((blob: Blob | null, ext: string) => {
     if (!blob) return
@@ -378,7 +385,7 @@ function App2D() {
 
   // 自动模式下 X/Y 滑块显示检测值(仅显示层,state 不动,避免渲染 effect 循环)
   const panelValues = useMemo(() => {
-    if (activeStyle !== 'animelight' || params['uGodRayAuto'] === 0 || !brightest) return params
+    if (activeStyle !== 'animelight' || params['uGodRayAuto'] !== 1 || !brightest) return params
     return { ...params, uCenterX: brightest.x, uCenterY: brightest.y }
   }, [activeStyle, params, brightest])
 
@@ -393,11 +400,14 @@ function App2D() {
     if (!decoded) return false
     const def = getStyle(decoded.styleId)
     if (!def) return false
+    // decodeSeed 只产出 numeric 参数(toggle 不参与编码),裸 setParams 会让
+    // uGodRayAuto 等开关被替换掉;以风格默认值为底合并补齐
+    const merged = mergeWithDefaults(def, decoded.params, defaultTextParams(decoded.styleId))
     setActiveStyle(decoded.styleId)
-    setParams(decoded.params)
-    setTextParams(defaultTextParams(decoded.styleId))
+    setParams(merged.params)
+    setTextParams(merged.textParams)
     setFontParams({})
-    styleMemoryRef.current[decoded.styleId] = { params: decoded.params, textParams: defaultTextParams(decoded.styleId) }
+    styleMemoryRef.current[decoded.styleId] = merged
     return true
   }, [image])
 
