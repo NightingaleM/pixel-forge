@@ -61,6 +61,10 @@ color += rayColor * acc * uGodRayStrength * (1.0 / 32.0) * 2.0;
 - 原有的亮度门限 `smoothstep(0.3, 0.6, lum)` 由新的 `uGodRayThreshold` 参数取代。
 - `uGodRayAngle` 删除:体积光方向由光源位置天然决定。
 - 采样使用 `uOriginal`(TEXTURE1 原图),与 pass1 输出无耦合。
+- **保留**现有 `if (uGodRayStrength > 0.01)` 早退分支(强度为 0 时跳过 32 次采样,
+  兼作性能开关)。
+- 亮度计算与现状一致内联 `dot(rgb, vec3(0.299, 0.587, 0.114))`(可提取 `luma()`
+  helper,循环内外共用)。
 
 ### 2. 参数表(StyleRegistry.animelight)
 
@@ -74,8 +78,13 @@ color += rayColor * acc * uGodRayStrength * (1.0 / 32.0) * 2.0;
 | uCenterX 光源横位置 | slider | 0–1, step 0.01 | 0.5 |
 | uCenterY 光源纵位置 | slider | 0–1, step 0.01 | 0.3 |
 
-- `uCenterX`/`uCenterY` 已在 `SKIP_RANDOM_UNIFORMS`(App2D)名单中,随机时保持不动;
-  toggle 类型在 `handleRandom` 中本就被跳过。
+- `uCenterX`/`uCenterY` 在 `SKIP_RANDOM_UNIFORMS`(App2D)名单中;toggle 类型在
+  `handleRandom` 中本就被跳过。**注意**:`handleRandom` 目前构建全新 `randomParams`
+  后整体 `setParams`,被 skip 的参数会从 state 中**消失**(ParamPanel 靠
+  `?? param.default` 才显示正常)。若不处理,随机后 `uGodRayAuto === 1` 判断失效、
+  X/Y uniform 不再被设置,自动光源静默失效。**配套修改**:`handleRandom` 改为以
+  当前 params 为底、只覆盖参与随机的键(即 `{ ...params }` 起底或从 prev 合并),
+  保持 toggle 与 skip 参数不丢。
 - i18n:zh.json / en.json 的 animelight 段同步增删词条(删 godRayAngle,增上述六项)。
 
 ### 3. 自动光源:最亮点检测
@@ -107,18 +116,27 @@ if (currentParams['uGodRayAuto'] === 1 && brightestRef.current) {
 
 ### 4. 自动/手动切换交互
 
-- ParamPanel 中 X/Y 滑块**始终显示**;自动模式下其值为注入的检测值。
+- ParamPanel 中 X/Y 滑块**始终显示**。自动模式下显示**检测到的光源值**:实现方式为
+  **显示层覆盖**——App2D 传给 ParamPanel 的 `values` 用一个合并视图
+  (`auto === 1 && 检测值存在` 时覆盖 X/Y),`params` state 本身不动
+  (避免写回 state 触发依赖 `params` 的渲染 effect 循环)。
 - 用户拖动 `uCenterX`/`uCenterY` 时,`handleParamChange` 检测到这两个 uniform,
   同时把 `uGodRayAuto` 置 0(自动切手动,一行拦截逻辑)。
 - 切回自动:把 toggle 打开即可。
+- `handleRandom` 的配套修改见 §2(保留 toggle/skip 参数,不再全量替换)。
 
 ### 5. 兼容性
 
 - **预设(presetStore)**:`mergeWithDefaults` 以风格默认值为底合并,旧预设中的
   `uGodRayAngle` 成为多余键被忽略;新参数缺失时回落默认值。
-- **seed(seedCodec)**:实现时需确认 `decodeSeed` 返回的 params 是否经过默认值合并;
-  若 `handleApplySeed` 直接 `setParams(decoded.params)` 且缺新参数键,顺手改为
-  `mergeWithDefaults` 兜底(与本设计参数增删直接相关的既有缺口)。
+- **seed(seedCodec)**:`decodeSeed` 会从当前注册表重建全部 numeric 参数,数字键不会
+  缺失;真正的缺口是 `isNumeric` 不含 `type: 'toggle'`,解码结果永远没有
+  `uGodRayAuto`,而 `handleApplySeed` 裸 `setParams(decoded.params)` 全量替换会让
+  自动模式静默关闭。**配套修改(必做)**:`handleApplySeed` 改为以
+  `mergeWithDefaults` 合并后再 set,缺失的 `uGodRayAuto` 回落默认值 1。
+- **旧 seed 数值错位(已决策,接受)**:参数表增删会改变混合进制 seed 的布局,
+  改动前生成的 animelight 旧 seed 会解码出"格式合法但数值错位"的参数。seed 定位为
+  短期分享码而非持久资产,不引入 SEED_VERSION;在发布说明中提示重新生成 seed 即可。
 
 ## 错误处理
 
@@ -131,6 +149,8 @@ if (currentParams['uGodRayAuto'] === 1 && brightestRef.current) {
   **y 翻转正确性**(构造上亮下暗的数据验证 UV y)。
 - Shader 视觉效果:项目无 GLSL 测试基建,人工验收——亮部(天空/光源)拉出光束、
   阈值/长度/颜色/强度均有可感知变化、自动光源落在画面最亮区域、拖 X/Y 切手动生效。
+- 交互回归(人工):随机按钮后自动光源仍生效(uGodRayAuto 未丢);应用旧 seed 后
+  自动模式仍开启。
 - 回归:eslint(不超 11 错误基线)、`tsc -b`、现有 vitest 全过。
 
 ## 性能
