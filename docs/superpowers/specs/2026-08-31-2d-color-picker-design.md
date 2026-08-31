@@ -42,7 +42,7 @@
 - **lightshadow_composite.frag**：`uGlowColor` → 三 uniform；`vec3 glowTint = vec3(1.0); if (...) glowTint = mix(vec3(1.0), hue2rgb(...), 0.5);` → `vec3 glowTint = vec3(uGlowColorR, uGlowColorG, uGlowColorB);`（删 mix 与哨兵；选白 #FFFFFF 即原「无色调」效果）
 - **animelight_composite.frag**：`uGodRayColor` → 三 uniform；`vec3 rayColor = hsv2rgb(vec3(uGodRayColor/360.0, 0.6, 1.0));` → `vec3 rayColor = vec3(uGodRayColorR, uGodRayColorG, uGodRayColorB);`
 
-因换用直取 + default 按原渲染结果换算，**默认视觉逐像素不变**；此后选什么渲什么（可调饱和度/明度）。shader 内若 `hue2rgb`（lightshadow）/`hsv2rgb`（animelight）因此失去唯一引用，删除函数定义保持整洁（sketch 的 `hue2rgb` 可能仍被其他行引用，以实际引用为准）。
+因换用直取 + default 按原渲染结果换算，**默认视觉逐像素不变**；此后选什么渲什么（可调饱和度/明度）。死函数清理（实施前以引用 grep 为准，已预核）：sketch 的 `hue2rgb` 仅 144 行引用，改后删除；lightshadow 的 `hue2rgb` 仅此一处引用，改后删除；**animelight 的 `hsv2rgb` 在 75 行仍有主图颜色转换引用，保留**（其 `hue2rgb` 若只被 `hsv2rgb` 引用则一并保留）。
 
 ## 3. 2D 渲染路径拆 uniform（App2D.tsx 一处）
 
@@ -56,8 +56,8 @@ color 分支是 renderParam 中唯一未挂 tooltip 的分支（ascii `charColor
 
 ## 5. 兼容性影响
 
-- **旧预设**：存的 hue 数字（number）因类型变化在 `mergeWithDefaults` 中被丢弃 → 回新默认 → **渲染视觉恰好不变**（default 按原渲染结果换算）。
-- **种子码**：3 个参数退出 seedCodec 编码（`isNumeric` 只认 undefined/number），sketch/lightshadow/animelight 的旧种子失效；新种子不含颜色参数（应用种子回默认色）。与上一任务 11 参数的同类已接受权衡。
+- **旧预设**：存的 hue 数字（number）因类型变化在 `mergeWithDefaults` 中被丢弃 → 回新默认。**保存在默认 hue 附近的预设渲染视觉不变**（default 按原渲染结果换算）；保存过自定义 hue 的预设，该颜色回默认色（同类已接受权衡）。
+- **种子码**：3 个参数退出 seedCodec 编码（`isNumeric` 只认 undefined/number），sketch/lightshadow/animelight 的旧种子失效——注意 mixed-radix 错位下部分旧种子可能解码"成功"但数值错位（QA 时按无效对待）；新种子不含颜色参数（应用种子回默认色）。与上一任务 11 参数的同类已接受权衡。
 - **随机按钮**：App2D 随机已跳过 color 类型。
 - **3D**：不涉及（其 color 机制独立且已工作）。
 - shader、`ShaderRenderer`、presetStore、seedCodec 本体不改逻辑。
