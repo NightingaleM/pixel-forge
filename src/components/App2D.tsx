@@ -305,18 +305,26 @@ function App2D() {
   const handleRandom = useCallback(() => {
     const styleDef = getStyle(activeStyle)
     if (!styleDef) return
-    // 以当前参数为底:toggle / skip 类参数保留现值,不再被整体替换丢弃
-    // (此前全量替换会让 animelight 的 uGodRayAuto、kaleidoscope 的 uCenterX 等
-    //  从 state 消失,自动光源静默失效)
+    // 以当前参数为底:toggle/select 类参数保留现值;text/font 不随机;
+    // color 参数随机生成(与 3D 随机一致)
     const randomParams: Record<string, number> = { ...params }
+    const randomColors: Record<string, string> = {}
     for (const p of styleDef.params) {
-      if (p.type === 'text' || p.type === 'color' || p.type === 'toggle' || p.type === 'select' || p.type === 'font') continue
+      if (p.type === 'text' || p.type === 'toggle' || p.type === 'select' || p.type === 'font') continue
       if (SKIP_RANDOM_UNIFORMS.includes(p.uniform)) continue
+      if (p.type === 'color') {
+        // 均匀随机 RGB(与 3D 随机一致),16777216 覆盖含 #FFFFFF 的全值域
+        randomColors[p.uniform] = '#' + Math.floor(Math.random() * 16777216).toString(16).padStart(6, '0')
+        continue
+      }
       const range = p.max - p.min
       const raw = p.min + Math.random() * range
       randomParams[p.uniform] = Math.round(raw / p.step) * p.step
     }
     setParams(randomParams)
+    if (Object.keys(randomColors).length > 0) {
+      setTextParams((prev) => ({ ...prev, ...randomColors }))
+    }
   }, [activeStyle, params])
 
   const downloadBlob = useCallback((blob: Blob | null, ext: string) => {
@@ -409,8 +417,8 @@ function App2D() {
   }, [activeStyle, params, brightest])
 
   const seed = useMemo(
-    () => currentStyle ? encodeSeed(activeStyle, params, currentStyle) : '',
-    [activeStyle, params, currentStyle],
+    () => currentStyle ? encodeSeed(activeStyle, params, currentStyle, textParams) : '',
+    [activeStyle, params, textParams, currentStyle],
   )
 
   const handleApplySeed = useCallback((code: string): boolean => {
@@ -419,9 +427,12 @@ function App2D() {
     if (!decoded) return false
     const def = getStyle(decoded.styleId)
     if (!def) return false
-    // decodeSeed 只产出 numeric 参数(toggle 不参与编码),裸 setParams 会让
-    // uGodRayAuto 等开关被替换掉;以风格默认值为底合并补齐
-    const merged = mergeWithDefaults(def, decoded.params, defaultTextParams(decoded.styleId))
+    // decodeSeed 产出 numeric + color 参数(toggle/select 仍不参与编码),以风格默认值
+    // 为底合并补齐;colorParams 覆盖默认色,text 类型(charset 等)仍回默认
+    const merged = mergeWithDefaults(def, decoded.params, {
+      ...defaultTextParams(decoded.styleId),
+      ...decoded.colorParams,
+    })
     setActiveStyle(decoded.styleId)
     setParams(merged.params)
     setTextParams(merged.textParams)
