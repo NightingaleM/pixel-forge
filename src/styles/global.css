@@ -494,6 +494,33 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+.param-value-editable {
+  cursor: text;
+  border-bottom: 1px dotted #999;
+}
+
+.param-value-editable:hover {
+  color: #FFF;
+}
+
+.param-value-input {
+  width: 3.5em;
+  font-size: 12px;
+  color: #FFF;
+  background: transparent;
+  border: 1px solid #666;
+  border-radius: 0;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  padding: 1px 4px;
+  outline: none;
+}
+
+.param-value-input:focus {
+  border-color: #FFF;
+}
+
 /* --- Custom Slider --- */
 
 .param-slider {

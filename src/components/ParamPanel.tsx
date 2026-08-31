@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useDraggable } from '../lib/useDraggable'
+import { snapToStep } from '../lib/paramValue'
 import type { ParamDef } from '../types'
 
 interface ParamPanelProps {
@@ -25,6 +26,56 @@ function formatValue(value: number, step?: number): string {
   if (Number.isInteger(value) && Number.isInteger(step)) return value.toString()
   const precision = step ? Math.max(0, Math.ceil(-Math.log10(step))) : 2
   return value.toFixed(precision)
+}
+
+/** 数字滑条数值标签：点击后内联编辑，Enter/失焦提交（clamp + step 对齐），Esc 取消。 */
+function ParamValueInput({ value, min, max, step, onCommit }: {
+  value: number
+  min: number
+  max: number
+  step: number
+  onCommit: (v: number) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState('')
+  const display = formatValue(value, step)
+
+  if (!editing) {
+    return (
+      <span
+        className="param-value param-value-editable"
+        onClick={() => {
+          setDraft(display)
+          setEditing(true)
+        }}
+      >
+        {display}
+      </span>
+    )
+  }
+
+  const commit = () => {
+    setEditing(false)
+    const v = parseFloat(draft)
+    if (Number.isNaN(v)) return
+    onCommit(snapToStep(v, min, max, step, value))
+  }
+
+  return (
+    <input
+      className="param-value-input"
+      ref={(el) => { if (el) el.select() }}
+      type="text"
+      inputMode="decimal"
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') commit()
+        else if (e.key === 'Escape') setEditing(false)
+      }}
+    />
+  )
 }
 
 function renderParam(
@@ -71,7 +122,15 @@ function renderParam(
             checked={(values[param.uniform] ?? param.default) === 1}
             onChange={(e) => onChange(param.uniform, e.target.checked ? 1 : 0)}
           />
-          <span className="param-label">{param.name}</span>
+          <span className="param-label">
+            {param.name}
+            {param.description && (
+              <span className="param-tooltip-wrap">
+                <span className="param-tooltip-icon">?</span>
+                <span className="param-tooltip-text">{param.description}</span>
+              </span>
+            )}
+          </span>
         </label>
       </div>
     )
@@ -99,7 +158,15 @@ function renderParam(
     return (
       <div key={param.uniform} className="param-row">
         <div className="param-header">
-          <span className="param-label">{param.name}</span>
+          <span className="param-label">
+            {param.name}
+            {param.description && (
+              <span className="param-tooltip-wrap">
+                <span className="param-tooltip-icon">?</span>
+                <span className="param-tooltip-text">{param.description}</span>
+              </span>
+            )}
+          </span>
         </div>
         <select
           className="param-select"
@@ -165,7 +232,13 @@ function renderParam(
             </span>
           )}
         </span>
-        <span className="param-value">{formatValue(values[param.uniform] ?? param.default, param.step)}</span>
+        <ParamValueInput
+          value={values[param.uniform] ?? param.default}
+          min={param.min}
+          max={param.max}
+          step={param.step}
+          onCommit={(v) => onChange(param.uniform, v)}
+        />
       </div>
       <input
         type="range"
