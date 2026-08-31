@@ -167,6 +167,15 @@ describe('encodeSeed / decodeSeed', () => {
     expect(decoded!.params).toEqual(maxed)
     expect(decoded!.colorParams).toEqual({})
   })
+
+  it('非法 hex 脏值回退 default 档位（防渲染期抛错）', () => {
+    const def = getStyle('sketch')!
+    const params = numericParams(def, (p) => p.default)
+    for (const dirty of ['#12345', 'red', '', '#GGGGGG', 'not-a-color']) {
+      const decoded = decodeSeed(encodeSeed('sketch', params, def, { uLineColor: dirty }))
+      expect(decoded!.colorParams.uLineColor).toBe('#ff7300')  // registry default 小写归一
+    }
+  })
 })
 
 describe('decodeSeed 容错', () => {

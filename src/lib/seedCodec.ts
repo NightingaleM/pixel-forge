@@ -83,8 +83,11 @@ export function encodeSeed(
     if (p.type === 'color') {
       // color 档：hex → 24-bit index，radix 2^24 覆盖 #000000..#FFFFFF 全值域。
       // 用显式 type 判断而非 else：seedable 联合含 text/font（无 default 属性），else 分支过不了 tsc
-      const hex = textParams[p.uniform] ?? p.default
-      big = big * 16777216n + BigInt(parseInt(hex.slice(1), 16))
+      // 非法 hex（如手改 localStorage 预设的脏值）回退 default——parseInt 得 NaN 会让
+      // BigInt 抛 RangeError，encodeSeed 在 seed useMemo 渲染期被调，无 ErrorBoundary 会白屏
+      const m = /^#?([0-9a-fA-F]{6})$/.exec(textParams[p.uniform] ?? '')
+      const idx = m ? parseInt(m[1], 16) : parseInt(p.default.slice(1), 16)
+      big = big * 16777216n + BigInt(idx)
     } else if (isNumeric(p)) {
       const count = BigInt(paramCount(p))
       const idx = BigInt(paramIndex(p, params[p.uniform] ?? p.default))
