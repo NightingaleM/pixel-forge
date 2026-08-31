@@ -108,11 +108,17 @@
       "dotScale": "Dot Scale",
       "dotScaleDesc": "Dot size relative to the cell",
       "colorMode": "Color Mode",
-      "colorModeDesc": "0=Grayscale  1=Color  2=Duotone",
+      "colorModeDesc": "Output color mode",
+      "modeGray": "Grayscale",
+      "modeColor": "Color",
+      "modeDuotone": "Duotone",
       "angle": "Grid Rotation",
       "angleDesc": "Overall rotation angle of the grid",
       "shape": "Shape Mode",
-      "shapeDesc": "0=Circle  1=Square  2=Diamond",
+      "shapeDesc": "Dot shape",
+      "shapeCircle": "Circle",
+      "shapeSquare": "Square",
+      "shapeDiamond": "Diamond",
       "hueShift": "Hue Shift",
       "hueShiftDesc": "Overall hue shift amount"
     },
@@ -126,11 +132,14 @@
       "pixelSize": "Pixelation",
       "pixelSizeDesc": "Pre-processing pixelation size. 1 = no pixelation",
       "noiseType": "Noise Type",
-      "noiseTypeDesc": "0=4×4 ordered dither  1=8×8 ordered dither  2=Random noise",
+      "noiseTypeDesc": "Dithering noise type",
+      "noiseOrdered4": "4×4 Ordered",
+      "noiseOrdered8": "8×8 Ordered",
+      "noiseRandom": "Random Noise",
       "ditherStrength": "Dither Strength",
       "ditherStrengthDesc": "Overall dithering intensity",
       "grayscale": "Grayscale",
-      "grayscaleDesc": "0=Color  1=Grayscale"
+      "grayscaleDesc": "Output grayscale image when enabled"
     },
     "popart": {
       "label": "Pop Art",
@@ -142,7 +151,12 @@
       "contrast": "Contrast",
       "contrastDesc": "Light-dark contrast intensity",
       "palette": "Palette",
-      "paletteDesc": "0=Original  1=Warm  2=Cool  3=Neon  4=Vintage",
+      "paletteDesc": "Tone-mapping palette",
+      "paletteOriginal": "Original",
+      "paletteWarm": "Warm",
+      "paletteCool": "Cool",
+      "paletteNeon": "Neon",
+      "paletteVintage": "Vintage",
       "benDay": "Ben-Day Dots",
       "benDayDesc": "Overlay Ben-Day Dots effect",
       "hueShift": "Hue Rotation",
@@ -178,15 +192,19 @@
       "detail": "Detail Preservation",
       "detailDesc": "Degree of original detail retention",
       "hatching": "Hatching",
-      "hatchingDesc": "0=Off  1=Enable hatching effect",
+      "hatchingDesc": "Overlay hatching strokes",
       "bgColor": "Background",
-      "bgColorDesc": "0=White  1=Deep navy",
+      "bgColorDesc": "Paper background color",
+      "bgWhite": "White",
+      "bgNavy": "Navy",
       "lineColor": "Line Color",
       "lineColorDesc": "Line hue angle",
       "hatchDensity": "Hatch Density",
       "hatchDensityDesc": "Hatching density",
       "edgeMethod": "Edge Method",
-      "edgeMethodDesc": "0=Sobel  1=Prewitt"
+      "edgeMethodDesc": "Edge detection algorithm",
+      "edgeSobel": "Sobel",
+      "edgePrewitt": "Prewitt"
     },
     "pointillism": {
       "label": "Pointillism",
@@ -202,7 +220,10 @@
       "dotOpacity": "Dot Opacity",
       "dotOpacityDesc": "Color dot opacity",
       "shape": "Shape Mode",
-      "shapeDesc": "0=Circle  1=Square  2=Triangle"
+      "shapeDesc": "Dot shape",
+      "shapeCircle": "Circle",
+      "shapeSquare": "Square",
+      "shapeTriangle": "Triangle"
     },
     "kaleidoscope": {
       "label": "Kaleidoscope",
@@ -238,7 +259,7 @@
       "screenDensity": "Screen Density",
       "screenDensityDesc": "Screen dot coverage density/contrast",
       "invert": "Invert",
-      "invertDesc": "0=White background, black lines  1=Black background, white lines"
+      "invertDesc": "Invert line and background (white on black)"
     },
     "animelight": {
       "label": "Anime Light",

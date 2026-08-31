@@ -108,11 +108,17 @@
       "dotScale": "圆点缩放",
       "dotScaleDesc": "圆点相对于单元格的大小比例",
       "colorMode": "颜色模式",
-      "colorModeDesc": "0=灰度  1=彩色  2=双色调",
+      "colorModeDesc": "输出色彩模式",
+      "modeGray": "灰度",
+      "modeColor": "彩色",
+      "modeDuotone": "双色调",
       "angle": "网格旋转角度",
       "angleDesc": "网格整体旋转的角度",
       "shape": "形状模式",
-      "shapeDesc": "0=圆形  1=方形  2=菱形",
+      "shapeDesc": "网点形状",
+      "shapeCircle": "圆形",
+      "shapeSquare": "方形",
+      "shapeDiamond": "菱形",
       "hueShift": "色相偏移",
       "hueShiftDesc": "整体色相的偏移量"
     },
@@ -126,11 +132,14 @@
       "pixelSize": "像素化粒度",
       "pixelSizeDesc": "预处理阶段的像素化大小，1 为不像素化",
       "noiseType": "噪声类型",
-      "noiseTypeDesc": "0=4×4有序抖动  1=8×8有序抖动  2=随机噪声",
+      "noiseTypeDesc": "抖动噪声类型",
+      "noiseOrdered4": "4×4有序抖动",
+      "noiseOrdered8": "8×8有序抖动",
+      "noiseRandom": "随机噪声",
       "ditherStrength": "抖动强度",
       "ditherStrengthDesc": "抖动处理的整体强度",
       "grayscale": "灰度模式",
-      "grayscaleDesc": "0=彩色  1=灰度"
+      "grayscaleDesc": "开启后输出灰度图像"
     },
     "popart": {
       "label": "Pop Art",
@@ -142,9 +151,14 @@
       "contrast": "对比度",
       "contrastDesc": "明暗对比的强度",
       "palette": "色板预设",
-      "paletteDesc": "0=原色  1=暖色  2=冷色  3=霓虹  4=复古",
+      "paletteDesc": "色调映射调色板",
+      "paletteOriginal": "原色",
+      "paletteWarm": "暖色",
+      "paletteCool": "冷色",
+      "paletteNeon": "霓虹",
+      "paletteVintage": "复古",
       "benDay": "叠加圆点",
-      "benDayDesc": "是否叠加本戴点（Ben-Day Dots）效果",
+      "benDayDesc": "叠加本戴点（Ben-Day Dots）网点效果",
       "hueShift": "色相旋转",
       "hueShiftDesc": "色相旋转角度",
       "dotSize": "圆点大小",
@@ -178,15 +192,19 @@
       "detail": "细节保留",
       "detailDesc": "保留原始细节的程度",
       "hatching": "影线叠加",
-      "hatchingDesc": "0=关闭  1=开启影线效果",
+      "hatchingDesc": "叠加影线排线效果",
       "bgColor": "背景色",
-      "bgColorDesc": "0=白色  1=深蓝",
+      "bgColorDesc": "纸张背景色",
+      "bgWhite": "白色",
+      "bgNavy": "深蓝",
       "lineColor": "线条颜色",
       "lineColorDesc": "线条的色相角度",
       "hatchDensity": "影线密度",
       "hatchDensityDesc": "影线的疏密程度",
       "edgeMethod": "边缘检测方法",
-      "edgeMethodDesc": "0=Sobel  1=Prewitt"
+      "edgeMethodDesc": "边缘检测算法",
+      "edgeSobel": "Sobel",
+      "edgePrewitt": "Prewitt"
     },
     "pointillism": {
       "label": "Pointillism",
@@ -202,7 +220,10 @@
       "dotOpacity": "圆点透明度",
       "dotOpacityDesc": "色点的不透明度",
       "shape": "形状模式",
-      "shapeDesc": "0=圆形  1=方形  2=三角形"
+      "shapeDesc": "笔触点形状",
+      "shapeCircle": "圆形",
+      "shapeSquare": "方形",
+      "shapeTriangle": "三角形"
     },
     "kaleidoscope": {
       "label": "Kaleidoscope",
@@ -238,7 +259,7 @@
       "screenDensity": "网点浓度",
       "screenDensityDesc": "网点覆盖的浓度/对比度",
       "invert": "反转模式",
-      "invertDesc": "0=白底黑线  1=黑底白线"
+      "invertDesc": "反转线条与背景（黑底白线）"
     },
     "animelight": {
       "label": "Anime Light",
