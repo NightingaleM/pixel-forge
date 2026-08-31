@@ -366,20 +366,46 @@ import { snapToStep } from '../lib/paramValue'
 import type { ParamDef } from '../types'
 ```
 
-在 `formatValue` 函数之后新增组件：
+在 `formatValue` 函数之后新增组件（已按质量审查修正：用 effect 聚焦而非 inline ref——inline ref 每次渲染重挂会导致每敲一键全选；另提取 ParamLabel 消除 5 处 tooltip 重复、preventDefault 防 label 内点击）：
 
 ```tsx
+/** 参数名 + 可选「?」描述 tooltip。preventDefault 防止在 label 内（toggle 分支）点击图标触发勾选。 */
+function ParamLabel({ name, description }: { name: string; description?: string }) {
+  return (
+    <span className="param-label">
+      {name}
+      {description && (
+        <span className="param-tooltip-wrap" onClick={(e) => e.preventDefault()}>
+          <span className="param-tooltip-icon">?</span>
+          <span className="param-tooltip-text">{description}</span>
+        </span>
+      )}
+    </span>
+  )
+}
+
 /** 数字滑条数值标签：点击后内联编辑，Enter/失焦提交（clamp + step 对齐），Esc 取消。 */
-function ParamValueInput({ value, min, max, step, onCommit }: {
+function ParamValueInput({ value, min, max, step, name, onCommit }: {
   value: number
   min: number
   max: number
   step: number
+  name: string
   onCommit: (v: number) => void
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
   const display = formatValue(value, step)
+
+  // 进入编辑态时聚焦并全选。用 effect（依赖 [editing]）而非 inline ref：
+  // inline ref 每次渲染都会重挂，导致每敲一键就全选、下一个字符覆盖全部输入。
+  useEffect(() => {
+    if (editing) {
+      inputRef.current?.focus()
+      inputRef.current?.select()
+    }
+  }, [editing])
 
   if (!editing) {
     return (
@@ -404,14 +430,16 @@ function ParamValueInput({ value, min, max, step, onCommit }: {
 
   return (
     <input
+      ref={inputRef}
       className="param-value-input"
-      ref={(el) => { if (el) el.select() }}
       type="text"
       inputMode="decimal"
+      aria-label={name}
       value={draft}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={commit}
       onKeyDown={(e) => {
+        if (e.nativeEvent.isComposing) return  // 输入法组合中的 Enter 不提交
         if (e.key === 'Enter') commit()
         else if (e.key === 'Escape') setEditing(false)
       }}
@@ -419,6 +447,8 @@ function ParamValueInput({ value, min, max, step, onCommit }: {
   )
 }
 ```
+
+（import 行相应为 `import { useEffect, useRef, useState, type ReactNode } from 'react'`；滑条调用处传 `name={param.name}`。原计划"toggle/select 补 tooltip"的展开 JSX 由 `ParamLabel` 组件统一承担——text/font/slider 分支的既有 tooltip 也替换为该组件。）
 
 - [ ] **Step 2: 滑条分支接入**
 
@@ -517,15 +547,15 @@ select 分支中替换：
 }
 
 .param-value-editable:hover {
-  color: #FFF;
+  color: #000;
 }
 
 .param-value-input {
-  width: 3.5em;
+  width: 6ch;
   font-size: 12px;
-  color: #FFF;
-  background: transparent;
-  border: 1px solid #666;
+  color: #000;
+  background: #FFF;
+  border: 1px solid #999;
   border-radius: 0;
   font-family: 'Consolas', 'Monaco', monospace;
   font-variant-numeric: tabular-nums;
@@ -535,9 +565,11 @@ select 分支中替换：
 }
 
 .param-value-input:focus {
-  border-color: #FFF;
+  border-color: #000;
 }
 ```
+
+（注意：`.param-panel` 为白底，输入框/hover 必须用黑字——原计划此处误写 `#FFF`，已修正。）
 
 （视觉变量对齐现有黑白风格；若与暗色主题变量冲突，参照 `.param-slider`/`.param-text-input` 既有取值微调。）
 

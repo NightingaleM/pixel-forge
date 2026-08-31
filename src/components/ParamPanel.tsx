@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useDraggable } from '../lib/useDraggable'
 import { snapToStep } from '../lib/paramValue'
@@ -28,17 +28,43 @@ function formatValue(value: number, step?: number): string {
   return value.toFixed(precision)
 }
 
+/** 参数名 + 可选「?」描述 tooltip。preventDefault 防止在 label 内（toggle 分支）点击图标触发勾选。 */
+function ParamLabel({ name, description }: { name: string; description?: string }) {
+  return (
+    <span className="param-label">
+      {name}
+      {description && (
+        <span className="param-tooltip-wrap" onClick={(e) => e.preventDefault()}>
+          <span className="param-tooltip-icon">?</span>
+          <span className="param-tooltip-text">{description}</span>
+        </span>
+      )}
+    </span>
+  )
+}
+
 /** 数字滑条数值标签：点击后内联编辑，Enter/失焦提交（clamp + step 对齐），Esc 取消。 */
-function ParamValueInput({ value, min, max, step, onCommit }: {
+function ParamValueInput({ value, min, max, step, name, onCommit }: {
   value: number
   min: number
   max: number
   step: number
+  name: string
   onCommit: (v: number) => void
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
   const display = formatValue(value, step)
+
+  // 进入编辑态时聚焦并全选。用 effect（依赖 [editing]）而非 inline ref：
+  // inline ref 每次渲染都会重挂，导致每敲一键就全选、下一个字符覆盖全部输入。
+  useEffect(() => {
+    if (editing) {
+      inputRef.current?.focus()
+      inputRef.current?.select()
+    }
+  }, [editing])
 
   if (!editing) {
     return (
@@ -63,14 +89,16 @@ function ParamValueInput({ value, min, max, step, onCommit }: {
 
   return (
     <input
+      ref={inputRef}
       className="param-value-input"
-      ref={(el) => { if (el) el.select() }}
       type="text"
       inputMode="decimal"
+      aria-label={name}
       value={draft}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={commit}
       onKeyDown={(e) => {
+        if (e.nativeEvent.isComposing) return  // 输入法组合中的 Enter 不提交
         if (e.key === 'Enter') commit()
         else if (e.key === 'Escape') setEditing(false)
       }}
@@ -91,15 +119,7 @@ function renderParam(
     return (
       <div key={param.uniform} className="param-row">
         <div className="param-header">
-          <span className="param-label">
-            {param.name}
-            {param.description && (
-              <span className="param-tooltip-wrap">
-                <span className="param-tooltip-icon">?</span>
-                <span className="param-tooltip-text">{param.description}</span>
-              </span>
-            )}
-          </span>
+          <ParamLabel name={param.name} description={param.description} />
         </div>
         <input
           type="text"
@@ -122,15 +142,7 @@ function renderParam(
             checked={(values[param.uniform] ?? param.default) === 1}
             onChange={(e) => onChange(param.uniform, e.target.checked ? 1 : 0)}
           />
-          <span className="param-label">
-            {param.name}
-            {param.description && (
-              <span className="param-tooltip-wrap">
-                <span className="param-tooltip-icon">?</span>
-                <span className="param-tooltip-text">{param.description}</span>
-              </span>
-            )}
-          </span>
+          <ParamLabel name={param.name} description={param.description} />
         </label>
       </div>
     )
@@ -158,15 +170,7 @@ function renderParam(
     return (
       <div key={param.uniform} className="param-row">
         <div className="param-header">
-          <span className="param-label">
-            {param.name}
-            {param.description && (
-              <span className="param-tooltip-wrap">
-                <span className="param-tooltip-icon">?</span>
-                <span className="param-tooltip-text">{param.description}</span>
-              </span>
-            )}
-          </span>
+          <ParamLabel name={param.name} description={param.description} />
         </div>
         <select
           className="param-select"
@@ -201,15 +205,7 @@ function renderParam(
     return (
       <div key={param.uniform} className="param-row">
         <div className="param-header">
-          <span className="param-label">
-            {param.name}
-            {param.description && (
-              <span className="param-tooltip-wrap">
-                <span className="param-tooltip-icon">?</span>
-                <span className="param-tooltip-text">{param.description}</span>
-              </span>
-            )}
-          </span>
+          <ParamLabel name={param.name} description={param.description} />
         </div>
         <label className="param-font-upload">
           <input type="file" accept=".ttf,.otf,.woff,.woff2" onChange={handleFile} />
@@ -223,20 +219,13 @@ function renderParam(
   return (
     <div key={param.uniform} className="param-row">
       <div className="param-header">
-        <span className="param-label">
-          {param.name}
-          {param.description && (
-            <span className="param-tooltip-wrap">
-              <span className="param-tooltip-icon">?</span>
-              <span className="param-tooltip-text">{param.description}</span>
-            </span>
-          )}
-        </span>
+        <ParamLabel name={param.name} description={param.description} />
         <ParamValueInput
           value={values[param.uniform] ?? param.default}
           min={param.min}
           max={param.max}
           step={param.step}
+          name={param.name}
           onCommit={(v) => onChange(param.uniform, v)}
         />
       </div>

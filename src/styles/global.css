@@ -500,15 +500,15 @@ body {
 }
 
 .param-value-editable:hover {
-  color: #FFF;
+  color: #000;
 }
 
 .param-value-input {
-  width: 3.5em;
+  width: 6ch;
   font-size: 12px;
-  color: #FFF;
-  background: transparent;
-  border: 1px solid #666;
+  color: #000;
+  background: #FFF;
+  border: 1px solid #999;
   border-radius: 0;
   font-family: 'Consolas', 'Monaco', monospace;
   font-variant-numeric: tabular-nums;
@@ -518,7 +518,7 @@ body {
 }
 
 .param-value-input:focus {
-  border-color: #FFF;
+  border-color: #000;
 }
 
 /* --- Custom Slider --- */
