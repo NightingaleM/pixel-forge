@@ -34,4 +34,17 @@ describe('defaultParams / defaultTextParams', () => {
       }
     }
   })
+
+  it('select 参数满足不变量：options 非空、value 唯一、default ∈ options', () => {
+    for (const s of styles) {
+      for (const def of s.params) {
+        if (def.type !== 'select') continue
+        const where = `${s.id}.${def.uniform}`
+        expect(def.options.length, where).toBeGreaterThan(0)
+        const values = def.options.map(o => o.value)
+        expect(new Set(values).size, where).toBe(values.length)
+        expect(values, where).toContain(def.default)
+      }
+    }
+  })
 })

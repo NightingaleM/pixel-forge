@@ -91,7 +91,8 @@ export function snapToStep(v: number, min: number, max: number, step: number, fa
 
 - shader uniform 名与取值、`defaultParams` / `defaultTextParams`（select/toggle 走既有 default 分支，天然兼容）
 - App2D 随机逻辑（已跳过 select/toggle/text/color/font）
-- preset / seed 编解码（存储仍是数字）
+- preset 存储与解码（presetStore 按 uniform 存数字，旧预设照常加载）
+- seed 编解码**有已知影响**：seedCodec 的 `isNumeric` 只编 undefined/number 类型，转换后这 11 个参数退出种子编码——涉及 6 个风格的旧种子串将解码为无效；新种子不含枚举参数（应用种子时枚举回默认值）。与 ascii/animelight 既有排除行为一致，属已接受的权衡（pre-release、种子为临时分享串而非持久数据）
 - 3D EffectRegistry、背景/录制/光照面板
 
 ## 6. 测试
