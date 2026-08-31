@@ -139,6 +139,10 @@ if (currentParams['uGodRayAuto'] === 1 && brightestRef.current) {
 - **旧 seed 数值错位(已决策,接受)**:参数表增删会改变混合进制 seed 的布局,
   改动前生成的 animelight 旧 seed 会解码出"格式合法但数值错位"的参数。seed 定位为
   短期分享码而非持久资产,不引入 SEED_VERSION;在发布说明中提示重新生成 seed 即可。
+- **码长信封放宽(已决策,接受)**:新参数集下 animelight 全 max 种子码长为
+  17 字符(原信封 6–13,见 `2026-06-25-2d-param-seed-design.md` §2.7)。
+  分享码仍可正常复制/手输,不为压缩码长牺牲参数精度;seedCodec 测试的长度断言
+  同步更新(13 → 17、上限 ≤13 → ≤17)。
 
 ## 错误处理
 
