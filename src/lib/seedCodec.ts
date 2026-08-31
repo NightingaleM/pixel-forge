@@ -64,18 +64,32 @@ function isNumeric(p: StyleDefinition['params'][number]): p is NumberParamDef {
   return p.type === undefined || p.type === 'number'
 }
 
-function numericListOf(def: StyleDefinition): NumberParamDef[] {
-  return def.params.filter(isNumeric)
+/** 参与种子编码的参数：数值档 + color 档（toggle/select/text/font 仍不参与）. */
+function seedableListOf(def: StyleDefinition): StyleDefinition['params'][number][] {
+  return def.params.filter((p) => isNumeric(p) || p.type === 'color')
 }
 
-/** 编码：{ styleId, params } → 种子码字符串. */
-export function encodeSeed(styleId: StyleId, params: Record<string, number>, def: StyleDefinition): string {
-  const numerics = numericListOf(def)
+/** 编码：{ styleId, params, textParams(color 部分) } → 种子码字符串.
+ *  textParams 缺省时 color 参数取各自 default（旧三参调用语义不变）. */
+export function encodeSeed(
+  styleId: StyleId,
+  params: Record<string, number>,
+  def: StyleDefinition,
+  textParams: Record<string, string> = {},
+): string {
+  const seedable = seedableListOf(def)
   let big = 0n
-  for (const p of numerics) {
-    const count = BigInt(paramCount(p))
-    const idx = BigInt(paramIndex(p, params[p.uniform] ?? p.default))
-    big = big * count + idx
+  for (const p of seedable) {
+    if (p.type === 'color') {
+      // color 档：hex → 24-bit index，radix 2^24 覆盖 #000000..#FFFFFF 全值域。
+      // 用显式 type 判断而非 else：seedable 联合含 text/font（无 default 属性），else 分支过不了 tsc
+      const hex = textParams[p.uniform] ?? p.default
+      big = big * 16777216n + BigInt(parseInt(hex.slice(1), 16))
+    } else if (isNumeric(p)) {
+      const count = BigInt(paramCount(p))
+      const idx = BigInt(paramIndex(p, params[p.uniform] ?? p.default))
+      big = big * count + idx
+    }
   }
   const version = ALPHABET[SEED_VERSION]
   const styleIdx = styles.findIndex((s) => s.id === styleId)
@@ -83,11 +97,11 @@ export function encodeSeed(styleId: StyleId, params: Record<string, number>, def
   return version + ALPHABET[styleIdx] + encodeB62(big)
 }
 
-/** 解码：种子码 → { styleId, params }；任何非法情况返回 null. */
+/** 解码：种子码 → { styleId, params, colorParams }；任何非法情况返回 null. */
 export function decodeSeed(
   code: string,
   registry: StyleDefinition[] = styles,
-): { styleId: StyleId; params: Record<string, number> } | null {
+): { styleId: StyleId; params: Record<string, number>; colorParams: Record<string, string> } | null {
   if (code.length < 2) return null
   const versionVal = CHAR_TO_VAL[code[0]]
   if (versionVal !== SEED_VERSION) return null
@@ -99,17 +113,25 @@ export function decodeSeed(
   const big = decodeB62(code.slice(2))
   if (big === null) return null
 
-  const numerics = numericListOf(def)
+  const seedable = seedableListOf(def)
   const out: Record<string, number> = {}
+  const colorOut: Record<string, string> = {}
   let rem = big
-  for (let i = numerics.length - 1; i >= 0; i--) {
-    const p = numerics[i]
-    const count = BigInt(paramCount(p))
-    const idx = Number(rem % count)
-    rem = rem / count
-    if (idx < 0 || idx >= paramCount(p)) return null
-    out[p.uniform] = valueOfIndex(p, idx)
+  for (let i = seedable.length - 1; i >= 0; i--) {
+    const p = seedable[i]
+    if (p.type === 'color') {
+      // color 档：24-bit index → 小写 hex（与 input type=color 产出一致）
+      const n = rem % 16777216n
+      rem = rem / 16777216n
+      colorOut[p.uniform] = '#' + n.toString(16).padStart(6, '0')
+    } else if (isNumeric(p)) {
+      const count = BigInt(paramCount(p))
+      const idx = Number(rem % count)
+      rem = rem / count
+      if (idx < 0 || idx >= paramCount(p)) return null
+      out[p.uniform] = valueOfIndex(p, idx)
+    }
   }
   if (rem !== 0n) return null
-  return { styleId: def.id, params: out }
+  return { styleId: def.id, params: out, colorParams: colorOut }
 }

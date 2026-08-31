@@ -87,7 +87,7 @@ describe('encodeSeed / decodeSeed', () => {
     for (const def of styles) {
       const maxed = numericParams(def, (p) => p.max)
       const code = encodeSeed(def.id, maxed, def)
-      expect(code.length).toBeLessThanOrEqual(17)
+      expect(code.length).toBeLessThanOrEqual(21)  // 实测最长 animelight=20（color 纳入编码后）留余量
       const decoded = decodeSeed(code)
       expect(decoded).not.toBeNull()
       expect(decoded!.params).toEqual(maxed)
@@ -97,22 +97,29 @@ describe('encodeSeed / decodeSeed', () => {
   it('全 max 码长等于 spec 表（抽样强校验打包正确性）', () => {
     const maxOf = (id: StyleId) => {
       const def = getStyle(id)!
-      return encodeSeed(id, numericParams(def, (p) => p.max), def).length
+      const colors: Record<string, string> = {}
+      for (const p of def.params) if (p.type === 'color') colors[p.uniform] = '#FFFFFF'
+      return encodeSeed(id, numericParams(def, (p) => p.max), def, colors).length
     }
-    expect(maxOf('ascii')).toBe(6)
+    expect(maxOf('ascii')).toBe(10)        // 档积 787185 × 2^24 ≈ 1.32e13 → 8 字符载荷 + 2 前缀（uCharColor 纳入编码）
     expect(maxOf('halftone')).toBe(8)
     expect(maxOf('kaleidoscope')).toBe(11)
-    expect(maxOf('animelight')).toBe(16)  // uGodRayColor 改 color 参数后不参与种子编码，码长 -1
+    expect(maxOf('animelight')).toBe(20)   // 实际档积 1.0136e24 × 2^24 ≈ 1.70e31 < 62^18 → 18 载荷 + 2 前缀
   })
 
   it('全 min 往返（参数码为空，仅 2 位前缀）', () => {
     for (const def of styles) {
       const mined = numericParams(def, (p) => p.min)
-      const code = encodeSeed(def.id, mined, def)
+      const black: Record<string, string> = {}
+      for (const p of def.params) if (p.type === 'color') black[p.uniform] = '#000000'
+      const code = encodeSeed(def.id, mined, def, black)
       expect(code.length).toBe(2)
       const decoded = decodeSeed(code)
       expect(decoded).not.toBeNull()
       expect(decoded!.params).toEqual(mined)
+      for (const [u, hex] of Object.entries(black)) {
+        expect(decoded!.colorParams[u]).toBe(hex)
+      }
     }
   })
 
@@ -122,6 +129,43 @@ describe('encodeSeed / decodeSeed', () => {
     const code = encodeSeed('halftone', params, def)
     const padded = code.slice(0, 2) + '000' + code.slice(2)
     expect(decodeSeed(padded)?.params).toEqual(params)
+  })
+
+  it('color 参数参与编码：往返还原（解码统一小写）', () => {
+    const def = getStyle('sketch')!
+    const params = numericParams(def, (p) => p.default)
+    const code = encodeSeed('sketch', params, def, { uLineColor: '#00FF7F' })
+    const decoded = decodeSeed(code)
+    expect(decoded).not.toBeNull()
+    expect(decoded!.colorParams).toEqual({ uLineColor: '#00ff7f' })
+    expect(decoded!.params).toEqual(params)   // numeric 部分不受影响
+  })
+
+  it('color 档位两端往返：#000000 与 #FFFFFF', () => {
+    const def = getStyle('animelight')!
+    const params = numericParams(def, (p) => p.default)
+    for (const hex of ['#000000', '#FFFFFF']) {
+      const code = encodeSeed('animelight', params, def, { uGodRayColor: hex })
+      expect(decodeSeed(code)!.colorParams).toEqual({
+        uGodRayColor: hex.toLowerCase(),
+      })
+    }
+  })
+
+  it('不传 textParams 时 color 用 default（旧三参调用兼容）', () => {
+    const def = getStyle('lightshadow')!
+    const params = numericParams(def, (p) => p.default)
+    const decoded = decodeSeed(encodeSeed('lightshadow', params, def))
+    // registry 默认色 '#FFFFFF' 大写；解码统一小写归一（与 input type=color 产出一致），故期望 '#ffffff'
+    expect(decoded!.colorParams).toEqual({ uGlowColor: '#ffffff' })
+  })
+
+  it('无 color 参数的风格：旧格式种子解码不变（向后兼容）', () => {
+    const def = getStyle('halftone')!
+    const maxed = numericParams(def, (p) => p.max)
+    const decoded = decodeSeed(encodeSeed('halftone', maxed, def))
+    expect(decoded!.params).toEqual(maxed)
+    expect(decoded!.colorParams).toEqual({})
   })
 })
 
