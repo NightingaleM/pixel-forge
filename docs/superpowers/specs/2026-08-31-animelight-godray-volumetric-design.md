@@ -37,7 +37,8 @@ Anime Light 当前的神光效果([animelight_composite.frag](../../../src/shade
 
 ### 1. Shader 算法(composite 内联)
 
-在 `animelight_composite.frag` 中替换现有 godRay 段:
+在 `animelight_composite.frag` 中替换现有 godRay 段(下方片段为**伪代码**,亮度计算
+以正文说明的内联 `dot` / `luma()` helper 为准):
 
 ```glsl
 // Volumetric light scattering(GPU Gems 3 Ch.13 简化版)
@@ -101,7 +102,8 @@ findBrightestPoint(data: Uint8ClampedArray | Uint8Array, w: number, h: number): 
 - 全黑/平局:返回第一个最大值位置(确定性行为)。
 
 App2D 在 `loadImage` effect 中:把图缩到 32×32 离屏 canvas,`getImageData` 后调用上述
-函数,结果存入 state(如 `brightestRef`)。
+函数,结果存入 **常规 state**(如 `brightest`,不用 ref——检测值同时驱动 §4 的滑块
+显示视图,ref 变更不触发重渲染会让滑块短暂显示旧值)。
 
 渲染注入(`renderWithStyle` 内,构建 `mergedParams` 时):
 
@@ -151,6 +153,9 @@ if (currentParams['uGodRayAuto'] === 1 && brightestRef.current) {
   阈值/长度/颜色/强度均有可感知变化、自动光源落在画面最亮区域、拖 X/Y 切手动生效。
 - 交互回归(人工):随机按钮后自动光源仍生效(uGodRayAuto 未丢);应用旧 seed 后
   自动模式仍开启。
+- **handleRandom 行为变化波及所有风格**(合并底取代全量替换):其他风格的 skip/toggle
+  参数(如 kaleidoscope 的 `uCenterX`、ascii 的 `uShowBg`)随机后**保留当前值**而非
+  从 state 消失——这是修正后的正确行为,但对 animelight 之外的风格抽查随机按钮无异常。
 - 回归:eslint(不超 11 错误基线)、`tsc -b`、现有 vitest 全过。
 
 ## 性能
