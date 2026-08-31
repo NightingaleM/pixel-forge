@@ -108,7 +108,7 @@
       "dotScale": "圆点缩放",
       "dotScaleDesc": "圆点相对于单元格的大小比例",
       "colorMode": "颜色模式",
-      "colorModeDesc": "0=彩色  1=灰度  2=CMYK",
+      "colorModeDesc": "0=灰度  1=彩色  2=双色调",
       "angle": "网格旋转角度",
       "angleDesc": "网格整体旋转的角度",
       "shape": "形状模式",

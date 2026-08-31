@@ -41,7 +41,9 @@ void main() {
   float transition = smoothstep(uThreshold - 0.1, uThreshold + 0.1, blurred);
 
   vec3 brightened = color + glow;
-  vec3 darkened = color * max(0.05, 1.0 - uShadowDepth * 0.7);
+  // 0.475 coefficient keeps the depth slider monotonic over its full 0..2
+  // range (2.0 * 0.475 = 0.95, just above the 0.05 floor — no dead travel)
+  vec3 darkened = color * max(0.05, 1.0 - uShadowDepth * 0.475);
 
   vec3 final = mix(darkened, brightened, transition);
   final *= mix(0.6, 1.0, lightFactor);

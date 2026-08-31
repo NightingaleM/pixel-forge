@@ -108,7 +108,7 @@
       "dotScale": "Dot Scale",
       "dotScaleDesc": "Dot size relative to the cell",
       "colorMode": "Color Mode",
-      "colorModeDesc": "0=Color  1=Grayscale  2=CMYK",
+      "colorModeDesc": "0=Grayscale  1=Color  2=Duotone",
       "angle": "Grid Rotation",
       "angleDesc": "Overall rotation angle of the grid",
       "shape": "Shape Mode",

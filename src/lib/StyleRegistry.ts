@@ -12,7 +12,7 @@ export const styles: StyleDefinition[] = [
     params: [
       { name: 'style.halftone.cellSize',    uniform: 'uCellSize',  min: 2,   max: 50,  step: 1,    default: 15,  description: 'style.halftone.cellSizeDesc' },
       { name: 'style.halftone.dotScale',    uniform: 'uDotScale',  min: 0.1, max: 3.0, step: 0.01, default: 1.45, description: 'style.halftone.dotScaleDesc' },
-      { name: 'style.halftone.colorMode',    uniform: 'uColorMode', min: 0,   max: 2,   step: 1,    default: 2,   description: 'style.halftone.colorModeDesc' },
+      { name: 'style.halftone.colorMode',    uniform: 'uColorMode', min: 0,   max: 2,   step: 1,    default: 1,   description: 'style.halftone.colorModeDesc' },
       { name: 'style.halftone.angle', uniform: 'uAngle',     min: 0,   max: 360, step: 1,    default: 0,   description: 'style.halftone.angleDesc' },
       { name: 'style.halftone.shape',    uniform: 'uShape',     min: 0,   max: 2,   step: 1,    default: 1,   description: 'style.halftone.shapeDesc' },
       { name: 'style.halftone.hueShift',    uniform: 'uHueShift',  min: 0,   max: 360, step: 1,    default: 0,   description: 'style.halftone.hueShiftDesc' },
@@ -91,7 +91,7 @@ export const styles: StyleDefinition[] = [
     params: [
       { name: 'style.sketch.edgeWidth',   uniform: 'uEdgeWidth',    min: 0.5, max: 10.0, step: 0.1,  default: 1.1, description: 'style.sketch.edgeWidthDesc' },
       { name: 'style.sketch.sensitivity', uniform: 'uSensitivity',   min: 0.01, max: 1.0, step: 0.01, default: 0.03, description: 'style.sketch.sensitivityDesc' },
-      { name: 'style.sketch.detail',   uniform: 'uDetail',        min: 0.0, max: 1.0, step: 0.01, default: 0,  description: 'style.sketch.detailDesc' },
+      { name: 'style.sketch.detail',   uniform: 'uDetail',        min: 0.0, max: 1.0, step: 0.01, default: 1,  description: 'style.sketch.detailDesc' },
       { name: 'style.sketch.hatching',   uniform: 'uHatching',      min: 0,   max: 1,   step: 1,    default: 0,   description: 'style.sketch.hatchingDesc' },
       { name: 'style.sketch.bgColor',     uniform: 'uBgColor',       min: 0,   max: 1,   step: 1,    default: 0,   description: 'style.sketch.bgColorDesc' },
       { name: 'style.sketch.lineColor',     uniform: 'uLineColor',     min: 0,   max: 360, step: 1,    default: 27,  description: 'style.sketch.lineColorDesc' },

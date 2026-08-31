@@ -119,12 +119,15 @@ void main() {
     float gray = dot(c, vec3(0.2126, 0.7152, 0.0722));
     c = mix(vec3(gray), c, uSaturation);
 
-    // Step 3: Posterize
-    float levels = floor(uLevels + 0.5);
-    c = posterize(c, levels);
+    // Step 3: Map to nearest palette color (decides the hue)
+    vec3 paletteColor = nearestPaletteColor(c, uPalette);
 
-    // Step 4: Map to nearest palette color
-    c = nearestPaletteColor(c, uPalette);
+    // Step 4: Posterize luminance into levels — few levels give the hard poster
+    // look, many levels approach smooth palette shading
+    float levels = floor(uLevels + 0.5);
+    float lum = dot(c, vec3(0.2126, 0.7152, 0.0722));
+    float q = posterize(vec3(lum), levels).r;
+    c = paletteColor * (0.35 + 0.65 * q);
 
     // Step 4.5: Apply hue shift
     if (uHueShift > 0.5) {

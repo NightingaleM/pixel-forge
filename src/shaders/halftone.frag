@@ -85,13 +85,14 @@ void main() {
   }
 
   if (uColorMode < 0.5) {
-    // monochrome mode
+    // grayscale halftone
     gl_FragColor = vec4(vec3(d), 1.0);
   } else if (uColorMode < 1.5) {
-    // CMYK mode - simplified: use grayscale halftone
-    gl_FragColor = vec4(vec3(d), 1.0);
-  } else {
     // color mode - preserve original colors with optional hue shift
     gl_FragColor = vec4(outColor * d, 1.0);
+  } else {
+    // duotone halftone - deep navy shadows into warm paper highlights
+    vec3 duo = mix(vec3(0.10, 0.23, 0.36), vec3(0.95, 0.91, 0.84), lum);
+    gl_FragColor = vec4(duo * d, 1.0);
   }
 }

@@ -97,8 +97,9 @@ void main() {
   float sensitivity = uSensitivity;
   float edge = smoothstep(sensitivity, sensitivity * 2.0, totalEdge);
 
-  // 4. Mix with detail (preserves more in bright areas)
-  edge = mix(edge, edge * lum, uDetail);
+  // 4. Detail preservation: 1 keeps edges everywhere, 0 fades lines in dark
+  // areas (lum-weighted) so shadows read cleaner
+  edge *= mix(lum, 1.0, uDetail);
 
   // 5. Invert: background with lines
   float line = 1.0 - edge;
