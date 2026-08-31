@@ -155,7 +155,7 @@ function CompareSlider({
         </div>
       </div>
 
-      <ZoomControl zoom={viewport.zoom} onZoom={setZoom} />
+      <ZoomControl zoom={viewport.zoom} onZoom={setZoom} onReset={reset} />
 
       <button
         className={`compare-toggle${compareMode ? ' active' : ''}`}
