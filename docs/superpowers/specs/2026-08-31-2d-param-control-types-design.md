@@ -61,12 +61,12 @@
 
 ## 2. i18n 更新（zh.json / en.json 同步）
 
-- 新增上表 19 个选项 label（zh：灰度/彩色/双色调、圆形/方形/菱形/三角形、4×4有序抖动/8×8有序抖动/随机噪声、原色/暖色/冷色/霓虹/复古、Sobel/Prewitt、白色/深蓝；en：Grayscale/Color/Duotone…）。
+- 新增上表选项 label，共 **21 个 i18n key**（`shapeCircle`/`shapeSquare` 在 halftone 与 pointillism 两个命名空间各有一份；zh：灰度/彩色/双色调、圆形/方形/菱形/三角形、4×4有序抖动/8×8有序抖动/随机噪声、原色/暖色/冷色/霓虹/复古、Sobel/Prewitt、白色/深蓝；en：Grayscale/Color/Duotone…）。
 - 11 个参数的 Desc 去掉「0=xxx 1=xxx」编码说明，改为一句自然描述（语义已由选项/开关承载）。例：`crosshatch.invertDesc` → 「反转线条与背景（黑底白线）」。
 
 ## 3. 数值内联编辑（ParamPanel.tsx）
 
-### 纯函数（可单测，从 ParamPanel 导出或放 lib）
+### 纯函数（新建 `src/lib/paramValue.ts` + 同名单测，沿用项目「纯函数放 lib 可单测」惯例）
 
 ```ts
 /** 把键入值规范化为参数合法值：NaN 返回 fallback；clamp 到 [min,max]；相对 min 按 step 对齐并修浮点误差。 */
@@ -83,9 +83,9 @@ export function snapToStep(v: number, min: number, max: number, step: number, fa
 - CSS：`.param-value-input` 追加到 global.css，宽度约 3.5em、右对齐，沿用 `param-value` 视觉变量。
 - **共享组件自然外溢**：App3D 也用 ParamPanel，其效果参数滑条同样获得内联编辑（不改 3D 的 registry/行为，仅共享组件能力提升，视为一致体验）。
 
-## 4. toggle 分支补 tooltip
+## 4. toggle / select 分支补 tooltip
 
-`renderParam` 的 toggle 分支当前不渲染 description tooltip（slider/text 均有）。补齐同款 `param-tooltip-wrap` 结构——本次转 toggle 的 4 个参数均有有用描述；3D 既有 toggle（`mouseEnabled` 等）无 description 字段，不受影响。
+`renderParam` 的 toggle 分支与 select 分支当前均不渲染 description tooltip（slider/text 均有）——select 的 Desc 现状是死文案（ascii 的 `caseModeDesc` 同样无处显示）。两分支都补齐同款 `param-tooltip-wrap` 结构：toggle 的 4 个、select 的 7 个转换参数均有有用描述；3D 既有 toggle（`mouseEnabled` 等）无 description 字段，不受影响。
 
 ## 5. 明确不改的部分
 
