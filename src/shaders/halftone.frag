@@ -35,8 +35,9 @@ vec3 rgb2hsv(vec3 c) {
 }
 
 vec3 hsv2rgb(vec3 c) {
-  vec3 rgb = hue2rgb(c.x);
-  return rgb * c.z;
+  vec3 rgb = hue2rgb(c.x) * c.z;
+  // Mix toward neutral gray (v,v,v) by saturation — hue2rgb alone is fully saturated
+  return mix(vec3(c.z), rgb, c.y);
 }
 
 void main() {

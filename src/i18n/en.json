@@ -126,7 +126,7 @@
       "pixelSize": "Pixelation",
       "pixelSizeDesc": "Pre-processing pixelation size. 1 = no pixelation",
       "noiseType": "Noise Type",
-      "noiseTypeDesc": "0=Floyd-Steinberg  1=Ordered Dither  2=Random Noise",
+      "noiseTypeDesc": "0=4×4 ordered dither  1=8×8 ordered dither  2=Random noise",
       "ditherStrength": "Dither Strength",
       "ditherStrengthDesc": "Overall dithering intensity",
       "grayscale": "Grayscale",
@@ -160,7 +160,7 @@
       "glowRadius": "Glow Radius",
       "glowRadiusDesc": "Glow effect spread radius",
       "lightDir": "Light Direction",
-      "lightDirDesc": "Simulated light direction. 0°=right, 90°=down, 180°=left, 270°=up",
+      "lightDirDesc": "Simulated light direction. 0°=right, 90°=up, 180°=left, 270°=down",
       "glowIntensity": "Glow Intensity",
       "glowIntensityDesc": "Glow brightness intensity",
       "glowColor": "Glow Color",
@@ -180,7 +180,7 @@
       "hatching": "Hatching",
       "hatchingDesc": "0=Off  1=Enable hatching effect",
       "bgColor": "Background",
-      "bgColorDesc": "0=White  1=Light paper texture",
+      "bgColorDesc": "0=White  1=Deep navy",
       "lineColor": "Line Color",
       "lineColorDesc": "Line hue angle",
       "hatchDensity": "Hatch Density",
@@ -202,7 +202,7 @@
       "dotOpacity": "Dot Opacity",
       "dotOpacityDesc": "Color dot opacity",
       "shape": "Shape Mode",
-      "shapeDesc": "0=Circle  1=Square  2=Ellipse"
+      "shapeDesc": "0=Circle  1=Square  2=Triangle"
     },
     "kaleidoscope": {
       "label": "Kaleidoscope",

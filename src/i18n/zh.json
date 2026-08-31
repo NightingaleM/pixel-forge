@@ -126,7 +126,7 @@
       "pixelSize": "像素化粒度",
       "pixelSizeDesc": "预处理阶段的像素化大小，1 为不像素化",
       "noiseType": "噪声类型",
-      "noiseTypeDesc": "0=Floyd-Steinberg  1=有序抖动  2=随机噪声",
+      "noiseTypeDesc": "0=4×4有序抖动  1=8×8有序抖动  2=随机噪声",
       "ditherStrength": "抖动强度",
       "ditherStrengthDesc": "抖动处理的整体强度",
       "grayscale": "灰度模式",
@@ -160,7 +160,7 @@
       "glowRadius": "光晕半径",
       "glowRadiusDesc": "光晕效果的扩散半径",
       "lightDir": "光照方向角度",
-      "lightDirDesc": "模拟光源的方向角度，0°=右，90°=下，180°=左，270°=上",
+      "lightDirDesc": "模拟光源的方向角度，0°=右，90°=上，180°=左，270°=下",
       "glowIntensity": "光晕强度",
       "glowIntensityDesc": "光晕的亮度强度",
       "glowColor": "光晕颜色",
@@ -180,7 +180,7 @@
       "hatching": "影线叠加",
       "hatchingDesc": "0=关闭  1=开启影线效果",
       "bgColor": "背景色",
-      "bgColorDesc": "0=白色  1=浅色纸纹",
+      "bgColorDesc": "0=白色  1=深蓝",
       "lineColor": "线条颜色",
       "lineColorDesc": "线条的色相角度",
       "hatchDensity": "影线密度",
@@ -202,7 +202,7 @@
       "dotOpacity": "圆点透明度",
       "dotOpacityDesc": "色点的不透明度",
       "shape": "形状模式",
-      "shapeDesc": "0=圆形  1=方形  2=椭圆"
+      "shapeDesc": "0=圆形  1=方形  2=三角形"
     },
     "kaleidoscope": {
       "label": "Kaleidoscope",
