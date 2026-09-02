@@ -1,5 +1,6 @@
 import type { NumberParamDef, StyleDefinition, StyleId } from '../types'
 import { styles } from './StyleRegistry'
+import { isValidHexColor } from './paramValue'
 
 const ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
 export const SEED_ALPHABET = ALPHABET   // 导出供测试构造越界序号（Task 4）
@@ -84,9 +85,10 @@ export function encodeSeed(
       // color 档：hex → 24-bit index，radix 2^24 覆盖 #000000..#FFFFFF 全值域。
       // 用显式 type 判断而非 else：seedable 联合含 text/font（无 default 属性），else 分支过不了 tsc
       // 非法 hex（如手改 localStorage 预设的脏值）回退 default——parseInt 得 NaN 会让
-      // BigInt 抛 RangeError，encodeSeed 在 seed useMemo 渲染期被调，无 ErrorBoundary 会白屏
-      const m = /^#?([0-9a-fA-F]{6})$/.exec(textParams[p.uniform] ?? '')
-      const idx = m ? parseInt(m[1], 16) : parseInt(p.default.slice(1), 16)
+      // BigInt 抛 RangeError，encodeSeed 在 seed useMemo 渲染期被调，无 ErrorBoundary 会白屏。
+      // 合法性判定与 presetStore/paramValue 共用 isValidHexColor（同一把尺子）
+      const v = textParams[p.uniform] ?? ''
+      const idx = isValidHexColor(v) ? parseInt(v.replace(/^#/, ''), 16) : parseInt(p.default.slice(1), 16)
       big = big * 16777216n + BigInt(idx)
     } else if (isNumeric(p)) {
       const count = BigInt(paramCount(p))

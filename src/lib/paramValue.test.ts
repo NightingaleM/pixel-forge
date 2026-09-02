@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { snapToStep, hexToRgb } from './paramValue'
+import { snapToStep, hexToRgb, isValidHexColor } from './paramValue'
 
 describe('snapToStep', () => {
   it('clamps 到 [min,max]', () => {
@@ -49,5 +49,22 @@ describe('hexToRgb', () => {
 
   it('容忍省略 # 前缀', () => {
     expect(hexToRgb('ff7300')).toEqual([1, 115 / 255, 0])
+  })
+})
+
+describe('isValidHexColor', () => {
+  it('接受 #RRGGBB（大小写、可省 #）', () => {
+    expect(isValidHexColor('#FF7300')).toBe(true)
+    expect(isValidHexColor('#ffffff')).toBe(true)
+    expect(isValidHexColor('00ff66')).toBe(true)
+  })
+  it('拒绝 3 位缩写 / 非法字符 / 长度不符 / 空串 / 颜色名 / 前后空白', () => {
+    expect(isValidHexColor('#FFF')).toBe(false)
+    expect(isValidHexColor('#GGGGGG')).toBe(false)
+    expect(isValidHexColor('#12345')).toBe(false)
+    expect(isValidHexColor('#1234567')).toBe(false)
+    expect(isValidHexColor('')).toBe(false)
+    expect(isValidHexColor('red')).toBe(false)
+    expect(isValidHexColor(' #ff0000')).toBe(false)
   })
 })

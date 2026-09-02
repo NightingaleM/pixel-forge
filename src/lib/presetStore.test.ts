@@ -121,4 +121,11 @@ describe('mergeWithDefaults', () => {
     const merged = mergeWithDefaults(def, {}, { [color.uniform]: '#ff0000' })
     expect(merged.textParams[color.uniform]).toBe('#ff0000')
   })
+  it('color 脏值回退默认（hex 校验）——渲染/种子/UI 三方行为一致的前提', () => {
+    const def = getStyle('ascii')!
+    const color = def.params.find(p => p.type === 'color') as { uniform: string; default: string }
+    // 手改 localStorage 预设可能带入任意串；merge 是脏值流入 state 的唯一入口
+    const merged = mergeWithDefaults(def, {}, { [color.uniform]: '#zzzzzz' })
+    expect(merged.textParams[color.uniform]).toBe(color.default)
+  })
 })

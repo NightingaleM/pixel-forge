@@ -1,5 +1,6 @@
 import type { StyleDefinition, StyleId } from '../types'
 import { styles } from './StyleRegistry'
+import { isValidHexColor } from './paramValue'
 
 export interface PresetEntry {
   id: string        // 唯一 id
@@ -112,7 +113,10 @@ export function mergeWithDefaults(
     if (p.type === 'text') {
       outT[p.uniform] = typeof textParams[p.uniform] === 'string' ? textParams[p.uniform] : p.textDefault
     } else if (p.type === 'color') {
-      outT[p.uniform] = typeof textParams[p.uniform] === 'string' ? textParams[p.uniform] : p.default
+      // hex 校验：手改 localStorage 的脏值（'#zzz'、颜色名等）在此拦截回退默认，
+      // 保证流入 state 的 color 一律合法——渲染(hexToRgb 黑色回退)/种子编码
+      // (回退 default 档)/色板 UI(浏览器回退 #000000) 不再各走各的
+      outT[p.uniform] = isValidHexColor(textParams[p.uniform]) ? textParams[p.uniform] : p.default
     } else {
       outP[p.uniform] = typeof params[p.uniform] === 'number' ? params[p.uniform] : p.default
     }

@@ -19,6 +19,11 @@ export function snapToStep(
   return parseFloat(snapped.toFixed(decimals))
 }
 
+/** color 参数合法格式：可选 '#' + 6 位 hex（大小写均可）。 */
+export function isValidHexColor(v: string): boolean {
+  return /^#?[0-9a-fA-F]{6}$/.test(v)
+}
+
 /** '#RRGGBB' → [r,g,b]（0..1 浮点，供 shader uniform）；非法输入返回 [0,0,0]。 */
 export function hexToRgb(hex: string): [number, number, number] {
   const m = /^#?([0-9a-fA-F]{6})$/.exec(hex)
