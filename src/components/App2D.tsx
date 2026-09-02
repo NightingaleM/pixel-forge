@@ -6,7 +6,7 @@ import { AsciiCanvasRenderer } from '../lib/AsciiCanvasRenderer'
 import { styles, getStyle, defaultParams, defaultTextParams } from '../lib/StyleRegistry'
 import { encodeSeed, decodeSeed } from '../lib/seedCodec'
 import { findBrightestPoint } from '../lib/brightPoint'
-import { hexToRgb } from '../lib/paramValue'
+import { hexToRgb, snapToStep } from '../lib/paramValue'
 import { loadPresets, savePreset, removePreset, mergeWithDefaults, type PresetEntry } from '../lib/presetStore'
 import type { StyleId } from '../types'
 import ImageUploader from './ImageUploader'
@@ -47,10 +47,12 @@ function App2D() {
   const asciiCanvasRef = useRef<HTMLCanvasElement>(null)
   const asciiRendererRef = useRef<AsciiCanvasRenderer | null>(null)
   const [fontParams, setFontParams] = useState<Record<string, FontFace | null>>({})
-  // 会话级风格记忆：每个风格最后一次离开时的参数状态（刷新即失，不持久化）
+  // 会话级风格记忆：每个风格最后一次离开时的参数/字体状态（刷新即失，不持久化）。
+  // fontParams 可选——seed/预设写入的记忆不含字体，语义为"字体不随种子/预设携带"
   const styleMemoryRef = useRef<Partial<Record<StyleId, {
     params: Record<string, number>
     textParams: Record<string, string>
+    fontParams?: Record<string, FontFace | null>
   }>>>({})
 
   // ---------------------------------------------------------------------------
@@ -84,12 +86,13 @@ function App2D() {
         asciiRendererRef.current.render(aCanvas, image, {
           charset: currentTextParams['uCharset'] ?? '',
           caseMode: currentParams['uCaseMode'] ?? 0,
-          charColor: currentTextParams['uCharColor'] ?? '#00ff66',
+          // 数值回退与 StyleRegistry ascii 默认保持一致（正常路径 state 必有值，纯防御）
+          charColor: currentTextParams['uCharColor'] ?? '#0af5a7',
           showBg: currentParams['uShowBg'] ?? 1,
-          charScale: currentParams['uCharScale'] ?? 1.0,
+          charScale: currentParams['uCharScale'] ?? 0.85,
           cellSize: currentParams['uCellSize'] ?? 14,
-          randomScale: currentParams['uRandomScale'] ?? 0,
-          bgFilter: currentParams['uBgFilter'] ?? 0.12,
+          randomScale: currentParams['uRandomScale'] ?? 0.55,
+          bgFilter: currentParams['uBgFilter'] ?? 0.07,
         }, fp)
         return
       }
@@ -106,9 +109,12 @@ function App2D() {
       for (const tp of textParamDefs) {
         const text = currentTextParams[tp.uniform] || tp.textDefault
         const fontSize = currentParams['uFontSize'] || 24
-        const texture = renderer.loadTextTexture(text, fontSize)
-        textTextures.push(texture)
-        atlasCount = text.length || 1
+        // 图集按码点切字（emoji 算 1 格）且超宽时整体缩放，格数以
+        // loadTextTexture 的实际产出为准——uAtlasCount 必须等于图集真实
+        // 格数，否则 shader 的 atlasU 映射会错位
+        const atlas = renderer.loadTextTexture(text, fontSize)
+        textTextures.push(atlas.texture)
+        atlasCount = atlas.cellCount
       }
 
       // Merge atlas count into params
@@ -149,6 +155,12 @@ function App2D() {
         renderer.renderMultiPass(passes)
       } else {
         renderer.useShader(shaderSources[0])
+        // 文字图集采样器指向单元 2：sampler 型 uniform 必须用 uniform1i 赋值
+        // （setUniform 的 uniform1f 路径对其无效，采样器保持默认值 0，会误采
+        // 单元 0 上的原图——textraster 曾因此从未显示过文字）。图集本身已在
+        // 上方 bindTexture(tex, 2) 绑定；每次 useShader 重链接后默认值复位，
+        // 故必须逐帧重新赋值。
+        if (textTextures.length > 0) renderer.setSampler('uCharAtlas', 2)
         renderer.setUniform('uResolution', [canvas.width, canvas.height])
         for (const [key, val] of Object.entries(mergedParams)) {
           renderer.setUniform(key, val)
@@ -182,6 +194,29 @@ function App2D() {
   )
 
   // ---------------------------------------------------------------------------
+  // Effect: re-fit canvas on window resize (debounced)
+  // ---------------------------------------------------------------------------
+  // loadImage 只在图片加载时按容器 fit 一次；窗口尺寸变化后不重排会导致画布
+  // 溢出容器或留白。防抖后 bump epoch：触发下方 loadImage 重新适配，并让渲染
+  // effect 重绘（重设画布尺寸会清屏，必须随后重绘）。ASCII 画布尺寸与容器
+  // 无关，此重绘仅重掷字符随机抖动，可接受。
+
+  const [relayoutEpoch, setRelayoutEpoch] = useState(0)
+  useEffect(() => {
+    if (!image) return
+    let timer: number | undefined
+    const onResize = () => {
+      window.clearTimeout(timer)
+      timer = window.setTimeout(() => setRelayoutEpoch((e) => e + 1), 150)
+    }
+    window.addEventListener('resize', onResize)
+    return () => {
+      window.removeEventListener('resize', onResize)
+      window.clearTimeout(timer)
+    }
+  }, [image])
+
+  // ---------------------------------------------------------------------------
   // Effect: create renderer & load image when canvas becomes available
   // ---------------------------------------------------------------------------
 
@@ -195,7 +230,7 @@ function App2D() {
     }
 
     rendererRef.current.loadImage(image)
-  }, [image])
+  }, [image, relayoutEpoch])
 
   // ---------------------------------------------------------------------------
   // Effect: detect brightest point (auto light source for volumetric god rays)
@@ -209,13 +244,19 @@ function App2D() {
     }
     const THUMB = 32
     try {
+      // 缩略图保持纵横比：方形拉伸会把亮点坐标沿长轴方向挤压偏移
+      const nw = image.naturalWidth || image.width
+      const nh = image.naturalHeight || image.height
+      const s = Math.min(1, THUMB / Math.max(nw, nh))
+      const tw = Math.max(1, Math.round(nw * s))
+      const th = Math.max(1, Math.round(nh * s))
       const c = document.createElement('canvas')
-      c.width = THUMB
-      c.height = THUMB
+      c.width = tw
+      c.height = th
       const ctx = c.getContext('2d', { willReadFrequently: true })
       if (!ctx) throw new Error('no 2d context')
-      ctx.drawImage(image, 0, 0, THUMB, THUMB)
-      setBrightest(findBrightestPoint(ctx.getImageData(0, 0, THUMB, THUMB).data, THUMB, THUMB))
+      ctx.drawImage(image, 0, 0, tw, th)
+      setBrightest(findBrightestPoint(ctx.getImageData(0, 0, tw, th).data, tw, th))
     } catch {
       // 跨域图片等导致 getImageData 失败:回落默认光源位置
       console.warn('[animelight] brightest point detection failed, using default light source')
@@ -230,15 +271,16 @@ function App2D() {
   const handleStyleChange = useCallback(
     (id: StyleId) => {
       // 无条件快照当前风格状态：默认/随机/手动调整的最后状态一视同仁
-      styleMemoryRef.current[activeStyle] = { params, textParams }
+      // （含字体——切回 ascii 时已上传字体不丢）
+      styleMemoryRef.current[activeStyle] = { params, textParams, fontParams }
       // 目标风格：有记忆用记忆（用户最后一次离开时的样子），无记忆用默认值
       const memo = styleMemoryRef.current[id]
       setParams(memo?.params ?? defaultParams(id))
       setTextParams(memo?.textParams ?? defaultTextParams(id))
-      setFontParams({})
+      setFontParams(memo?.fontParams ?? {})
       setActiveStyle(id)
     },
-    [activeStyle, params, textParams],
+    [activeStyle, params, textParams, fontParams],
   )
 
   // ---------------------------------------------------------------------------
@@ -251,7 +293,7 @@ function App2D() {
     // ASCII uses a lazy AsciiCanvasRenderer; shader styles need rendererRef.
     if (styleDef?.renderMode !== 'canvas2d' && !rendererRef.current) return
     renderWithStyle(activeStyle, params, textParams, fontParams)
-  }, [image, activeStyle, params, textParams, fontParams, renderWithStyle])
+  }, [image, activeStyle, params, textParams, fontParams, renderWithStyle, relayoutEpoch])
 
   // ---------------------------------------------------------------------------
   // Cleanup
@@ -319,7 +361,9 @@ function App2D() {
       }
       const range = p.max - p.min
       const raw = p.min + Math.random() * range
-      randomParams[p.uniform] = Math.round(raw / p.step) * p.step
+      // 相对 min 对齐 + clamp + 修浮点尾——与手输路径共用同一把 snapToStep 尺子，
+      // 避免按 0 网格对齐的基准偏差与 0.7300000000000002 式浮点噪声
+      randomParams[p.uniform] = snapToStep(raw, p.min, p.max, p.step, p.default)
     }
     setParams(randomParams)
     if (Object.keys(randomColors).length > 0) {

@@ -36,10 +36,6 @@ export class ShaderRenderer {
   private maxTextureSize: number;
   private imageWidth: number = 0;
   private imageHeight: number = 0;
-  // Natural size of the uploaded texture. The texture is uploaded from the
-  // source image as-is (never resized), so this can differ from imageWidth/Height.
-  private srcTexWidth: number = 0;
-  private srcTexHeight: number = 0;
 
   // Cached uniform locations for current program
   private uniformCache: Map<string, WebGLUniformLocation> = new Map();
@@ -108,17 +104,13 @@ export class ShaderRenderer {
     this.imageWidth = width;
     this.imageHeight = height;
 
-    // The texture below is uploaded from the raw image element, so record its
-    // natural size separately from the fitted canvas size.
-    this.srcTexWidth = image.naturalWidth || image.width;
-    this.srcTexHeight = image.naturalHeight || image.height;
-
     // Resize the canvas to match
     this.canvas.width = width;
     this.canvas.height = height;
     gl.viewport(0, 0, width, height);
 
-    // Create / reuse the texture
+    // Create / reuse the texture. Uploaded from the raw image element at its
+    // natural size (never resized), so it can differ from the fitted canvas size.
     if (this.texture) {
       gl.deleteTexture(this.texture);
     }
@@ -203,6 +195,20 @@ export class ShaderRenderer {
           throw new Error(`Unsupported uniform array length: ${value.length}`);
       }
     }
+  }
+
+  /**
+   * Set a sampler uniform to a texture unit. Samplers must be assigned via
+   * uniform1i — setUniform's uniform1f path raises GL INVALID_OPERATION and
+   * leaves the sampler at its default unit 0 (which holds the input image).
+   */
+  setSampler(name: string, unit: number): void {
+    if (!this.program) {
+      throw new Error('No shader program is active. Call useShader() first.');
+    }
+    const loc = this.getUniformLocation(name);
+    if (loc === null) return; // Uniform not found or optimized away -- silently skip
+    this.gl.uniform1i(loc, unit);
   }
 
   /**
@@ -312,13 +318,14 @@ export class ShaderRenderer {
     for (let i = 0; i < passes.length; i++) {
       const pass = passes[i];
       const isLast = i === passes.length - 1;
-      // uResolution must describe this pass's INPUT texture: pass 0 reads the
-      // full-res source image, later passes read the FBO textures. Only the
-      // renderer knows these sizes, so inject before caller uniforms (which may
-      // still override). Without this, uResolution defaults to (0,0) and any
+      // uResolution always describes the OUTPUT canvas (this.imageWidth/Height),
+      // even for pass 0 whose input is the full-res source image: pixel params
+      // (uGlowRadius etc.) are canvas-pixel based for every style, single-pass
+      // ones included. Describing pass 0's input in source texels made glow/edge
+      // strength shrink by the downscale ratio on large images — the opposite
+      // convention of single-pass styles. Injected here before caller uniforms
+      // (which may still override); without it uResolution defaults to (0,0) and
       // texel-based sampling (1.0 / uResolution) collapses to inf/NaN.
-      const inputW = i === 0 ? this.srcTexWidth : width;
-      const inputH = i === 0 ? this.srcTexHeight : height;
 
       if (isLast) {
         // Render final pass to the canvas (not FBO)
@@ -338,7 +345,7 @@ export class ShaderRenderer {
         const uOriginalLoc = gl.getUniformLocation(this.program!, 'uOriginal');
         if (uOriginalLoc) gl.uniform1i(uOriginalLoc, 1);
 
-        this.setUniform('uResolution', [inputW, inputH]);
+        this.setUniform('uResolution', [width, height]);
         for (const [name, value] of Object.entries(pass.uniforms)) {
           this.setUniform(name, value);
         }
@@ -367,7 +374,7 @@ export class ShaderRenderer {
         const uOriginalLoc2 = gl.getUniformLocation(this.program!, 'uOriginal');
         if (uOriginalLoc2) gl.uniform1i(uOriginalLoc2, 1);
 
-        this.setUniform('uResolution', [inputW, inputH]);
+        this.setUniform('uResolution', [width, height]);
         for (const [name, value] of Object.entries(pass.uniforms)) {
           this.setUniform(name, value);
         }
@@ -389,25 +396,36 @@ export class ShaderRenderer {
 
   /**
    * Generate a text atlas texture from the given string.
+   *
+   * Iterates by code points (Array.from), so surrogate pairs (emoji, etc.)
+   * draw as one glyph instead of two broken halves — cellCount is the code
+   * point count, and callers must use it as uAtlasCount to match the shader's
+   * (charIndex, cellLocal) → atlasU mapping.
+   *
+   * Total width is capped at MAX_TEXTURE_SIZE by shrinking the whole atlas
+   * proportionally: every glyph still fills its own cell, so the mapping
+   * stays valid and only glyph sharpness degrades. Without the cap, a long
+   * text at large fontSize makes texImage2D fail silently and leaves an
+   * incomplete (all-zero) texture.
    */
-  loadTextTexture(text: string, fontSize: number): WebGLTexture {
-    const charCount = text.length || 1
-    const actualText = text.length > 0 ? text : ' '
-    const cellSize = fontSize
+  loadTextTexture(text: string, fontSize: number): { texture: WebGLTexture; cellCount: number } {
+    const chars = Array.from(text.length > 0 ? text : ' ')
+    const scale = Math.min(1, this.maxTextureSize / (fontSize * chars.length))
+    const cell = fontSize * scale
 
     const canvas = document.createElement('canvas')
-    canvas.width = cellSize * charCount
-    canvas.height = cellSize
+    canvas.width = Math.min(this.maxTextureSize, Math.round(cell * chars.length))
+    canvas.height = Math.max(1, Math.round(cell))
 
     const ctx = canvas.getContext('2d')!
     ctx.clearRect(0, 0, canvas.width, canvas.height)
-    ctx.font = `bold ${fontSize}px monospace`
+    ctx.font = `bold ${cell}px monospace`
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     ctx.fillStyle = '#ffffff'
 
-    for (let i = 0; i < actualText.length; i++) {
-      ctx.fillText(actualText[i], i * cellSize + cellSize / 2, cellSize / 2)
+    for (let i = 0; i < chars.length; i++) {
+      ctx.fillText(chars[i], i * cell + cell / 2, cell / 2)
     }
 
     const gl = this.gl
@@ -420,7 +438,7 @@ export class ShaderRenderer {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
 
-    return texture
+    return { texture, cellCount: chars.length }
   }
 
   /**
@@ -460,8 +478,6 @@ export class ShaderRenderer {
     this.uniformCache.clear();
     this.imageWidth = 0;
     this.imageHeight = 0;
-    this.srcTexWidth = 0;
-    this.srcTexHeight = 0;
   }
 
   /**

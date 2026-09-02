@@ -7,7 +7,6 @@ uniform sampler2D uCharAtlas;   // TEXTURE2: character atlas
 uniform vec2 uResolution;
 uniform float uCellSize;
 uniform float uAtlasCount;      // number of characters in atlas
-uniform float uFontSize;        // font size used for atlas
 uniform float uBgBrightness;
 uniform float uColorStrength;
 uniform float uAngle;
