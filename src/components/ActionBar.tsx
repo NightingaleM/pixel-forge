@@ -23,7 +23,10 @@ function ActionBar({ onDownloadPng, onDownloadJpg, onDownloadSvg, renderMode, on
           <button className="action-btn action-btn--primary" onClick={onDownloadSvg}>{t('export.svg')}</button>
         </>
       ) : (
-        <button className="action-btn" onClick={onDownloadPng}>{t('common.download')}</button>
+        <>
+          <button className="action-btn" onClick={onDownloadPng}>{t('common.download')}</button>
+          <button className="action-btn" onClick={onDownloadJpg}>{t('export.jpg')}</button>
+        </>
       )}
       <button className="action-btn action-btn--secondary" onClick={onReset}>{t('common.reset')}</button>
       <button className="action-btn action-btn--secondary" onClick={onRandom}>{t('common.random')}</button>

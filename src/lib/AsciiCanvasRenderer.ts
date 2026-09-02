@@ -13,7 +13,10 @@ export interface AsciiRenderParams {
   bgFilter: number
 }
 
-const MAX_PROCESS_SIZE = 1280
+// 处理/导出分辨率上限：与 ShaderRenderer 的 MAX_PREVIEW_SIZE(2048) 对齐，
+// 各风格导出分辨率一致。注意 ASCII 为 CPU 逐格渲染，小 cellSize + 大图时
+// 单次渲染耗时随像素总数上升。
+const MAX_PROCESS_SIZE = 2048
 const SYSTEM_FONT = 'monospace'
 
 export class AsciiCanvasRenderer {
@@ -88,6 +91,11 @@ export class AsciiCanvasRenderer {
     const ramp = this.buildRamp(ctx, charset, fontSize, font)
     if (ramp.length === 0) {
       console.warn('[ASCII] render: empty density ramp (charset has no measurable characters)')
+      // 字符集不可测时至少按设置绘制背景，避免留下与 showBg 不符的全透明画布；
+      // 同时清空字符矩阵，防止 SVG 导出残留上一张图的字符
+      ctx.clearRect(0, 0, w, h)
+      if (params.showBg === 1) ctx.drawImage(image, 0, 0, w, h)
+      this.lastMatrix = []
       return
     }
 
