@@ -8,7 +8,9 @@ uniform float uEdgeWidth;
 uniform float uSensitivity;
 uniform float uDetail;
 uniform float uHatching;
-uniform float uBgColor;
+uniform float uBgColorR;
+uniform float uBgColorG;
+uniform float uBgColorB;
 uniform float uLineColorR;
 uniform float uLineColorG;
 uniform float uLineColorB;
@@ -126,11 +128,8 @@ void main() {
     line = min(line, 1.0 - hatchMask * darkness);
   }
 
-  // 7. Background color
-  vec3 bg = vec3(1.0);
-  if (uBgColor > 0.5) {
-    bg = vec3(0.102, 0.227, 0.361); // #1A3A5C
-  }
+  // 7. Background color (color picker RGB; default #FFFFFF, navy #1A3A5C pickable)
+  vec3 bg = vec3(uBgColorR, uBgColorG, uBgColorB);
 
   // 8. Line color (color picker RGB; black = black lines)
   vec3 lineColor = vec3(uLineColorR, uLineColorG, uLineColorB);

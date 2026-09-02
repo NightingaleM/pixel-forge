@@ -111,10 +111,8 @@ export const styles: StyleDefinition[] = [
       { name: 'style.sketch.sensitivity', uniform: 'uSensitivity',   min: 0.01, max: 1.0, step: 0.01, default: 0.03, description: 'style.sketch.sensitivityDesc' },
       { name: 'style.sketch.detail',   uniform: 'uDetail',        min: 0.0, max: 1.0, step: 0.01, default: 1,  description: 'style.sketch.detailDesc' },
       { name: 'style.sketch.hatching', uniform: 'uHatching', type: 'toggle' as const, default: 0, description: 'style.sketch.hatchingDesc' },
-      { name: 'style.sketch.bgColor', uniform: 'uBgColor', type: 'select' as const, options: [
-        { label: 'style.sketch.bgWhite', value: 0 },
-        { label: 'style.sketch.bgNavy', value: 1 },
-      ], default: 0, description: 'style.sketch.bgColorDesc' },
+      // 背景色：原白/深蓝二选一 select 改为色板（旧深蓝 #1A3A5C 可手动选回）
+      { name: 'style.sketch.bgColor', uniform: 'uBgColor', type: 'color' as const, default: '#FFFFFF', description: 'style.sketch.bgColorDesc' },
       { name: 'style.sketch.lineColor', uniform: 'uLineColor', type: 'color' as const, default: '#FF7300', description: 'style.sketch.lineColorDesc' },
       { name: 'style.sketch.hatchDensity',  uniform: 'uHatchDensity',  min: 1,   max: 10,  step: 1,    default: 1,   description: 'style.sketch.hatchDensityDesc' },
       { name: 'style.sketch.edgeMethod', uniform: 'uEdgeMethod', type: 'select' as const, options: [

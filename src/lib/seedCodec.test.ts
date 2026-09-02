@@ -134,10 +134,11 @@ describe('encodeSeed / decodeSeed', () => {
   it('color 参数参与编码：往返还原（解码统一小写）', () => {
     const def = getStyle('sketch')!
     const params = numericParams(def, (p) => p.default)
-    const code = encodeSeed('sketch', params, def, { uLineColor: '#00FF7F' })
+    // sketch 现有 2 个 color 参数（uLineColor + uBgColor 色板化）——顺带验证多 color 打包
+    const code = encodeSeed('sketch', params, def, { uLineColor: '#00FF7F', uBgColor: '#1A3A5C' })
     const decoded = decodeSeed(code)
     expect(decoded).not.toBeNull()
-    expect(decoded!.colorParams).toEqual({ uLineColor: '#00ff7f' })
+    expect(decoded!.colorParams).toEqual({ uLineColor: '#00ff7f', uBgColor: '#1a3a5c' })
     expect(decoded!.params).toEqual(params)   // numeric 部分不受影响
   })
 
