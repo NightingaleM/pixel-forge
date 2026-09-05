@@ -480,5 +480,38 @@
     "empty": "No presets yet — tweak params and click \"Save Preset\"",
     "apply": "Apply",
     "delete": "Delete"
+  },
+  "meta": {
+    "home": {
+      "title": "PixelForge - Image Stylization & 3D Particle Animation",
+      "desc": "PixelForge — a WebGL-based online image art stylization tool. Real-time rendering in 11 art styles including halftone, pop art, sketch and pointillism, plus 3D GLTF particle effects. Free, no sign-up."
+    },
+    "p2d": {
+      "title": "PixelForge 2D Studio - Halftone, Pop Art, Sketch & More Art Filters",
+      "desc": "Upload an image and preview 11 art styles in real time — halftone, pop art, sketch, pointillism, kaleidoscope, ASCII and more. Adjustable parameters, shareable seeds and local presets. Runs entirely in your browser, free, no sign-up."
+    },
+    "p3d": {
+      "title": "PixelForge 3D Particle Studio - GLTF Particle Effects",
+      "desc": "Turn GLTF/GLB models into GPU particle effects with volumetric sampling and particle/background controls. Rendered locally in your browser, free to use."
+    },
+    "about": {
+      "title": "About PixelForge - Free Online Image Stylization & 3D Particles",
+      "desc": "Learn about PixelForge's features and tech stack: WebGL shader art filters and three.js 3D particle effects. A free, client-only tool."
+    },
+    "privacy": {
+      "title": "Privacy Policy - PixelForge",
+      "desc": "PixelForge privacy policy: how we collect, use and protect your data."
+    },
+    "terms": {
+      "title": "Terms of Service - PixelForge",
+      "desc": "Terms of use for PixelForge: acceptance, license, user content and disclaimers."
+    },
+    "help": {
+      "title": "Help - PixelForge",
+      "desc": "Step-by-step guides for 2D stylization and 3D particle animation, plus tips on browsers, supported formats and performance."
+    },
+    "notFound": {
+      "title": "Page Not Found - PixelForge"
+    }
   }
 }

@@ -1,4 +1,3 @@
-import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import InfoPage from './InfoPage'
 
@@ -6,8 +5,6 @@ const sections = ['collect', 'usage', 'cookies', 'thirdParty', 'security', 'righ
 
 export default function Privacy() {
   const { t } = useTranslation()
-
-  useEffect(() => { document.title = `PixelForge - ${t('privacy.title')}` }, [t])
 
   return (
     <InfoPage titleKey="privacy.title">

@@ -1,11 +1,8 @@
-import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import InfoPage from './InfoPage'
 
 export default function Help() {
   const { t } = useTranslation()
-
-  useEffect(() => { document.title = `PixelForge - ${t('help.title')}` }, [t])
 
   return (
     <InfoPage titleKey="help.title">

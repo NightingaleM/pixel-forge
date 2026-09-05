@@ -20,4 +20,12 @@
     <loc>https://pixelforge.oylz.site/help</loc>
     <priority>0.6</priority>
   </url>
+  <url>
+    <loc>https://pixelforge.oylz.site/privacy</loc>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://pixelforge.oylz.site/terms</loc>
+    <priority>0.3</priority>
+  </url>
 </urlset>

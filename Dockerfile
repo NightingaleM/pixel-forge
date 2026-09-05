@@ -10,6 +10,9 @@
 # ==================== 第一阶段：构建 ====================
 FROM node:22-alpine AS build
 
+# chromium 供构建期预渲染使用（scripts/prerender.mjs，SEO：为不执行 JS 的爬虫输出静态 HTML）
+RUN apk add --no-cache chromium
+
 WORKDIR /app
 
 # 先复制依赖配置文件，利用 Docker 层缓存加速重复构建
@@ -27,6 +30,9 @@ ENV NODE_OPTIONS="--max-old-space-size=512"
 # 避免 tsc 和 vite 同时占用内存（原 build 脚本是 tsc -b && vite build）
 RUN npx tsc -b
 RUN npx vite build
+
+# 预渲染 7 个路由为静态 HTML（独立分步，chrome 与 vite 不同时占用内存）
+RUN node scripts/prerender.mjs
 
 # ==================== 第二阶段：运行 ====================
 FROM nginx:alpine

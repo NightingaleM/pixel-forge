@@ -480,5 +480,38 @@
     "empty": "暂无保存的配置，调整参数后点「保存配置」",
     "apply": "应用",
     "delete": "删除"
+  },
+  "meta": {
+    "home": {
+      "title": "PixelForge - 图片风格化 & 3D 粒子动画",
+      "desc": "PixelForge — 基于 WebGL 的在线图片艺术风格化工具。支持半色调、波普艺术、素描、点彩等 11 种艺术风格实时渲染，以及 3D GLTF 模型粒子特效。免费、无需注册。"
+    },
+    "p2d": {
+      "title": "PixelForge 2D 风格化工作台 - 半色调/波普/素描等 11 种艺术滤镜",
+      "desc": "上传图片，实时预览半色调、波普艺术、素描、点彩、万花筒、ASCII 等 11 种艺术风格。参数可调、支持种子分享与本地预设，全部在浏览器内完成，免费无需注册。"
+    },
+    "p3d": {
+      "title": "PixelForge 3D 粒子工作台 - GLTF 模型粒子特效",
+      "desc": "上传 GLTF/GLB 模型，化为 GPU 粒子特效。支持体积采样、背景与粒子参数调节，浏览器本地渲染，免费在线使用。"
+    },
+    "about": {
+      "title": "关于 PixelForge - 免费在线图片风格化与 3D 粒子工具",
+      "desc": "了解 PixelForge 的功能与技术栈：WebGL shader 图片艺术风格化、three.js 3D 粒子特效，纯前端免费工具。"
+    },
+    "privacy": {
+      "title": "隐私政策 - PixelForge",
+      "desc": "PixelForge 隐私政策：了解我们如何收集、使用与保护你的数据。"
+    },
+    "terms": {
+      "title": "使用条款 - PixelForge",
+      "desc": "PixelForge 使用条款：接受、许可、用户内容与免责声明。"
+    },
+    "help": {
+      "title": "使用帮助 - PixelForge",
+      "desc": "2D 风格化与 3D 粒子动画的使用步骤与技巧：浏览器要求、支持格式与性能建议。"
+    },
+    "notFound": {
+      "title": "页面不存在 - PixelForge"
+    }
   }
 }

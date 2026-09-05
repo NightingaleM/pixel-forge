@@ -1,7 +1,8 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
 import { lazy, Suspense, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import LangSwitch from './components/LangSwitch'
+import { applyPageMeta } from './lib/pageMeta'
 
 const Home = lazy(() => import('./components/Home'))
 const App2D = lazy(() => import('./components/App2D'))
@@ -12,13 +13,20 @@ const Terms = lazy(() => import('./components/Terms'))
 const Help = lazy(() => import('./components/Help'))
 const NotFound = lazy(() => import('./components/NotFound'))
 
-export default function App() {
+/** Router 上下文内的 meta 管理器：按路由应用 title/og/canonical，语言切换时重应用 */
+function PageMetaApplier() {
   const { t, i18n } = useTranslation()
+  const location = useLocation()
 
   useEffect(() => {
-    document.title = `PixelForge - ${t('home.subtitle')}`
+    applyPageMeta(location.pathname, t)
     document.documentElement.lang = i18n.language.startsWith('zh') ? 'zh' : 'en'
-  }, [t, i18n.language])
+  }, [location.pathname, t, i18n.language])
+
+  return null
+}
+
+export default function App() {
 
   // Global wheel handler for all param sliders — adjust by step per tick
   useEffect(() => {
@@ -39,6 +47,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      <PageMetaApplier />
       <LangSwitch />
       <Suspense fallback={<div className="loading">Loading...</div>}>
         <Routes>
