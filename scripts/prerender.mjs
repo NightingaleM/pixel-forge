@@ -85,7 +85,7 @@ async function main() {
     await waitForPort(PORT, 30_000)
     browser = await puppeteer.launch({
       executablePath: findChrome(),
-      args: ['--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage'],
+      args: ['--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage', '--enable-unsafe-swiftshader'],
       defaultViewport: { width: 1280, height: 800 },
     })
 

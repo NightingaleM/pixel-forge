@@ -8,10 +8,24 @@
 # ============================================================
 
 # ==================== 第一阶段：构建 ====================
-FROM node:22-alpine AS build
+FROM node:22-bookworm-slim AS build
 
-# chromium 供构建期预渲染使用（scripts/prerender.mjs，SEO：为不执行 JS 的爬虫输出静态 HTML）
-RUN apk add --no-cache chromium
+# chrome-headless-shell 供构建期预渲染使用（scripts/prerender.mjs，SEO：为不执行 JS 的爬虫输出静态 HTML）
+# - 不用 alpine：apk 的 chromium 不含 SwiftShader（无 GPU 容器里 /3d 路由 WebGL 必失败），
+#   而官方 chrome-headless-shell 二进制需要 glibc（musl 上起不来）→ 用 Debian slim
+# - chrome-headless-shell 自带 SwiftShader，无 GPU 容器也能软渲染 WebGL
+# - 下载走 npmmirror 镜像（直连 storage.googleapis.com 不可靠），软链到 /usr/bin/chromium 供脚本探测
+# - apt 换阿里云源加速
+ENV PUPPETEER_DOWNLOAD_BASE_URL=https://registry.npmmirror.com/-/binary/chrome-for-testing
+RUN sed -i 's|deb.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources \
+  && apt-get update \
+  && apt-get install -y --no-install-recommends ca-certificates unzip \
+     libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
+     libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 \
+     libgbm1 libasound2 libpango-1.0-0 libcairo2 \
+  && rm -rf /var/lib/apt/lists/* \
+  && npx -y puppeteer browsers install chrome-headless-shell --path /opt/browsers \
+  && ln -s /opt/browsers/chrome-headless-shell/*/chrome-headless-shell-*/chrome-headless-shell /usr/bin/chromium
 
 WORKDIR /app
 
