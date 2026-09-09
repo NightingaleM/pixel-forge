@@ -96,12 +96,12 @@
   },
   "compare": {
     "closeImage": "关闭图片",
-    "compareOn": "Compare ON",
-    "compare": "Compare"
+    "compareOn": "对比已开启",
+    "compare": "对比"
   },
   "style": {
     "halftone": {
-      "label": "Halftone",
+      "label": "半色调",
       "desc": "半色调网点效果，通过不同大小的圆点模拟明暗变化，模拟传统印刷工艺的视觉质感。",
       "cellSize": "网格大小",
       "cellSizeDesc": "控制半色调网格的单元格大小，值越大圆点越稀疏",
@@ -123,7 +123,7 @@
       "hueShiftDesc": "整体色相的偏移量"
     },
     "diffusion": {
-      "label": "Diffusion",
+      "label": "扩散抖动",
       "desc": "误差扩散抖动效果，模拟传统印刷中色彩扩散与量化处理，产生独特的纹理质感。",
       "levels": "色阶数",
       "levelsDesc": "色彩量化级别，值越小颜色越少、效果越强烈",
@@ -142,7 +142,7 @@
       "grayscaleDesc": "开启后输出灰度图像"
     },
     "popart": {
-      "label": "Pop Art",
+      "label": "波普艺术",
       "desc": "波普艺术风格，通过高饱和度、高对比度和色调分离呈现大胆鲜艳的视觉效果。",
       "levels": "色调分离级数",
       "levelsDesc": "色调分离的级数，值越小色阶越少、效果越平面化",
@@ -165,7 +165,7 @@
       "dotSizeDesc": "本戴点的圆点大小"
     },
     "lightshadow": {
-      "label": "Light & Shadow",
+      "label": "光影",
       "desc": "光影效果，分离并增强图像的明暗区域，通过阈值分割和光晕叠加营造戏剧性光影氛围。",
       "contrast": "明暗对比",
       "contrastDesc": "明暗区域的对比强度",
@@ -183,7 +183,7 @@
       "shadowDepthDesc": "暗部区域的加深程度"
     },
     "sketch": {
-      "label": "Sketch",
+      "label": "素描",
       "desc": "素描风格，通过多方向边缘检测提取轮廓线条，可选叠加影线效果，模拟手绘铅笔素描。",
       "edgeWidth": "边缘线宽",
       "edgeWidthDesc": "检测到的边缘线条宽度",
@@ -205,7 +205,7 @@
       "edgePrewitt": "Prewitt"
     },
     "pointillism": {
-      "label": "Pointillism",
+      "label": "点彩",
       "desc": "点彩画派风格，用密集的彩色圆点重构图像，致敬修拉等印象派画家的独特技法。",
       "dotSize": "圆点大小",
       "dotSizeDesc": "每个色点的基础大小",
@@ -224,7 +224,7 @@
       "shapeTriangle": "三角形"
     },
     "kaleidoscope": {
-      "label": "Kaleidoscope",
+      "label": "万花筒",
       "desc": "万花筒镜像效果，将画面以中心为原点分割为多个扇区并镜像翻转，产生对称图案。适合制作故障拼贴、错位人像和实验感画面。",
       "segments": "扇区数",
       "segmentsDesc": "万花筒的镜像分割数量",
@@ -242,7 +242,7 @@
       "hueShiftDesc": "整体色相偏移"
     },
     "crosshatch": {
-      "label": "Crosshatch",
+      "label": "网纹底稿",
       "desc": "网纹底稿风格，黑白线稿 + 可旋转纹理网点 + 纸张噪声，模拟漫画网纸/网点纸的印刷质感。",
       "dotSize": "网点大小",
       "dotSizeDesc": "纹理网点的基础大小",
@@ -260,7 +260,7 @@
       "invertDesc": "反转线条与背景（黑底白线）"
     },
     "animelight": {
-      "label": "Anime Light",
+      "label": "动画光影",
       "desc": "动画光影风格，高饱和气氛光、描边加神光束，呈现日系动画美术感的画面效果。",
       "saturation": "饱和度",
       "saturationDesc": "色彩饱和度增强",
@@ -290,7 +290,7 @@
       "contrastDesc": "画面对比度"
     },
     "textraster": {
-      "label": "Text Raster",
+      "label": "文字栅格",
       "desc": "文字栅格风格，将图片重构为文字栅格画面，每个网格单元以字符密度映射亮度。适合制作文本海报、信息屏和实验排版效果。",
       "cellSize": "字符大小",
       "cellSizeDesc": "每个字符单元的像素大小",
