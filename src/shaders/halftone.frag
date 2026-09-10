@@ -76,6 +76,8 @@ float screenMask(float angle, float channel) {
     else inkAmount = clamp(darkness * 1.35, 0.0, 1.0);
   }
 
+  // A zero-radius smoothing band would otherwise leave ink at the cell center.
+  if (inkAmount <= 0.0) return 0.0;
   vec2 local = fract(screenPx / uCellSize) - 0.5;
   float radius = clamp(inkAmount * uDotScale * 0.48, 0.0, 0.7);
   return 1.0 - smoothstep(radius - 0.04, radius + 0.04, shapeDistance(local));

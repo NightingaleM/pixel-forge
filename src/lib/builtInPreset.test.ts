@@ -4,6 +4,7 @@ import zh from '../i18n/zh.json'
 import en from '../i18n/en.json'
 import { findMatchingBuiltInPreset, resolvePresetValues } from './builtInPreset'
 import { getStyle } from './StyleRegistry'
+import halftoneShader from '../shaders/halftone.frag?raw'
 
 function readI18n(root: unknown, dottedKey: string): unknown {
   return dottedKey.split('.').reduce<unknown>((value, key) => {
@@ -67,6 +68,14 @@ describe('quick style locales', () => {
 })
 
 describe('halftone built-in presets', () => {
+  it('guards zero ink before smoothing so white areas stay unprinted', () => {
+    // Vitest has no WebGL context; protect the shader boundary condition here.
+    // With radius = 0, the unguarded smoothstep mask is 0.5 at a cell center.
+    expect(halftoneShader).toMatch(
+      /if\s*\(inkAmount\s*<=\s*0\.0\)\s*return\s+0\.0;[\s\S]*float radius\s*=\s*clamp\(inkAmount/,
+    )
+  })
+
   it('offers four complete, resolvable print presets with translated labels', () => {
     const halftone = getStyle('halftone')!
     expect(halftone.presets?.map(({ id }) => id)).toEqual([
