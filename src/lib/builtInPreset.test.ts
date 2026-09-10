@@ -93,3 +93,23 @@ describe('halftone built-in presets', () => {
     }
   })
 })
+
+describe('lightshadow built-in presets', () => {
+  it('offers four complete dramatic grades with translated labels and matching colors', () => {
+    const lightshadow = getStyle('lightshadow')!
+    expect(lightshadow.presets?.map(({ id }) => id)).toEqual([
+      'softWindow', 'productHalo', 'lowKey', 'coolNeon',
+    ])
+    const colors = ['#ffffff', '#ffffff', '#ffd0a0', '#62c6ff']
+    for (const [index, preset] of (lightshadow.presets ?? []).entries()) {
+      const values = resolvePresetValues(lightshadow, preset.params, preset.textParams ?? {})
+      expect(Object.keys(values.params)).toHaveLength(6)
+      expect(values).toEqual({ params: preset.params, textParams: { uGlowColor: colors[index] } })
+      expect(findMatchingBuiltInPreset(lightshadow, values.params, values.textParams)).toBe(preset.id)
+      for (const locale of [zh, en]) {
+        expect(readI18n(locale, preset.label)).toEqual(expect.any(String))
+        expect(readI18n(locale, preset.label)).not.toBe('')
+      }
+    }
+  })
+})

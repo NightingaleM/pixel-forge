@@ -102,13 +102,31 @@ export const styles: StyleDefinition[] = [
     ],
     isMultiPass: true,
     params: [
-      { name: 'style.lightshadow.contrast',   uniform: 'uContrast',    min: 0.5, max: 3.0, step: 0.01, default: 3,    description: 'style.lightshadow.contrastDesc' },
-      { name: 'style.lightshadow.threshold', uniform: 'uThreshold',    min: 0.1, max: 0.9, step: 0.01, default: 0.29, description: 'style.lightshadow.thresholdDesc' },
-      { name: 'style.lightshadow.glowRadius',   uniform: 'uGlowRadius',  min: 0,   max: 50,  step: 0.1,  default: 50,  description: 'style.lightshadow.glowRadiusDesc' },
-      { name: 'style.lightshadow.lightDir', uniform: 'uLightDir',    min: 0,   max: 360, step: 1,    default: 5,    description: 'style.lightshadow.lightDirDesc' },
-      { name: 'style.lightshadow.glowIntensity',   uniform: 'uGlowIntensity', min: 0.0, max: 2.0, step: 0.01, default: 0.25, description: 'style.lightshadow.glowIntensityDesc' },
+      { name: 'style.lightshadow.contrast',   uniform: 'uContrast',    min: 0.5, max: 3.0, step: 0.01, default: 1.25, description: 'style.lightshadow.contrastDesc' },
+      { name: 'style.lightshadow.threshold', uniform: 'uThreshold',    min: 0.1, max: 0.9, step: 0.01, default: 0.55, description: 'style.lightshadow.thresholdDesc' },
+      { name: 'style.lightshadow.glowRadius',   uniform: 'uGlowRadius',  min: 0,   max: 50,  step: 0.1,  default: 18,  description: 'style.lightshadow.glowRadiusDesc' },
+      { name: 'style.lightshadow.lightDir', uniform: 'uLightDir',    min: 0,   max: 360, step: 1,    default: 135, description: 'style.lightshadow.lightDirDesc' },
+      { name: 'style.lightshadow.glowIntensity',   uniform: 'uGlowIntensity', min: 0.0, max: 2.0, step: 0.01, default: 0.35, description: 'style.lightshadow.glowIntensityDesc' },
       { name: 'style.lightshadow.glowColor', uniform: 'uGlowColor', type: 'color' as const, default: '#FFFFFF', description: 'style.lightshadow.glowColorDesc' },
-      { name: 'style.lightshadow.shadowDepth',   uniform: 'uShadowDepth',   min: 0.0, max: 2.0, step: 0.01, default: 1.92, description: 'style.lightshadow.shadowDepthDesc' },
+      { name: 'style.lightshadow.shadowDepth',   uniform: 'uShadowDepth',   min: 0.0, max: 2.0, step: 0.01, default: 0.6, description: 'style.lightshadow.shadowDepthDesc' },
+    ],
+    presets: [
+      { id: 'softWindow', label: 'style.lightshadow.presets.softWindow', params: {
+        uContrast: 1.15, uThreshold: 0.62, uGlowRadius: 18, uLightDir: 135,
+        uGlowIntensity: 0.22, uShadowDepth: 0.35,
+      }, textParams: { uGlowColor: '#FFFFFF' } },
+      { id: 'productHalo', label: 'style.lightshadow.presets.productHalo', params: {
+        uContrast: 1.2, uThreshold: 0.72, uGlowRadius: 24, uLightDir: 270,
+        uGlowIntensity: 0.55, uShadowDepth: 0.25,
+      }, textParams: { uGlowColor: '#FFFFFF' } },
+      { id: 'lowKey', label: 'style.lightshadow.presets.lowKey', params: {
+        uContrast: 1.55, uThreshold: 0.58, uGlowRadius: 12, uLightDir: 35,
+        uGlowIntensity: 0.12, uShadowDepth: 1.2,
+      }, textParams: { uGlowColor: '#FFD0A0' } },
+      { id: 'coolNeon', label: 'style.lightshadow.presets.coolNeon', params: {
+        uContrast: 1.35, uThreshold: 0.5, uGlowRadius: 30, uLightDir: 220,
+        uGlowIntensity: 0.65, uShadowDepth: 0.75,
+      }, textParams: { uGlowColor: '#62C6FF' } },
     ],
   },
 

@@ -68,6 +68,17 @@ function numericParams(def: StyleDefinition, pick: (p: NumberParamDef) => number
 }
 
 describe('encodeSeed / decodeSeed', () => {
+  it('decodes the pre-upgrade lightshadow seed unchanged', () => {
+    expect(decodeSeed('03EPxNkRL6Bg2d')).toEqual({
+      styleId: 'lightshadow',
+      params: {
+        uContrast: 1.25, uThreshold: 0.55, uGlowRadius: 18,
+        uLightDir: 135, uGlowIntensity: 0.35, uShadowDepth: 0.6,
+      },
+      colorParams: { uGlowColor: '#62c6ff' },
+    })
+  })
+
   it('decodes the pre-upgrade halftone seed unchanged', () => {
     expect(decodeSeed('00njY7e')).toEqual({
       styleId: 'halftone',

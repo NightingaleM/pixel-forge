@@ -172,21 +172,27 @@
     },
     "lightshadow": {
       "label": "Light & Shadow",
-      "desc": "Light and shadow effect, separating and enhancing bright and dark areas with threshold segmentation and glow overlay for dramatic lighting.",
+      "desc": "Dramatic tonal shaping with deeper shadows, thresholded highlight glow, and a subtle screen-space ambient gradient.",
       "contrast": "Contrast",
       "contrastDesc": "Contrast between light and dark areas",
       "threshold": "Threshold",
       "thresholdDesc": "Brightness threshold for light-dark separation. Below = shadow",
       "glowRadius": "Glow Radius",
       "glowRadiusDesc": "Glow effect spread radius",
-      "lightDir": "Light Direction",
-      "lightDirDesc": "Simulated light direction. 0°=right, 90°=up, 180°=left, 270°=down",
+      "lightDir": "Ambient Light Direction",
+      "lightDirDesc": "Direction of the screen-space ambient gradient. 0°=right, 90°=up, 180°=left, 270°=down",
       "glowIntensity": "Glow Intensity",
       "glowIntensityDesc": "Glow brightness intensity",
       "glowColor": "Glow Color",
       "glowColorDesc": "Glow color",
       "shadowDepth": "Shadow Depth",
-      "shadowDepthDesc": "Dark area deepening intensity"
+      "shadowDepthDesc": "Dark area deepening intensity",
+      "presets": {
+        "softWindow": "Soft Window",
+        "productHalo": "Product Halo",
+        "lowKey": "Low Key",
+        "coolNeon": "Cool Neon"
+      }
     },
     "sketch": {
       "label": "Sketch",

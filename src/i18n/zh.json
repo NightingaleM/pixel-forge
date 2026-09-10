@@ -172,21 +172,27 @@
     },
     "lightshadow": {
       "label": "光影",
-      "desc": "光影效果，分离并增强图像的明暗区域，通过阈值分割和光晕叠加营造戏剧性光影氛围。",
+      "desc": "通过暗部加深、高光阈值光晕和轻柔的画面氛围渐变，塑造富有戏剧性的明暗色调。",
       "contrast": "明暗对比",
       "contrastDesc": "明暗区域的对比强度",
       "threshold": "阈值分割点",
       "thresholdDesc": "明暗分割的亮度阈值，低于此值为暗部",
       "glowRadius": "光晕半径",
       "glowRadiusDesc": "光晕效果的扩散半径",
-      "lightDir": "光照方向角度",
-      "lightDirDesc": "模拟光源的方向角度，0°=右，90°=上，180°=左，270°=下",
+      "lightDir": "氛围光方向",
+      "lightDirDesc": "画面氛围渐变的方向，0°=右，90°=上，180°=左，270°=下",
       "glowIntensity": "光晕强度",
       "glowIntensityDesc": "光晕的亮度强度",
       "glowColor": "光晕颜色",
       "glowColorDesc": "光晕的颜色",
       "shadowDepth": "暗部浓度",
-      "shadowDepthDesc": "暗部区域的加深程度"
+      "shadowDepthDesc": "暗部区域的加深程度",
+      "presets": {
+        "softWindow": "柔和窗光",
+        "productHalo": "产品光晕",
+        "lowKey": "低调光影",
+        "coolNeon": "冷色霓虹"
+      }
     },
     "sketch": {
       "label": "素描",

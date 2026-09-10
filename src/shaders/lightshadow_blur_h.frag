@@ -5,6 +5,13 @@ varying vec2 vUv;
 uniform sampler2D uImage;
 uniform vec2 uResolution;
 uniform float uGlowRadius;
+uniform float uThreshold;
+
+float brightPass(float lum) {
+  float gate = smoothstep(uThreshold - 0.08, uThreshold + 0.08, lum);
+  float normalized = max(lum - uThreshold, 0.0) / max(1.0 - uThreshold, 0.001);
+  return gate * normalized;
+}
 
 void main() {
   vec2 texel = 1.0 / uResolution;
@@ -40,13 +47,13 @@ void main() {
     weights[i] /= totalWeight;
   }
 
-  // 1D horizontal Gaussian blur on luminance
+  // Extract highlights before the horizontal Gaussian blur.
   float blurredLum = 0.0;
   for (int i = 0; i < 9; i++) {
     vec2 sampleUv = vUv + vec2(offsets[i] * (radius / 4.0) * texel.x, 0.0);
     vec3 sampleColor = texture2D(uImage, sampleUv).rgb;
     float lum = dot(sampleColor, vec3(0.299, 0.587, 0.114));
-    blurredLum += lum * weights[i];
+    blurredLum += brightPass(lum) * weights[i];
   }
 
   gl_FragColor = vec4(vec3(blurredLum), 1.0);
