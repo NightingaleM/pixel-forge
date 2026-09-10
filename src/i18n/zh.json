@@ -102,7 +102,13 @@
   "style": {
     "halftone": {
       "label": "半色调",
-      "desc": "半色调网点效果，通过不同大小的圆点模拟明暗变化，模拟传统印刷工艺的视觉质感。",
+      "desc": "将色彩通道分离为不同角度的半色调网点，在暖色纸面上叠印油墨，呈现报纸、彩色分色与双色印刷质感。",
+      "presets": {
+        "newsprint": "新闻纸",
+        "colorPrint": "彩色印刷",
+        "duotoneRiso": "双色孔版",
+        "coarsePoster": "粗网点海报"
+      },
       "cellSize": "网格大小",
       "cellSizeDesc": "控制半色调网格的单元格大小，值越大圆点越稀疏",
       "dotScale": "圆点缩放",

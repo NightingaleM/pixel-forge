@@ -10,8 +10,8 @@ export const styles: StyleDefinition[] = [
     description: 'style.halftone.desc',
     shaderImports: [() => import('../shaders/halftone.frag?raw').then(m => m.default)],
     params: [
-      { name: 'style.halftone.cellSize',    uniform: 'uCellSize',  min: 2,   max: 50,  step: 1,    default: 15,  description: 'style.halftone.cellSizeDesc' },
-      { name: 'style.halftone.dotScale',    uniform: 'uDotScale',  min: 0.1, max: 3.0, step: 0.01, default: 1.45, description: 'style.halftone.dotScaleDesc' },
+      { name: 'style.halftone.cellSize',    uniform: 'uCellSize',  min: 2,   max: 50,  step: 1,    default: 11,  description: 'style.halftone.cellSizeDesc' },
+      { name: 'style.halftone.dotScale',    uniform: 'uDotScale',  min: 0.1, max: 3.0, step: 0.01, default: 1.05, description: 'style.halftone.dotScaleDesc' },
       { name: 'style.halftone.colorMode', uniform: 'uColorMode', type: 'select' as const, options: [
         { label: 'style.halftone.modeGray', value: 0 },
         { label: 'style.halftone.modeColor', value: 1 },
@@ -22,8 +22,22 @@ export const styles: StyleDefinition[] = [
         { label: 'style.halftone.shapeCircle', value: 0 },
         { label: 'style.halftone.shapeSquare', value: 1 },
         { label: 'style.halftone.shapeDiamond', value: 2 },
-      ], default: 1, description: 'style.halftone.shapeDesc' },
+      ], default: 0, description: 'style.halftone.shapeDesc' },
       { name: 'style.halftone.hueShift',    uniform: 'uHueShift',  min: 0,   max: 360, step: 1,    default: 0,   description: 'style.halftone.hueShiftDesc' },
+    ],
+    presets: [
+      { id: 'newsprint', label: 'style.halftone.presets.newsprint', params: {
+        uCellSize: 9, uDotScale: 1.15, uColorMode: 0, uAngle: 45, uShape: 0, uHueShift: 0,
+      } },
+      { id: 'colorPrint', label: 'style.halftone.presets.colorPrint', params: {
+        uCellSize: 11, uDotScale: 1.05, uColorMode: 1, uAngle: 0, uShape: 0, uHueShift: 0,
+      } },
+      { id: 'duotoneRiso', label: 'style.halftone.presets.duotoneRiso', params: {
+        uCellSize: 14, uDotScale: 1.2, uColorMode: 2, uAngle: 15, uShape: 0, uHueShift: 0,
+      } },
+      { id: 'coarsePoster', label: 'style.halftone.presets.coarsePoster', params: {
+        uCellSize: 24, uDotScale: 1.4, uColorMode: 1, uAngle: 30, uShape: 1, uHueShift: 15,
+      } },
     ],
   },
 

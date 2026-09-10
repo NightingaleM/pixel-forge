@@ -68,6 +68,14 @@ function numericParams(def: StyleDefinition, pick: (p: NumberParamDef) => number
 }
 
 describe('encodeSeed / decodeSeed', () => {
+  it('decodes the pre-upgrade halftone seed unchanged', () => {
+    expect(decodeSeed('00njY7e')).toEqual({
+      styleId: 'halftone',
+      params: { uCellSize: 21, uDotScale: 1.2, uAngle: 45, uHueShift: 30 },
+      colorParams: {},
+    })
+  })
+
   it('SEED_VERSION = 0', () => {
     expect(SEED_VERSION).toBe(0)
   })

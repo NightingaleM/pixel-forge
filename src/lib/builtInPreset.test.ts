@@ -3,6 +3,7 @@ import type { BuiltInPresetDefinition, StyleDefinition } from '../types'
 import zh from '../i18n/zh.json'
 import en from '../i18n/en.json'
 import { findMatchingBuiltInPreset, resolvePresetValues } from './builtInPreset'
+import { getStyle } from './StyleRegistry'
 
 function readI18n(root: unknown, dottedKey: string): unknown {
   return dottedKey.split('.').reduce<unknown>((value, key) => {
@@ -62,5 +63,24 @@ describe('quick style locales', () => {
     expect(readI18n(zh, 'preset.quickStyles')).not.toBe('')
     expect(readI18n(en, 'preset.quickStyles')).toEqual(expect.any(String))
     expect(readI18n(en, 'preset.quickStyles')).not.toBe('')
+  })
+})
+
+describe('halftone built-in presets', () => {
+  it('offers four complete, resolvable print presets with translated labels', () => {
+    const halftone = getStyle('halftone')!
+    expect(halftone.presets?.map(({ id }) => id)).toEqual([
+      'newsprint', 'colorPrint', 'duotoneRiso', 'coarsePoster',
+    ])
+    for (const preset of halftone.presets ?? []) {
+      const values = resolvePresetValues(halftone, preset.params, preset.textParams ?? {})
+      expect(Object.keys(values.params)).toHaveLength(6)
+      expect(values).toEqual({ params: preset.params, textParams: {} })
+      expect(findMatchingBuiltInPreset(halftone, values.params, values.textParams)).toBe(preset.id)
+      for (const locale of [zh, en]) {
+        expect(readI18n(locale, preset.label)).toEqual(expect.any(String))
+        expect(readI18n(locale, preset.label)).not.toBe('')
+      }
+    }
   })
 })

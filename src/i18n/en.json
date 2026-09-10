@@ -102,7 +102,13 @@
   "style": {
     "halftone": {
       "label": "Halftone",
-      "desc": "Halftone dot effect, simulating tonal changes through varying dot sizes, recreating the visual texture of traditional printing.",
+      "desc": "Separate color channels into angled halftone screens and overprint inks on warm paper, from newsprint to CMY and two-color prints.",
+      "presets": {
+        "newsprint": "Newsprint",
+        "colorPrint": "Color Print",
+        "duotoneRiso": "Duotone Riso",
+        "coarsePoster": "Coarse Poster"
+      },
       "cellSize": "Grid Size",
       "cellSizeDesc": "Controls the halftone grid cell size. Larger values produce sparser dots",
       "dotScale": "Dot Scale",

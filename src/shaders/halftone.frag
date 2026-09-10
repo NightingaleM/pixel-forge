@@ -40,59 +40,64 @@ vec3 hsv2rgb(vec3 c) {
   return mix(vec3(c.z), rgb, c.y);
 }
 
-void main() {
-  // rotate UV by angle
-  float rad = uAngle * 3.14159265 / 180.0;
-  vec2 uv = vUv - 0.5;
-  mat2 rot = mat2(cos(rad), -sin(rad), sin(rad), cos(rad));
-  uv = rot * uv + 0.5;
+vec2 rotatePx(vec2 px, float degrees) {
+  float rad = degrees * 3.14159265 / 180.0;
+  mat2 r = mat2(cos(rad), -sin(rad), sin(rad), cos(rad));
+  return r * (px - uResolution * 0.5) + uResolution * 0.5;
+}
 
-  float cellSize = uCellSize;
-  vec2 cellCount = uResolution / cellSize;
-  vec2 cellUv = uv * cellCount;
-  vec2 cellId = floor(cellUv);
-  vec2 cellLocal = fract(cellUv) - 0.5;
+float shapeDistance(vec2 p) {
+  if (uShape < 0.5) return length(p);
+  if (uShape < 1.5) return max(abs(p.x), abs(p.y));
+  return (abs(p.x) + abs(p.y)) * 0.7071;
+}
 
-  // sample center of cell for color
-  vec2 sampleUv = (cellId + 0.5) / cellCount;
-  vec3 color = texture2D(uImage, clamp(sampleUv, 0.0, 1.0)).rgb;
-  float lum = dot(color, vec3(0.299, 0.587, 0.114));
+float screenMask(float angle, float channel) {
+  vec2 screenPx = rotatePx(gl_FragCoord.xy, angle);
+  vec2 cellId = floor(screenPx / uCellSize);
+  vec2 screenCenter = (cellId + 0.5) * uCellSize;
+  // Undo only the screen rotation so each ink samples the original composition.
+  vec2 sourceCenter = rotatePx(screenCenter, -angle);
+  vec2 sampleUv = clamp(sourceCenter / uResolution, 0.0, 1.0);
+  vec3 sampled = texture2D(uImage, sampleUv).rgb;
+  float darkness = 1.0 - dot(sampled, vec3(0.299, 0.587, 0.114));
+  float inkAmount = darkness;
 
-  // radius based on luminance (dark = bigger dot)
-  float radius = uDotScale * (1.0 - lum) * 0.45;
-
-  // distance calculation based on shape
-  float dist;
-  if (uShape < 0.5) {
-    // circle
-    dist = length(cellLocal);
-  } else if (uShape < 1.5) {
-    // square (Chebyshev distance)
-    dist = max(abs(cellLocal.x), abs(cellLocal.y));
-  } else {
-    // diamond (Manhattan distance, normalized)
-    dist = (abs(cellLocal.x) + abs(cellLocal.y)) * 0.7071;
-  }
-
-  float d = 1.0 - smoothstep(radius - 0.5, radius + 0.5, dist);
-
-  // apply hue shift
-  vec3 outColor = color;
-  if (uHueShift > 0.5) {
-    vec3 hsv = rgb2hsv(outColor);
+  if (uColorMode >= 0.5 && uColorMode < 1.5) {
+    vec3 hsv = rgb2hsv(sampled);
     hsv.x = fract(hsv.x + uHueShift / 360.0);
-    outColor = hsv2rgb(hsv);
+    vec3 ink = 1.0 - hsv2rgb(hsv);
+    if (channel < 0.5) inkAmount = ink.r;
+    else if (channel < 1.5) inkAmount = ink.g;
+    else inkAmount = ink.b;
+  } else if (uColorMode >= 1.5) {
+    // Blue builds shadows; red carries midtones on an independent screen.
+    if (channel < 0.5) inkAmount = smoothstep(0.15, 1.0, darkness);
+    else inkAmount = clamp(darkness * 1.35, 0.0, 1.0);
   }
 
+  vec2 local = fract(screenPx / uCellSize) - 0.5;
+  float radius = clamp(inkAmount * uDotScale * 0.48, 0.0, 0.7);
+  return 1.0 - smoothstep(radius - 0.04, radius + 0.04, shapeDistance(local));
+}
+
+void main() {
+  vec3 paper = vec3(0.97, 0.955, 0.92);
+  vec3 outColor = paper;
   if (uColorMode < 0.5) {
-    // grayscale halftone
-    gl_FragColor = vec4(vec3(d), 1.0);
+    outColor *= 1.0 - screenMask(uAngle, 0.0);
   } else if (uColorMode < 1.5) {
-    // color mode - preserve original colors with optional hue shift
-    gl_FragColor = vec4(outColor * d, 1.0);
+    float cMask = screenMask(uAngle + 15.0, 0.0);
+    float mMask = screenMask(uAngle + 75.0, 1.0);
+    float yMask = screenMask(uAngle, 2.0);
+    outColor *= mix(vec3(1.0), vec3(0.0, 0.68, 0.82), cMask);
+    outColor *= mix(vec3(1.0), vec3(0.88, 0.08, 0.48), mMask);
+    outColor *= mix(vec3(1.0), vec3(1.0, 0.82, 0.08), yMask);
   } else {
-    // duotone halftone - deep navy shadows into warm paper highlights
-    vec3 duo = mix(vec3(0.10, 0.23, 0.36), vec3(0.95, 0.91, 0.84), lum);
-    gl_FragColor = vec4(duo * d, 1.0);
+    float blueMask = screenMask(uAngle, 0.0);
+    float redMask = screenMask(uAngle + 55.0, 1.0);
+    outColor *= mix(vec3(1.0), vec3(0.10, 0.23, 0.36), blueMask);
+    outColor *= mix(vec3(1.0), vec3(0.92, 0.22, 0.16), redMask);
   }
+  gl_FragColor = vec4(outColor, 1.0);
 }
