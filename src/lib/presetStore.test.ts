@@ -128,4 +128,17 @@ describe('mergeWithDefaults', () => {
     const merged = mergeWithDefaults(def, {}, { [color.uniform]: '#zzzzzz' })
     expect(merged.textParams[color.uniform]).toBe(color.default)
   })
+  it('normalizes non-finite and out-of-range numbers plus invalid select and toggle values', () => {
+    const def = getStyle('ascii')!
+    const merged = mergeWithDefaults(def, {
+      uCharScale: Infinity,
+      uCellSize: 999,
+      uCaseMode: 99,
+      uShowBg: 2,
+    }, {})
+    expect(merged.params.uCharScale).toBe(0.85)
+    expect(merged.params.uCellSize).toBe(40)
+    expect(merged.params.uCaseMode).toBe(0)
+    expect(merged.params.uShowBg).toBe(1)
+  })
 })
