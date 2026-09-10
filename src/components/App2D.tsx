@@ -8,13 +8,15 @@ import { encodeSeed, decodeSeed } from '../lib/seedCodec'
 import { findBrightestPoint } from '../lib/brightPoint'
 import { hexToRgb, snapToStep } from '../lib/paramValue'
 import { loadPresets, savePreset, removePreset, mergeWithDefaults, type PresetEntry } from '../lib/presetStore'
-import type { StyleId } from '../types'
+import { findMatchingBuiltInPreset, resolveBuiltInPreset } from '../lib/builtInPreset'
+import type { BuiltInPresetDefinition, StyleId } from '../types'
 import ImageUploader from './ImageUploader'
 import StyleSelector from './StyleSelector'
 import ParamPanel from './ParamPanel'
 import PresetBar from './PresetBar'
 import PresetPanel from './PresetPanel'
 import { SeedBar } from './SeedBar'
+import BuiltInPresetBar from './BuiltInPresetBar'
 import ActionBar from './ActionBar'
 import { CompareSlider } from './CompareSlider'
 import ConfirmDialog from './ConfirmDialog'
@@ -454,6 +456,11 @@ function App2D() {
 
   const currentStyle = getStyle(activeStyle)
 
+  const activeBuiltInPresetId = useMemo(
+    () => currentStyle ? findMatchingBuiltInPreset(currentStyle, params, textParams) : null,
+    [currentStyle, params, textParams],
+  )
+
   // 自动模式下 X/Y 滑块显示检测值(仅显示层,state 不动,避免渲染 effect 循环)
   const panelValues = useMemo(() => {
     if (activeStyle !== 'animelight' || params['uGodRayAuto'] !== 1 || !brightest) return params
@@ -484,6 +491,16 @@ function App2D() {
     styleMemoryRef.current[decoded.styleId] = merged
     return true
   }, [image])
+
+  const handleApplyBuiltInPreset = useCallback((preset: BuiltInPresetDefinition) => {
+    const def = getStyle(activeStyle)
+    if (!def || !def.presets?.some((candidate) => candidate.id === preset.id)) return
+    const merged = resolveBuiltInPreset(def, preset)
+    styleMemoryRef.current[activeStyle] = merged
+    setParams(merged.params)
+    setTextParams(merged.textParams)
+    setFontParams({})
+  }, [activeStyle])
 
   // ---------------------------------------------------------------------------
   // Preset handlers（localStorage 持久化预设）
@@ -589,6 +606,11 @@ function App2D() {
           top={
             <>
               <SeedBar seed={seed} onApply={handleApplySeed} />
+              <BuiltInPresetBar
+                presets={currentStyle.presets ?? []}
+                activeId={activeBuiltInPresetId}
+                onApply={handleApplyBuiltInPreset}
+              />
               <PresetBar
                 defaultName={presetDefaultName}
                 onSave={handleSavePreset}

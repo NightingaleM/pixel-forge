@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import type { BuiltInPresetDefinition, StyleDefinition } from '../types'
+import zh from '../i18n/zh.json'
+import en from '../i18n/en.json'
 import { findMatchingBuiltInPreset, resolvePresetValues } from './builtInPreset'
+
+function readI18n(root: unknown, dottedKey: string): unknown {
+  return dottedKey.split('.').reduce<unknown>((value, key) => {
+    if (typeof value !== 'object' || value === null) return undefined
+    return (value as Record<string, unknown>)[key]
+  }, root)
+}
 
 const def: StyleDefinition = {
   id: 'halftone', label: 'x', description: 'x', shaderImports: [],
@@ -44,5 +53,14 @@ describe('findMatchingBuiltInPreset', () => {
   })
   it('returns null when no presets exist', () => {
     expect(findMatchingBuiltInPreset(def, { uSize: 4, uMode: 0 }, { uColor: '#ffffff' })).toBeNull()
+  })
+})
+
+describe('quick style locales', () => {
+  it('provides a non-empty quick styles label in both supported languages', () => {
+    expect(readI18n(zh, 'preset.quickStyles')).toEqual(expect.any(String))
+    expect(readI18n(zh, 'preset.quickStyles')).not.toBe('')
+    expect(readI18n(en, 'preset.quickStyles')).toEqual(expect.any(String))
+    expect(readI18n(en, 'preset.quickStyles')).not.toBe('')
   })
 })

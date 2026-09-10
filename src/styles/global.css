@@ -335,6 +335,13 @@ body {
   flex-wrap: wrap;
 }
 
+.built-in-presets { border-top: 1px solid #ddd; padding: 10px 0; }
+.built-in-presets-label { margin-bottom: 7px; color: #666; font-size: 11px; }
+.built-in-presets-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.built-in-preset-btn { min-height: 30px; border: 1px solid #999; border-radius: 0; background: #fff; color: #111; font: inherit; font-size: 11px; cursor: pointer; }
+.built-in-preset-btn:hover { background: #eaeaea; }
+.built-in-preset-btn.active { border-color: #000; background: #000; color: #fff; }
+
 /* --- Preset Panel (draggable floating list) --- */
 
 .preset-panel {

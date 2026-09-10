@@ -471,6 +471,7 @@
     "hint": "复制当前配置或粘贴他人种子码以复现"
   },
   "preset": {
+    "quickStyles": "快速风格",
     "save": "保存配置",
     "confirm": "保存",
     "namePlaceholder": "配置名称…",

@@ -471,6 +471,7 @@
     "hint": "Copy current config or paste a seed to reproduce"
   },
   "preset": {
+    "quickStyles": "Quick Styles",
     "save": "Save Preset",
     "confirm": "Save",
     "namePlaceholder": "Preset name…",
