@@ -128,6 +128,18 @@ describe('mergeWithDefaults', () => {
     const merged = mergeWithDefaults(def, {}, { [color.uniform]: '#zzzzzz' })
     expect(merged.textParams[color.uniform]).toBe(color.default)
   })
+  it('falls back when a persisted color value is numeric', () => {
+    const s = new MemoryStorage()
+    s.setItem('pixel-forge.presets.v1', JSON.stringify([
+      { id: 'numeric-color', name: 'legacy', styleId: 'ascii', params: {}, textParams: { uCharColor: 123456 }, createdAt: 1 },
+    ]))
+    setPresetStorage(s)
+    const preset = loadPresets()[0]!
+    const def = getStyle('ascii')!
+    const color = def.params.find(p => p.type === 'color') as { uniform: string; default: string }
+
+    expect(mergeWithDefaults(def, preset.params, preset.textParams).textParams[color.uniform]).toBe(color.default)
+  })
   it('normalizes non-finite and out-of-range numbers plus invalid select and toggle values', () => {
     const def = getStyle('ascii')!
     const merged = mergeWithDefaults(def, {

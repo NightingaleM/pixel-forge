@@ -22,7 +22,7 @@ export function resolvePresetValues(
         : p.textDefault
     } else if (p.type === 'color') {
       const raw = inputTextParams[p.uniform]
-      textParams[p.uniform] = (isValidHexColor(raw ?? '') ? raw : p.default).toLowerCase()
+      textParams[p.uniform] = (typeof raw === 'string' && isValidHexColor(raw) ? raw : p.default).toLowerCase()
     } else if (p.type === 'select') {
       const raw = inputParams[p.uniform]
       params[p.uniform] = Number.isFinite(raw) && p.options.some((o) => o.value === raw)
