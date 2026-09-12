@@ -163,16 +163,34 @@ export const styles: StyleDefinition[] = [
     description: 'style.pointillism.desc',
     shaderImports: [() => import('../shaders/pointillism.frag?raw').then(m => m.default)],
     params: [
-      { name: 'style.pointillism.dotSize', uniform: 'uDotSize',        min: 2,   max: 60,  step: 1,    default: 12,  description: 'style.pointillism.dotSizeDesc' },
+      { name: 'style.pointillism.dotSize', uniform: 'uDotSize',        min: 2,   max: 60,  step: 1,    default: 10,  description: 'style.pointillism.dotSizeDesc' },
       { name: 'style.pointillism.density',     uniform: 'uDensity',        min: 0.1, max: 5.0, step: 0.01, default: 1.6, description: 'style.pointillism.densityDesc' },
-      { name: 'style.pointillism.randomness', uniform: 'uRandomness',     min: 0.0, max: 1.0, step: 0.01, default: 0.39, description: 'style.pointillism.randomnessDesc' },
-      { name: 'style.pointillism.sizeVariation', uniform: 'uSizeVariation', min: 0.0, max: 1.0, step: 0.01, default: 0.5, description: 'style.pointillism.sizeVariationDesc' },
-      { name: 'style.pointillism.dotOpacity', uniform: 'uDotOpacity',   min: 0.1, max: 1.0, step: 0.01, default: 0.91, description: 'style.pointillism.dotOpacityDesc' },
+      { name: 'style.pointillism.randomness', uniform: 'uRandomness',     min: 0.0, max: 1.0, step: 0.01, default: 0.65, description: 'style.pointillism.randomnessDesc' },
+      { name: 'style.pointillism.sizeVariation', uniform: 'uSizeVariation', min: 0.0, max: 1.0, step: 0.01, default: 0.45, description: 'style.pointillism.sizeVariationDesc' },
+      { name: 'style.pointillism.dotOpacity', uniform: 'uDotOpacity',   min: 0.1, max: 1.0, step: 0.01, default: 0.88, description: 'style.pointillism.dotOpacityDesc' },
       { name: 'style.pointillism.shape', uniform: 'uShape', type: 'select' as const, options: [
         { label: 'style.pointillism.shapeCircle', value: 0 },
         { label: 'style.pointillism.shapeSquare', value: 1 },
         { label: 'style.pointillism.shapeTriangle', value: 2 },
       ], default: 0, description: 'style.pointillism.shapeDesc' },
+    ],
+    presets: [
+      { id: 'fineDots', label: 'style.pointillism.presets.fineDots', params: {
+        uDotSize: 6, uDensity: 2.8, uRandomness: 0.45,
+        uSizeVariation: 0.25, uDotOpacity: 0.9, uShape: 0,
+      } },
+      { id: 'seuratColor', label: 'style.pointillism.presets.seuratColor', params: {
+        uDotSize: 10, uDensity: 1.8, uRandomness: 0.65,
+        uSizeVariation: 0.45, uDotOpacity: 0.88, uShape: 0,
+      } },
+      { id: 'looseBrush', label: 'style.pointillism.presets.looseBrush', params: {
+        uDotSize: 18, uDensity: 1.0, uRandomness: 0.9,
+        uSizeVariation: 0.75, uDotOpacity: 0.82, uShape: 0,
+      } },
+      { id: 'confetti', label: 'style.pointillism.presets.confetti', params: {
+        uDotSize: 13, uDensity: 1.45, uRandomness: 1.0,
+        uSizeVariation: 1.0, uDotOpacity: 0.95, uShape: 2,
+      } },
     ],
   },
 

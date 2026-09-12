@@ -7,66 +7,60 @@ uniform vec2 uResolution;
 uniform float uDotSize;
 uniform float uDensity;
 uniform float uRandomness;
-uniform float uSizeVariation; // 0.0-1.0, random size variation
-uniform float uDotOpacity;    // 0.1-1.0, dot transparency
-uniform float uShape;         // 0=circle, 1=square, 2=triangle
+uniform float uSizeVariation;
+uniform float uDotOpacity;
+uniform float uShape;
 
 float hash(vec2 p) {
     return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
 }
 
 void main() {
-    // Step 1: Scale UV by density to get grid spacing
-    float cellSize = uDotSize / uDensity;
+    vec2 pixel = vUv * uResolution;
+    float spacing = max(uDotSize, 2.0);
+    vec2 baseCell = floor(pixel / spacing);
+    float bestDist = 999.0;
+    vec3 bestColor = vec3(1.0);
 
-    // Step 2: Create grid
-    vec2 cellUv = vUv * (uResolution / cellSize);
-
-    // Step 3: Get cell ID
-    vec2 cellId = floor(cellUv);
-
-    // Step 4: Get local position within cell
-    vec2 cellLocal = fract(cellUv) - 0.5;
-
-    // Step 5: Add randomness to cell center using hash
-    vec2 jitter = vec2(hash(cellId), hash(cellId + 100.0)) * 2.0 - 1.0;
-    cellLocal -= jitter * uRandomness * 0.4;
-
-    // Step 6: Sample original image color at cell center (adjusted for jitter)
-    vec2 sampleUv = (cellId + 0.5 + jitter * uRandomness * 0.4) * cellSize / uResolution;
-    vec3 color = texture2D(uImage, clamp(sampleUv, 0.0, 1.0)).rgb;
-
-    // Step 7: Size variation - randomly scale each dot
-    float sizeRand = mix(1.0, hash(cellId + 200.0) * 1.5 + 0.5, uSizeVariation);
-    float baseRadius = 0.4 * sizeRand;
-
-    // Step 8: Shape-based distance calculation
-    float dist;
-    if (uShape < 0.5) {
-        // circle
-        dist = length(cellLocal);
-    } else if (uShape < 1.5) {
-        // square (Chebyshev distance)
-        dist = max(abs(cellLocal.x), abs(cellLocal.y));
-    } else {
-        // triangle (equilateral triangle SDF)
-        vec2 p = cellLocal;
-        float k = 1.732; // sqrt(3)
-        p.x = abs(p.x) - 0.4;
-        p.y = p.y + 0.4 / k;
-        if (p.x + k * p.y > 0.0) {
-            p = vec2(p.x - k * p.y, -k * p.x - p.y) / 2.0;
+    for (int oy = -1; oy <= 1; oy++) {
+        for (int ox = -1; ox <= 1; ox++) {
+            vec2 cell = baseCell + vec2(float(ox), float(oy));
+            vec2 jitter = vec2(hash(cell), hash(cell + 37.17)) - 0.5;
+            vec2 sitePx = (cell + 0.5 + jitter * uRandomness * 0.8) * spacing;
+            vec2 siteUv = clamp(sitePx / uResolution, 0.0, 1.0);
+            vec3 color = texture2D(uImage, siteUv).rgb;
+            float lum = dot(color, vec3(0.299, 0.587, 0.114));
+            float hi = max(color.r, max(color.g, color.b));
+            float lo = min(color.r, min(color.g, color.b));
+            float importance = mix(0.18, 1.0, max(1.0 - lum, (hi - lo) * 0.65));
+            float probability = clamp(importance * uDensity * 0.55, 0.03, 0.98);
+            bool occupied = hash(cell + 91.73) <= probability;
+            float sizeRand = mix(1.0, 0.55 + hash(cell + 173.0) * 0.9, uSizeVariation);
+            float radius = spacing * 0.42 * sizeRand;
+            vec2 local = (pixel - sitePx) / max(radius, 0.001);
+            float candidateDist;
+            if (uShape < 0.5) {
+                candidateDist = length(local);
+            } else if (uShape < 1.5) {
+                candidateDist = max(abs(local.x), abs(local.y));
+            } else {
+                vec2 p = local;
+                const float k = 1.7320508;
+                p.x = abs(p.x) - 1.0;
+                p.y = p.y + 1.0 / k;
+                if (p.x + k * p.y > 0.0) p = vec2(p.x - k * p.y, -k * p.x - p.y) * 0.5;
+                p.x -= clamp(p.x, -2.0, 0.0);
+                candidateDist = length(p) * sign(p.y);
+            }
+            if (occupied && candidateDist < bestDist) {
+                bestDist = candidateDist;
+                bestColor = color;
+            }
         }
-        p.x -= clamp(p.x, -0.8, 0.0);
-        dist = -length(p) * 1.2;
-        dist = max(dist, abs(cellLocal.y) - 0.4);
     }
 
-    float mask = 1.0 - smoothstep(baseRadius - 0.05, baseRadius + 0.05, dist);
-
-    // Apply opacity
-    mask *= uDotOpacity;
-
-    // Step 9: Output - white background with colored dots
-    gl_FragColor = vec4(mix(vec3(1.0), color, mask), 1.0);
+    float edgeWidth = 1.0 / max(spacing * 0.42, 1.0);
+    float mask = 1.0 - smoothstep(1.0 - edgeWidth, 1.0 + edgeWidth, bestDist);
+    vec3 canvas = vec3(0.985, 0.98, 0.96);
+    gl_FragColor = vec4(mix(canvas, bestColor, mask * uDotOpacity), 1.0);
 }

@@ -220,9 +220,9 @@
       "label": "Pointillism",
       "desc": "Pointillism style, reconstructing images with dense colored dots, paying homage to Impressionist painters like Seurat.",
       "dotSize": "Dot Size",
-      "dotSizeDesc": "Base size of each color dot",
+      "dotSizeDesc": "Brush scale for each color mark",
       "density": "Density",
-      "densityDesc": "Color dot distribution density",
+      "densityDesc": "Mark occupancy, with more marks in dark or colorful areas",
       "randomness": "Randomness",
       "randomnessDesc": "Random offset of dot positions",
       "sizeVariation": "Size Variation",
@@ -233,7 +233,13 @@
       "shapeDesc": "Dot shape",
       "shapeCircle": "Circle",
       "shapeSquare": "Square",
-      "shapeTriangle": "Triangle"
+      "shapeTriangle": "Triangle",
+      "presets": {
+        "fineDots": "Fine Dots",
+        "seuratColor": "Seurat Color",
+        "looseBrush": "Loose Brush",
+        "confetti": "Confetti"
+      }
     },
     "kaleidoscope": {
       "label": "Kaleidoscope",

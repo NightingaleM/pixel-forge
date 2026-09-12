@@ -220,9 +220,9 @@
       "label": "点彩",
       "desc": "点彩画派风格，用密集的彩色圆点重构图像，致敬修拉等印象派画家的独特技法。",
       "dotSize": "圆点大小",
-      "dotSizeDesc": "每个色点的基础大小",
+      "dotSizeDesc": "每个色点笔触的缩放大小",
       "density": "密度",
-      "densityDesc": "色点的分布密度",
+      "densityDesc": "色点的出现概率，暗部和高饱和区域更密集",
       "randomness": "随机抖动",
       "randomnessDesc": "色点位置的随机偏移量",
       "sizeVariation": "大小随机变化",
@@ -233,7 +233,13 @@
       "shapeDesc": "笔触点形状",
       "shapeCircle": "圆形",
       "shapeSquare": "方形",
-      "shapeTriangle": "三角形"
+      "shapeTriangle": "三角形",
+      "presets": {
+        "fineDots": "精细点彩",
+        "seuratColor": "修拉色彩",
+        "looseBrush": "松散笔触",
+        "confetti": "五彩纸屑"
+      }
     },
     "kaleidoscope": {
       "label": "万花筒",

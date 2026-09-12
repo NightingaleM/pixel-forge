@@ -68,6 +68,17 @@ function numericParams(def: StyleDefinition, pick: (p: NumberParamDef) => number
 }
 
 describe('encodeSeed / decodeSeed', () => {
+  it('decodes the pre-upgrade pointillism seed unchanged', () => {
+    expect(decodeSeed('0548EOMw')).toEqual({
+      styleId: 'pointillism',
+      params: {
+        uDotSize: 10, uDensity: 1.6, uRandomness: 0.65,
+        uSizeVariation: 0.45, uDotOpacity: 0.88,
+      },
+      colorParams: {},
+    })
+  })
+
   it('decodes the pre-upgrade lightshadow seed unchanged', () => {
     expect(decodeSeed('03EPxNkRL6Bg2d')).toEqual({
       styleId: 'lightshadow',

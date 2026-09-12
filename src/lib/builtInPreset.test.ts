@@ -113,3 +113,22 @@ describe('lightshadow built-in presets', () => {
     }
   })
 })
+
+describe('pointillism built-in presets', () => {
+  it('offers four complete mark presets with translated labels', () => {
+    const pointillism = getStyle('pointillism')!
+    expect(pointillism.presets?.map(({ id }) => id)).toEqual([
+      'fineDots', 'seuratColor', 'looseBrush', 'confetti',
+    ])
+    for (const preset of pointillism.presets ?? []) {
+      const values = resolvePresetValues(pointillism, preset.params, preset.textParams ?? {})
+      expect(Object.keys(values.params)).toHaveLength(6)
+      expect(values).toEqual({ params: preset.params, textParams: {} })
+      expect(findMatchingBuiltInPreset(pointillism, values.params, values.textParams)).toBe(preset.id)
+      for (const locale of [zh, en]) {
+        expect(readI18n(locale, preset.label)).toEqual(expect.any(String))
+        expect(readI18n(locale, preset.label)).not.toBe('')
+      }
+    }
+  })
+})
