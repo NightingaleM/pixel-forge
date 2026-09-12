@@ -50,7 +50,8 @@ void main() {
                 p.y = p.y + 1.0 / k;
                 if (p.x + k * p.y > 0.0) p = vec2(p.x - k * p.y, -k * p.x - p.y) * 0.5;
                 p.x -= clamp(p.x, -2.0, 0.0);
-                candidateDist = length(p) * sign(p.y);
+                float signedDistance = -length(p) * sign(p.y);
+                candidateDist = 1.0 + signedDistance * k;
             }
             if (occupied && candidateDist < bestDist) {
                 bestDist = candidateDist;
