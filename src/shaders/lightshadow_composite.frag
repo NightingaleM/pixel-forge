@@ -21,6 +21,13 @@ float compressTone(float value) {
   return value;
 }
 
+// Contrast may push very dark channels below zero. Lift them into a positive,
+// ordered toe before attenuation so greater shadow depth can only darken them.
+float protectShadow(float value) {
+  if (value < 0.1) return 0.01 / (0.2 - value);
+  return value;
+}
+
 void main() {
   vec3 color = texture2D(uOriginal, vUv).rgb;
   float blurredBright = texture2D(uImage, vUv).r;
@@ -37,7 +44,12 @@ void main() {
   float transition = smoothstep(uThreshold - 0.08, uThreshold + 0.08, origLum);
   vec3 contrasted = (color - 0.5) * uContrast + 0.5;
   vec3 glow = glowTint * blurredBright * uGlowIntensity;
-  vec3 shadowed = contrasted * max(0.2, 1.0 - uShadowDepth * 0.4);
+  vec3 shadowBase = vec3(
+    protectShadow(contrasted.r),
+    protectShadow(contrasted.g),
+    protectShadow(contrasted.b)
+  );
+  vec3 shadowed = shadowBase * max(0.2, 1.0 - uShadowDepth * 0.4);
   vec3 shaped = mix(shadowed, contrasted + glow, transition);
   vec3 final = shaped * mix(0.9, 1.1, lightFactor);
   final = vec3(compressTone(final.r), compressTone(final.g), compressTone(final.b));
