@@ -584,6 +584,8 @@ function App2D() {
       {image && currentStyle && (
         <ParamPanel
           title={t(currentStyle.label)}
+          defaultPos={{ x: 282, y: 110 }}
+          storageKey="pixel-forge.panelPos.2d.v1"
           description={t(currentStyle.description)}
           params={currentStyle.params.map(p => {
             if (p.type === 'select') {

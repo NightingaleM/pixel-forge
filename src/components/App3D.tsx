@@ -515,6 +515,7 @@ export default function App3D() {
         <ParamPanel
           title={t('app3d.backgroundPanelTitle')}
           defaultPos={{ x: 15, y: 870 }}
+          storageKey="pixel-forge.panelPos.3d.bg.v1"
           defaultCollapsed={false}
         >
           <BackgroundPanel
@@ -534,6 +535,7 @@ export default function App3D() {
         <ParamPanel
           title={t('app3d.lighting')}
           defaultPos={{ x: 15, y: 680 }}
+          storageKey="pixel-forge.panelPos.3d.light.v1"
           defaultCollapsed={true}
         >
           <LightingPanel
@@ -546,6 +548,7 @@ export default function App3D() {
         <ParamPanel
           title={t('app3d.recordingPanelTitle')}
           defaultPos={{ x: 15, y: 768 }}
+          storageKey="pixel-forge.panelPos.3d.rec.v1"
           defaultCollapsed={true}
         >
           <RecordingControls engineRef={engineRef} />
@@ -561,6 +564,7 @@ export default function App3D() {
             onChange={handleBaseParamChange}
             onTextChange={handleBaseTextChange}
             defaultPos={{ x: 345, y: 35 }}
+            storageKey="pixel-forge.panelPos.3d.base.v1"
           />
         )}
 
@@ -575,6 +579,7 @@ export default function App3D() {
             onChange={handleParamChange}
             onTextChange={handleTextChange}
             defaultPos={{ x: 632, y: 35 }}
+            storageKey="pixel-forge.panelPos.3d.fx.v1"
           />
         )}
 
@@ -583,6 +588,7 @@ export default function App3D() {
           <ParamPanel
             title={t('app3d.gradientEditor')}
             defaultPos={{ x: 345, y: 400 }}
+            storageKey="pixel-forge.panelPos.3d.grad.v1"
             defaultCollapsed={false}
           >
             <GradientEditor config={gradientConfig} onChange={handleGradientChange} />

@@ -17,6 +17,7 @@ interface ParamPanelProps {
   onRandom?: () => void
   onClose?: () => void
   defaultPos?: { x: number; y: number }
+  storageKey?: string
   children?: ReactNode
   top?: ReactNode
   defaultCollapsed?: boolean
@@ -244,9 +245,9 @@ function renderParam(
   )
 }
 
-function ParamPanel({ title, description, params, values, textValues, onChange, onTextChange, fontValues, onFontChange, onRandom, onClose, defaultPos, children, top, defaultCollapsed }: ParamPanelProps) {
+function ParamPanel({ title, description, params, values, textValues, onChange, onTextChange, fontValues, onFontChange, onRandom, onClose, defaultPos, storageKey, children, top, defaultCollapsed }: ParamPanelProps) {
   const { t } = useTranslation()
-  const { ref: panelRef, pos, onHeaderMouseDown } = useDraggable(defaultPos)
+  const { ref: panelRef, pos, onHeaderMouseDown } = useDraggable(defaultPos, storageKey)
   const [collapsed, setCollapsed] = useState(defaultCollapsed ?? false)
 
   return (

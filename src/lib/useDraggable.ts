@@ -1,4 +1,5 @@
 import { useRef, useState, useCallback, useEffect } from 'react'
+import { loadPanelPos, savePanelPos } from './panelPosStore'
 
 export interface DragPos { x: number; y: number }
 
@@ -17,15 +18,22 @@ export function clampPanelPos(
 /**
  * 浮动面板拖动：标题栏按下 → window mousemove 移动（按面板实际尺寸四边限位）→ mouseup 结束。
  * 窗口 resize / 挂载时对当前位置重新限位，防止面板滞留视口外。
+ * 传 storageKey 时位置持久化：初始优先读存储，拖动结束（mouseup）写入——
+ * 不在 mousemove 每帧写；存储的旧位置超视口时由挂载 reclamp 拉回。
  * 返回 ref 挂在面板根节点、onHeaderMouseDown 挂在标题栏。
  */
-export function useDraggable(defaultPos?: DragPos) {
+export function useDraggable(defaultPos?: DragPos, storageKey?: string) {
   const ref = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState<DragPos>(
-    defaultPos ?? { x: typeof window !== 'undefined' ? window.innerWidth - 320 : 600, y: 35 },
+    (storageKey ? loadPanelPos(storageKey) : null)
+    ?? defaultPos
+    ?? { x: typeof window !== 'undefined' ? window.innerWidth - 320 : 600, y: 35 },
   )
   const dragging = useRef(false)
   const offset = useRef({ x: 0, y: 0 })
+  // mouseup 保存时需要最新位置；用 ref 同步，避免在 setState updater 里做写入副作用
+  const posRef = useRef(pos)
+  useEffect(() => { posRef.current = pos }, [pos])
 
   const onHeaderMouseDown = useCallback((e: React.MouseEvent) => {
     if (!ref.current) return
@@ -51,7 +59,10 @@ export function useDraggable(defaultPos?: DragPos) {
       if (!dragging.current) return
       setPos(clampToViewport({ x: e.clientX - offset.current.x, y: e.clientY - offset.current.y }))
     }
-    const onMouseUp = () => { dragging.current = false }
+    const onMouseUp = () => {
+      if (dragging.current && storageKey) savePanelPos(storageKey, posRef.current)
+      dragging.current = false
+    }
     // 挂载与 resize 时把当前面板拉回视口内（拖动只在 move 时限位，窗口缩小后面板会悬在外）
     const reclamp = () => setPos((p) => clampToViewport(p))
     window.addEventListener('mousemove', onMouseMove)
@@ -63,7 +74,7 @@ export function useDraggable(defaultPos?: DragPos) {
       window.removeEventListener('mouseup', onMouseUp)
       window.removeEventListener('resize', reclamp)
     }
-  }, [])
+  }, [storageKey])
 
   return { ref, pos, onHeaderMouseDown }
 }
