@@ -133,7 +133,7 @@ describe('encodeSeed / decodeSeed', () => {
     }
     expect(maxOf('ascii')).toBe(10)        // 档积 787185 × 2^24 ≈ 1.32e13 → 8 字符载荷 + 2 前缀（uCharColor 纳入编码）
     expect(maxOf('halftone')).toBe(8)
-    expect(maxOf('kaleidoscope')).toBe(11)
+    expect(maxOf('kaleidoscope')).toBe(12)   // +uFracture(6档) +uCellSize(11档) 后码长 9→10 载荷
     expect(maxOf('animelight')).toBe(20)   // 实际档积 1.0136e24 × 2^24 ≈ 1.70e31 < 62^18 → 18 载荷 + 2 前缀
   })
 
