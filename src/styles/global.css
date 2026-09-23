@@ -940,7 +940,8 @@ body {
   pointer-events: none;
 }
 
-/* 种子条:与缩略图同宽,等宽小字,ellipsis 兜底(复制失败文案较长时截断) */
+/* 种子条:与缩略图同宽,等宽小字;点击全选文字(user-select:all——无剪贴板
+   权限,选中即完整码,ellipsis 只裁显示不裁内容) */
 .image-strip-seed {
   width: 80px;
   padding: 1px 2px;
@@ -950,7 +951,8 @@ body {
   color: #333;
   background: #F5F5F5;
   border: 1px solid #DDD;
-  cursor: copy;
+  cursor: text;
+  user-select: all;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1947,7 +1949,8 @@ body {
   background: none;
   border: none;
   padding: 0;
-  cursor: copy;
+  cursor: text;
+  user-select: all;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

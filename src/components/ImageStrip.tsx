@@ -7,7 +7,6 @@ import { useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { BatchImage, RowSeedView } from '../lib/batch/imageList'
 import { BATCH_MAX_ROWS } from '../lib/batch/batchJob'
-import { useCopyFeedback } from '../lib/useCopyFeedback'
 
 export interface TestImage {
   src: string
@@ -57,7 +56,6 @@ function ImageStrip({
 }: ImageStripProps) {
   const { t } = useTranslation()
   const inputRef = useRef<HTMLInputElement>(null)
-  const { feedback, copy } = useCopyFeedback()
 
   return (
     <div className={`image-strip${mode === 'batch' ? ' image-strip--batch' : ''}`}>
@@ -97,17 +95,11 @@ function ImageStrip({
             >
               {removeIcon}
             </button>
-            {/* 种子条:截断码 + title 全量 + 点击复制;独立模式未独立行显示「跟随」。
-                stopPropagation 防触发选中 */}
+            {/* 种子条:截断码 + title 全量;点击全选文字(user-select:all,无需剪贴板
+                权限,Ctrl+C 即复制完整码——ellipsis 只裁显示,选中的是完整字符串)。
+                独立模式未独立行显示「跟随」 */}
             {sv && sv.full !== null ? (
-              <button
-                type="button"
-                className="image-strip-seed"
-                title={sv.full}
-                onClick={(e) => { e.stopPropagation(); void copy(img.id, sv.full!) }}
-              >
-                {feedback?.id === img.id ? (feedback.ok ? t('seed.copied') : t('seed.copyFailed')) : sv.short}
-              </button>
+              <span className="image-strip-seed" title={sv.full}>{sv.short}</span>
             ) : (
               <span className="image-strip-seed image-strip-seed--follow">{t('batch.followBase')}</span>
             )}

@@ -3,11 +3,10 @@
 // 结果 tab(进度/画廊/重试/重骰/单张与 ZIP 下载/灯箱)。行状态(images)与队列
 // 调度(runner/drain)的唯一所有者是 App2D,本组件不持业务状态,全部经回调上交。
 // 种子编辑回归主界面 SeedBar(ParamPanel 顶部);v3 配置 tab 另设只读行列表
-// (缩略图+种子码点击复制+状态点,编辑仍不在面板内)。
+// (缩略图+种子码点击全选+状态点,编辑仍不在面板内)。
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useDraggable } from '../lib/useDraggable'
-import { useCopyFeedback } from '../lib/useCopyFeedback'
 import { getStyle } from '../lib/StyleRegistry'
 import { canRunBatch, type BatchFormat } from '../lib/batch/batchJob'
 import { blobExt, type BatchImage, type RowSeedView } from '../lib/batch/imageList'
@@ -81,7 +80,6 @@ function BatchPanel({
   onClose,
 }: BatchPanelProps) {
   const { t } = useTranslation()
-  const { feedback, copy } = useCopyFeedback()
   const { ref: panelRef, pos, onHeaderMouseDown } = useDraggable(
     { x: 90, y: 130 }, 'pixel-forge.panelPos.batch.v1',
   )
@@ -200,14 +198,7 @@ function BatchPanel({
                       <img className="batch-rowlist-thumb" src={row.image.src} alt="" aria-hidden="true" />
                       <span className={`batch-rowlist-dot batch-rowlist-dot--${row.status}`} aria-hidden="true" />
                       {sv && sv.full !== null ? (
-                        <button
-                          type="button"
-                          className="batch-rowlist-seed"
-                          title={sv.full}
-                          onClick={(e) => { e.stopPropagation(); void copy(row.id, sv.full!) }}
-                        >
-                          {feedback?.id === row.id ? (feedback.ok ? t('seed.copied') : t('seed.copyFailed')) : sv.short}
-                        </button>
+                        <span className="batch-rowlist-seed" title={sv.full}>{sv.short}</span>
                       ) : (
                         <span className="batch-rowlist-seed batch-rowlist-seed--follow">{t('batch.followBase')}</span>
                       )}
