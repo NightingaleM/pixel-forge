@@ -914,10 +914,9 @@ body {
   gap: 2px;
 }
 
-/* 对比层容器:包住缩略图,overflow 裁掉 clip 外溢出;边框/选中仍在 .image-strip-thumb 上(零改动) */
+/* 对比层容器:仅作定位容器,不裁剪——选中 outline 画在 border box 外,overflow:hidden 会裁掉它;边框/选中仍在 .image-strip-thumb 上(零改动) */
 .image-strip-thumb-wrap {
   position: relative;
-  overflow: hidden;
   flex-shrink: 0;
 }
 
