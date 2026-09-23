@@ -589,6 +589,9 @@ function App2D() {
 
   const handleStyleChange = useCallback(
     (id: StyleId) => {
+      // 同风格再点早退:StyleSelector 对 active 项点击仍回调,放行会用当前工作
+      // 副本(独立模式下可能与 base 有别)静默覆写 base,平白溅射其他行的回退目标
+      if (id === activeStyle) return
       // 无条件快照当前风格状态：默认/随机/手动调整的最后状态一视同仁
       // （含字体——切回 ascii 时已上传字体不丢）
       styleMemoryRef.current[activeStyle] = { params, textParams, fontParams }
@@ -902,12 +905,15 @@ function App2D() {
   // 单图=退出编辑(v1 语义);批量=关闭批量会话:revoke 全部行结果 URL + 终止队列
   // + 清空会话(resetSession 内含 stopBatch 与面板收起,v1 batchJob 双模型已退役)
   const handleClose = useCallback(() => {
-    images.forEach((row) => {
+    // 走 ref 读最新行(handleTestImageClick 同款模式):确认对话开着时行可能刚
+    // 完成并建了 objectUrl,闭包里的 images 不含它,resetSession 清行后该 URL
+    // 无人 revoke 而泄漏
+    batchImagesRef.current.forEach((row) => {
       if (row.objectUrl) URL.revokeObjectURL(row.objectUrl)
     })
     resetSession()
     setCloseDialog(null)
-  }, [images, resetSession])
+  }, [resetSession])
 
   return (
     <div className="app-container">
