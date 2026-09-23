@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   BATCH_MAX_ROWS, canRunBatch, dedupeName, effectiveFormat,
-  resolveRowRenderState, rowSeed, zipEntryName,
+  resolveRowRenderState, rowSeed, rowRenderedSeed, rowRenderedStyleId, zipEntryName,
   type BatchJob, type BatchRow,
 } from './batchJob'
 import { getStyle } from '../StyleRegistry'
@@ -45,6 +45,20 @@ describe('rowSeed', () => {
   it('override 优先,否则统一值', () => {
     expect(rowSeed(job, row)).toBe('0A1')
     expect(rowSeed(job, { ...row, seedOverride: '9z' })).toBe('9z')
+  })
+})
+
+describe('rowRenderedSeed / rowRenderedStyleId', () => {
+  const job = { baseline, unifiedSeed: '0A1', seedMode: 'unified', format: 'png', rows: [] } as BatchJob
+  const row = { id: 'r1', seedOverride: null, renderedSeed: null, renderedStyleId: null } as BatchRow
+  it('无快照时回退当前生效种子与基线风格', () => {
+    expect(rowRenderedSeed(job, row)).toBe('0A1')
+    expect(rowRenderedStyleId(job, row)).toBe('halftone')
+  })
+  it('有快照时优先快照:替换基线/重骰后旧结果按生成时刻标注', () => {
+    const r2 = { ...row, renderedSeed: '9z', renderedStyleId: 'popart' } as BatchRow
+    expect(rowRenderedSeed(job, r2)).toBe('9z')
+    expect(rowRenderedStyleId(job, r2)).toBe('popart')
   })
 })
 

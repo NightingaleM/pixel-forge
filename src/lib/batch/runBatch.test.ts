@@ -3,9 +3,11 @@ import { describe, it, expect } from 'vitest'
 import { unzipSync } from 'fflate'
 import { createBatchRunner, buildBatchZip } from './runBatch'
 import type { BatchJob, BatchRow } from './batchJob'
+import { encodeSeed } from '../seedCodec'
+import { getStyle } from '../StyleRegistry'
 
 function mkRow(id: string, status: BatchRow['status'] = 'pending'): BatchRow {
-  return { id, fileName: `${id}.jpg`, image: {} as HTMLImageElement, seedOverride: null, status, blob: null, objectUrl: null, error: null }
+  return { id, fileName: `${id}.jpg`, image: {} as HTMLImageElement, seedOverride: null, status, blob: null, objectUrl: null, error: null, renderedSeed: null, renderedStyleId: null }
 }
 function mkJob(rows: BatchRow[]): BatchJob {
   return { baseline: { styleId: 'halftone', params: {}, textParams: {}, fontParams: {} }, unifiedSeed: '00', seedMode: 'unified', format: 'png', rows }
@@ -52,6 +54,18 @@ describe('createBatchRunner', () => {
     let err: string | null = null
     await runner.run(job, { onRowUpdate: (_id, p) => { err = p.error ?? null } })
     expect(err).toBeTruthy()
+  })
+
+  it('done patch 快照渲染种子与解析风格,processing patch 先清空旧快照', async () => {
+    // 跨风格种子:基线 halftone,统一种子携带 popart
+    const popartSeed = encodeSeed('popart', {}, getStyle('popart')!, {})
+    const job = mkJob([{ ...mkRow('a'), renderedSeed: 'stale', renderedStyleId: 'halftone' }])
+    job.unifiedSeed = popartSeed
+    const patches: Array<Partial<BatchRow>> = []
+    const runner = createBatchRunner(async () => new Blob(['x']))
+    await runner.run(job, { onRowUpdate: (_id, p) => patches.push({ ...p }) })
+    expect(patches[0]).toMatchObject({ status: 'processing', renderedSeed: null, renderedStyleId: null })
+    expect(patches[1]).toMatchObject({ status: 'done', renderedSeed: popartSeed, renderedStyleId: 'popart' })
   })
 })
 

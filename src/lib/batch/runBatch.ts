@@ -34,13 +34,17 @@ export function createBatchRunner(renderTask: RenderTaskFn) {
     const queue = job.rows.filter((r) => r.status === 'pending' || r.status === 'failed')
     for (const row of queue) {
       if (cancelled) break
-      cb.onRowUpdate(row.id, { status: 'processing', error: null })
+      // 重渲染前先清空旧快照:重跑/重骰/重试都必经 processing,单一闸口
+      // 保证非 done 行不携带上一轮的渲染元数据
+      cb.onRowUpdate(row.id, { status: 'processing', error: null, renderedSeed: null, renderedStyleId: null })
       await nextFrame()   // 行处理前让出一帧,UI 先绘出 processing 态
       try {
-        const state = resolveRowRenderState(job.baseline, rowSeed(job, row))
+        const seed = rowSeed(job, row)
+        const state = resolveRowRenderState(job.baseline, seed)
         if (!state) throw new Error('invalid seed')
         const blob = await renderTask({ row, ...state, format: effectiveFormat(state.styleId, job.format) })
-        cb.onRowUpdate(row.id, { status: 'done', blob })
+        // done 快照:定格实际用于渲染的种子与解析出的风格(种子可携带其他风格)
+        cb.onRowUpdate(row.id, { status: 'done', blob, renderedSeed: seed, renderedStyleId: state.styleId })
       } catch (e) {
         cb.onRowUpdate(row.id, { status: 'failed', error: e instanceof Error ? e.message : String(e) })
       }

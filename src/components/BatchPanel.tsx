@@ -7,7 +7,7 @@ import { useDraggable } from '../lib/useDraggable'
 import { getStyle } from '../lib/StyleRegistry'
 import { randomSeed } from '../lib/randomSeed'
 import { decodeSeed } from '../lib/seedCodec'
-import { BATCH_MAX_ROWS, canRunBatch, dedupeName, rowSeed, zipEntryName, type BatchJob, type BatchRow } from '../lib/batch/batchJob'
+import { BATCH_MAX_ROWS, canRunBatch, dedupeName, rowRenderedSeed, rowRenderedStyleId, zipEntryName, type BatchJob, type BatchRow } from '../lib/batch/batchJob'
 import { buildBatchZip, createBatchRunner, createCanvasRenderTask } from '../lib/batch/runBatch'
 import { randomId } from '../lib/randomId'
 import Lightbox, { type LightboxItem } from './Lightbox'
@@ -230,6 +230,7 @@ function BatchPanel({ job, setJob, onClose }: BatchPanelProps) {
             return { ...j, rows: [...j.rows, {
               id: randomId(), fileName: file.name, image: img,
               seedOverride: null, status: 'pending', blob: null, objectUrl: null, error: null,
+              renderedSeed: null, renderedStyleId: null,
             }] }
           })
         }
@@ -282,10 +283,11 @@ function BatchPanel({ job, setJob, onClose }: BatchPanelProps) {
     return randomSeed(def, j.baseline.params, j.baseline.textParams)
   }, [baselineDef])
 
-  // 单张下载:与 ZIP 内条目同命名({styleId}_{原名}_{种子}.{ext}),直接落用户目录
+  // 单张下载:与 ZIP 内条目同命名({styleId}_{原名}_{种子}.{ext}),直接落用户目录。
+  // 种子/风格读 done 快照:替换基线或重骰后,旧结果仍按生成时刻的值标注
   const downloadRow = useCallback((row: BatchRow) => {
     if (!row.blob) return
-    const name = zipEntryName(job.baseline.styleId, row.fileName, rowSeed(job, row), blobExt(row.blob))
+    const name = zipEntryName(rowRenderedStyleId(job, row), row.fileName, rowRenderedSeed(job, row), blobExt(row.blob))
     saveBlob(row.blob, name)
   }, [job])
 
@@ -295,7 +297,7 @@ function BatchPanel({ job, setJob, onClose }: BatchPanelProps) {
     // 同图同种子跑两次会撞名,逐条 dedupe(单张下载无 Set,无需处理)
     const taken = new Set<string>()
     const entries = done.map((r) => {
-      const name = dedupeName(zipEntryName(job.baseline.styleId, r.fileName, rowSeed(job, r), blobExt(r.blob!)), taken)
+      const name = dedupeName(zipEntryName(rowRenderedStyleId(job, r), r.fileName, rowRenderedSeed(job, r), blobExt(r.blob!)), taken)
       taken.add(name)
       return { name, blob: r.blob! }
     })
@@ -308,7 +310,7 @@ function BatchPanel({ job, setJob, onClose }: BatchPanelProps) {
   const lightboxItems: LightboxItem[] = useMemo(() => doneRows.map((r) => ({
     objectUrl: r.objectUrl!,
     fileName: r.fileName,
-    seed: rowSeed(job, r),
+    seed: rowRenderedSeed(job, r),
     ext: r.blob ? blobExt(r.blob) : '',
   })), [doneRows, job])
   const doneIdxById = useMemo(() => new Map(doneRows.map((r, i) => [r.id, i])), [doneRows])

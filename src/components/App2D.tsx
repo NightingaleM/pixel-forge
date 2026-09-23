@@ -482,6 +482,8 @@ function App2D() {
         blob: null,
         objectUrl: null,
         error: null,
+        renderedSeed: null,
+        renderedStyleId: null,
       }],
     })
   }, [image, batchJob, activeStyle, params, textParams, currentStyle, makeBaseline])

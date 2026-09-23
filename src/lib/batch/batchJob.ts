@@ -27,6 +27,11 @@ export interface BatchRow {
   blob: Blob | null
   objectUrl: string | null
   error: string | null
+  /** done 时的渲染元数据快照:结果图定格时的种子/风格。非 done 态为 null
+   *  (runBatch 的 processing patch 统一清空)。替换基线/重骰后,旧结果的
+   *  下载命名与灯箱标注仍按生成时刻的种子/风格,而非当前生效值。 */
+  renderedSeed: string | null
+  renderedStyleId: StyleId | null
 }
 
 export interface BatchJob {
@@ -66,6 +71,18 @@ export function resolveRowRenderState(
 
 export function rowSeed(job: BatchJob, row: BatchRow): string {
   return row.seedOverride ?? job.unifiedSeed
+}
+
+/** 行结果的「实际渲染」种子:done 快照优先,无快照(理论上仅 done 前的瞬态)
+ *  回退当前生效种子。下载命名/灯箱标注统一走此入口。 */
+export function rowRenderedSeed(job: BatchJob, row: BatchRow): string {
+  return row.renderedSeed ?? rowSeed(job, row)
+}
+
+/** 行结果的「实际渲染」风格:done 快照优先(跨风格种子解析出的 styleId),
+ *  无快照回退基线风格。ZIP/单张下载的风格前缀统一走此入口。 */
+export function rowRenderedStyleId(job: BatchJob, row: BatchRow): StyleId {
+  return row.renderedStyleId ?? job.baseline.styleId
 }
 
 /** SVG 导出仅对 canvas2d(ASCII)风格有意义;行种子切到 shader 风格时回退 png。 */
