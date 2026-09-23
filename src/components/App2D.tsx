@@ -144,10 +144,13 @@ function App2D() {
   }, [image])
 
   // 首次上传(仅上传页挂载的 ImageUploader 触发,images 必为空):
-  // 1 张走数组但单图行为不变;≥2 张即批量模式,选中第 0 行
+  // 1 张走数组但单图行为不变;≥2 张即批量模式,选中第 0 行。
+  // 首传同样受 20 行上限:multiple 一次选/拖超量时按序截断——[+] 与测试图
+  // 追加路径各有守卫,此处不截会让 strip 计数击穿(如 25/20)且再无回落入口
   const handleImagesLoad = useCallback((imgs: HTMLImageElement[], names: string[]) => {
     if (imgs.length === 0) return
-    setImages(imgs.map((img, i) => makeRow(img, names[i] ?? '')))
+    const capped = imgs.slice(0, BATCH_MAX_ROWS)
+    setImages(capped.map((img, i) => makeRow(img, names[i] ?? '')))
     setSelectedIndex(0)
   }, [])
 
@@ -408,16 +411,6 @@ function App2D() {
     downloadBlob(new Blob([svg], { type: 'image/svg+xml' }), 'svg')
   }, [fontParams, downloadBlob])
 
-  // 主画布 × 的确认回调:单图=退出编辑(v1 语义);批量=关闭批量会话。
-  // 批量下 revoke 全部行的结果 URL 再清数据(T2 尚无处理能力,runner 终止在 T3 上移)
-  const handleClose = useCallback(() => {
-    images.forEach((row) => {
-      if (row.objectUrl) URL.revokeObjectURL(row.objectUrl)
-    })
-    resetSession()
-    setCloseDialog(null)
-  }, [images, resetSession])
-
   // 测试图点击:ImageStrip 只透传 src,由 App2D 按模式分派——
   // 单图(含上传页)= v1 行为加载为唯一图;批量 = 追加为新行(受 20 上限)
   const handleTestImageClick = useCallback(
@@ -599,6 +592,21 @@ function App2D() {
       return null
     })
   }, [])
+
+  // 主画布 × 的确认回调:单图=退出编辑(v1 语义,不触碰 v1 批量面板——v1 关图
+  // 从不连带关批量任务);批量=关闭批量会话。
+  // 批量分支除 revoke images 各行 URL 外还要 closeBatch():过渡期 v1 BatchPanel
+  // 仍可达(单图→批量应用→v1 面板跑起来→strip 追加进批量态),images 清空后若
+  // v1 job 仍在跑就成了确认文案之外的"僵尸任务";setBatchJob(null) 也让面板
+  // 卸载,其卸载 effect 自会 cancel runner。T3 退役 v1 面板后此双模型清理自然消失。
+  const handleClose = useCallback(() => {
+    if (isBatch) closeBatch()
+    images.forEach((row) => {
+      if (row.objectUrl) URL.revokeObjectURL(row.objectUrl)
+    })
+    resetSession()
+    setCloseDialog(null)
+  }, [isBatch, images, resetSession, closeBatch])
 
   return (
     <div className="app-container">
