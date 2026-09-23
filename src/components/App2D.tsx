@@ -490,10 +490,23 @@ function App2D() {
         resetSession()
         return
       }
+      // 独立模式:删的是选中行时,选中会改指另一行(前一行/0),工作副本必须随之
+      // 换装——否则 SeedBar/主画布仍显示已删行的参数,下一次开始处理还会拿陈旧
+      // 工作副本 syncRowSeed 无声覆写新选中行的种子(用户没做任何编辑却丢数据)。
+      // 删非选中行仅平移索引、指向行不变,无需重载;统一模式 base==工作副本同样无虞
+      if (seedMode === 'perImage' && i === selectedIndex) {
+        const def = getStyle(activeStyle)
+        const newRow = next[Math.max(0, selectedIndex - 1)]
+        if (def && newRow) {
+          const w = loadWorking(newRow, batchBase, def)
+          setParams(w.params)
+          setTextParams(w.textParams)
+        }
+      }
       setImages(next)
       setSelectedIndex((s) => (i <= s ? Math.max(0, s - 1) : s))
     },
-    [images, resetSession],
+    [images, resetSession, seedMode, selectedIndex, activeStyle, batchBase],
   )
 
   // ---------------------------------------------------------------------------
@@ -745,6 +758,12 @@ function App2D() {
             prev.length >= BATCH_MAX_ROWS ? prev : [...prev, makeRow(img, testImageName(src))],
           )
         } else {
+          // 替换唯一图前防御性回收旧结果的 objectUrl:单图也能开批量面板跑出 done
+          // 结果,直接丢弃行引用会让该 URL 无人 revoke 而泄漏(批量分支是追加、
+          // 不替换既有行,无需处理)。走 ref 读最新行,避免异步 onload 闭包 stale
+          batchImagesRef.current.forEach((r) => {
+            if (r.objectUrl) URL.revokeObjectURL(r.objectUrl)
+          })
           setImages([makeRow(img, testImageName(src))])
           setSelectedIndex(0)
         }
