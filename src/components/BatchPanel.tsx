@@ -1,14 +1,16 @@
 // src/components/BatchPanel.tsx
-// 批量处理浮动面板:配置 tab(上传/种子策略/格式/开始处理)。
-// 结果 tab 画廊与关闭确认是 Task 7、挂载进 App2D 是 Task 8 —— 当前均留占位。
-import { useCallback, useEffect, useRef, useState } from 'react'
+// 批量处理浮动面板:配置 tab(上传/种子策略/格式/开始处理)+ 结果 tab(画廊/下载/灯箱)。
+// 挂载进 App2D 是 Task 8。
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useDraggable } from '../lib/useDraggable'
 import { getStyle } from '../lib/StyleRegistry'
 import { randomSeed } from '../lib/randomSeed'
 import { decodeSeed } from '../lib/seedCodec'
-import { BATCH_MAX_ROWS, canRunBatch, type BatchJob, type BatchRow } from '../lib/batch/batchJob'
-import { createBatchRunner, createCanvasRenderTask } from '../lib/batch/runBatch'
+import { BATCH_MAX_ROWS, canRunBatch, dedupeName, rowSeed, zipEntryName, type BatchJob, type BatchRow } from '../lib/batch/batchJob'
+import { buildBatchZip, createBatchRunner, createCanvasRenderTask } from '../lib/batch/runBatch'
+import Lightbox, { type LightboxItem } from './Lightbox'
+import ConfirmDialog from './ConfirmDialog'
 
 export interface BatchPanelProps {
   job: BatchJob
@@ -32,6 +34,21 @@ const yieldFrame = () =>
   new Promise<void>((r) =>
     typeof requestAnimationFrame === 'function' ? requestAnimationFrame(() => r()) : setTimeout(r, 0),
   )
+
+// blob MIME → 扩展名。行的实际格式可能与 job.format 不同(effectiveFormat 会按行风格
+// 回退 svg→png),下载命名以 blob 为准,否则回退行会被误存成 .svg。
+const blobExt = (b: Blob): string =>
+  b.type === 'image/svg+xml' ? 'svg' : b.type === 'image/jpeg' ? 'jpg' : 'png'
+
+// 触发浏览器下载:临时 <a> 点击后立即回收 URL(同步生命周期,无需延时兜底)
+function saveBlob(blob: Blob, name: string) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = name
+  a.click()
+  URL.revokeObjectURL(url)
+}
 
 /** 种子码内联编辑:非编辑态 <code> + 骰子;编辑态 input,Enter 提交 / Esc 取消。
  *  校验在组件内做(decodeSeed):非法显示错误且不回调 onApply,父层无需重复校验。
@@ -106,9 +123,13 @@ function BatchPanel({ job, setJob, onClose }: BatchPanelProps) {
     { x: 90, y: 130 }, 'pixel-forge.panelPos.batch.v1',
   )
   const [tab, setTab] = useState<'config' | 'results'>('config')
-  // 处理中点关闭应走确认弹窗(Task 7 接 ConfirmDialog,当前仅保留状态占位)
+  // 处理中点关闭应走确认弹窗;灯箱记录的是"已完成行列表"的序号(非全行序号)
   const [confirmClose, setConfirmClose] = useState(false)
+  const [lightboxIdx, setLightboxIdx] = useState<number | null>(null)
   const runningRef = useRef(false)
+  // 卸载标记:runner.cancel() 单独拦不住 drain 的 while 循环(run 每次进入会重置
+  // cancelled 标志),面板卸载后靠它让循环退出,避免"僵尸批量"继续离屏渲染
+  const aliveRef = useRef(true)
   // 基线在面板创建时定格:批量结果不随主界面后续调参漂移(Task 8 的"替换基线"才更新)
   const runnerRef = useRef(createBatchRunner(createCanvasRenderTask(job.baseline)))
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -117,6 +138,8 @@ function BatchPanel({ job, setJob, onClose }: BatchPanelProps) {
   // SVG 导出只对 canvas2d(ASCII)风格开放,与 effectiveFormat 的回退规则一致
   const isBaselineCanvas2d = baselineDef?.renderMode === 'canvas2d'
   const processingCount = job.rows.filter((r) => r.status === 'processing').length
+  const doneCount = job.rows.filter((r) => r.status === 'done').length
+  const failedCount = job.rows.filter((r) => r.status === 'failed').length
   // runningRef 变化不触发重绘,用行状态兜底:跑首行前的空窗期也能禁用格式切换等操作
   const isRunning = processingCount > 0 || runningRef.current
   const atLimit = job.rows.length >= BATCH_MAX_ROWS
@@ -124,6 +147,17 @@ function BatchPanel({ job, setJob, onClose }: BatchPanelProps) {
   // drain 的 while 循环要读最新 job(setJob 异步提交),用 ref 规避闭包旧值
   const jobRef = useRef(job)
   useEffect(() => { jobRef.current = job }, [job])
+
+  // 卸载即取消:App2D 关闭路径 setJob(null) → 面板卸载 → cancel + aliveRef 双闸停队列。
+  // effect 体里回设 true:StrictMode 开发态双挂载,第二次挂载要复活标记
+  useEffect(() => {
+    const runner = runnerRef.current   // runner 终生不变,拷局部供 cleanup 使用(refs 规约)
+    aliveRef.current = true
+    return () => {
+      aliveRef.current = false
+      runner.cancel()
+    }
+  }, [])
 
   const patchRow = useCallback((id: string, patch: Partial<BatchRow>) => {
     setJob((j) => {
@@ -135,6 +169,9 @@ function BatchPanel({ job, setJob, onClose }: BatchPanelProps) {
   // done 时建 objectUrl、移除/重跑时 revoke —— objectUrl 生命周期统一在此管理
   const updateRow = useCallback((id: string, patch: Partial<BatchRow>) => {
     if (patch.status === 'done' && patch.blob) {
+      // 迟到的 done 更新:行已被移除的话 setJob 对未知 id 是 no-op,
+      // 但 objectUrl 已经创建出来没人 revoke —— 先查行还在不在
+      if (!jobRef.current.rows.some((r) => r.id === id)) return
       patch.objectUrl = URL.createObjectURL(patch.blob)
     }
     patchRow(id, patch)
@@ -146,10 +183,13 @@ function BatchPanel({ job, setJob, onClose }: BatchPanelProps) {
     if (runningRef.current) return
     runningRef.current = true
     try {
+      // 重试/重骰在同一个点击事件里"先 patch 再 drain",jobRef 要等 effect 提交后才
+      // 更新;不让出一帧,首轮就会读到旧快照误判"无待处理"而提前退出(行卡在 pending)
+      await yieldFrame()
       // run 只吃 pending/failed 行;循环直到没有 pending(处理中新追加的行自动续跑)
       while (true) {
         const j = jobRef.current
-        if (!j) break
+        if (!j || !aliveRef.current) break
         // 只盯 pending:failed 行交给结果 tab 的显式"重试",
         // 否则持续失败的行会让本循环无限重跑
         if (!j.rows.some((r) => r.status === 'pending')) break
@@ -201,6 +241,22 @@ function BatchPanel({ job, setJob, onClose }: BatchPanelProps) {
     })
   }, [setJob])
 
+  // 画廊"换效果重跑":随机新种子 → 该行切独立种子(不再跟随统一值)并回到 pending。
+  // 旧 objectUrl 先 revoke 再置 null(patch 同时翻 pending,画廊即刻不再引用该 URL)
+  const rerollRow = useCallback((id: string) => {
+    const j = jobRef.current
+    if (!j || !baselineDef) return
+    const row = j.rows.find((r) => r.id === id)
+    if (!row) return
+    if (row.objectUrl) URL.revokeObjectURL(row.objectUrl)
+    patchRow(id, {
+      seedOverride: randomSeed(baselineDef, j.baseline.params, j.baseline.textParams),
+      status: 'pending', blob: null, objectUrl: null, error: null,
+    })
+    // 串行守卫:已在跑时新 pending 由 while 循环接走,与开始处理同契约
+    if (!runningRef.current) void drain()
+  }, [baselineDef, patchRow, drain])
+
   const randomizeAll = useCallback(() => {
     const j = jobRef.current
     if (!j || !baselineDef) return
@@ -217,6 +273,37 @@ function BatchPanel({ job, setJob, onClose }: BatchPanelProps) {
     if (!def) return j.unifiedSeed   // 风格缺失(理论不可达):退回现值,别让骰子崩面板
     return randomSeed(def, j.baseline.params, j.baseline.textParams)
   }, [baselineDef])
+
+  // 单张下载:与 ZIP 内条目同命名({styleId}_{原名}_{种子}.{ext}),直接落用户目录
+  const downloadRow = useCallback((row: BatchRow) => {
+    if (!row.blob) return
+    const name = zipEntryName(job.baseline.styleId, row.fileName, rowSeed(job, row), blobExt(row.blob))
+    saveBlob(row.blob, name)
+  }, [job])
+
+  const downloadZip = useCallback(async () => {
+    const done = job.rows.filter((r) => r.status === 'done' && r.blob)
+    if (done.length === 0) return
+    // 同图同种子跑两次会撞名,逐条 dedupe(单张下载无 Set,无需处理)
+    const taken = new Set<string>()
+    const entries = done.map((r) => {
+      const name = dedupeName(zipEntryName(job.baseline.styleId, r.fileName, rowSeed(job, r), blobExt(r.blob!)), taken)
+      taken.add(name)
+      return { name, blob: r.blob! }
+    })
+    saveBlob(await buildBatchZip(entries), 'pixel-forge-batch.zip')
+  }, [job])
+
+  // 灯箱只陈列"已完成且有 objectUrl"的行:index 用该列表内的序号(Lightbox 只夹上界,
+  // 负数/越界会取错项);行被重骰/移除时列表收缩,渲染处的 Math.min 再兜一次底
+  const doneRows = useMemo(() => job.rows.filter((r) => r.status === 'done' && r.objectUrl), [job.rows])
+  const lightboxItems: LightboxItem[] = useMemo(() => doneRows.map((r) => ({
+    objectUrl: r.objectUrl!,
+    fileName: r.fileName,
+    seed: rowSeed(job, r),
+    ext: r.blob ? blobExt(r.blob) : '',
+  })), [doneRows, job])
+  const doneIdxById = useMemo(() => new Map(doneRows.map((r, i) => [r.id, i])), [doneRows])
 
   return (
     <div
@@ -300,12 +387,80 @@ function BatchPanel({ job, setJob, onClose }: BatchPanelProps) {
             </button>
           </div>
         ) : (
-          // 结果 tab(画廊/重试/重骰/ZIP 下载)—— Task 7 实现
-          null
+          <div className="batch-results">
+            <div className="batch-progress-row">
+              <div className="batch-progress">
+                <div className="batch-progress-fill" style={{ width: `${job.rows.length ? ((doneCount + failedCount) / job.rows.length) * 100 : 0}%` }} />
+              </div>
+              <span className="batch-progress-label">
+                {t('batch.processing', { done: doneCount + failedCount, total: job.rows.length })}
+                {failedCount > 0 && ` · ${t('batch.failedCount', { n: failedCount })}`}
+              </span>
+            </div>
+            <div className="batch-gallery">
+              {job.rows.map((row) => (
+                <div key={row.id} className={`batch-cell batch-cell--${row.status}`}>
+                  {row.status === 'done' && row.objectUrl ? (
+                    <img src={row.objectUrl} alt={row.fileName} onClick={() => setLightboxIdx(doneIdxById.get(row.id)!)} />
+                  ) : row.status === 'processing' ? (
+                    <div className="batch-spinner" />
+                  ) : row.status === 'failed' ? (
+                    <div className="batch-cell-msg">
+                      <span className="batch-cell-err" title={row.error ?? ''}>{t('batch.retry')}</span>
+                      <button className="batch-icon-btn" title={t('batch.retry')} aria-label={t('batch.retry')}
+                        onClick={() => {
+                          // 先 patch 回 pending 再 drain:drain 循环只认 pending,
+                          // 不 patch 的话 failed 行永远不会被再次处理
+                          patchRow(row.id, { status: 'pending', error: null })
+                          void drain()
+                        }}>
+                        {/* 环形重试箭头 */}
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <path d="M3 12a9 9 0 1 0 3-6.7" />
+                          <path d="M3 4v5h5" />
+                        </svg>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="batch-cell-msg"><span>{t('batch.pending')}</span></div>
+                  )}
+                  {row.status === 'done' && (
+                    <div className="batch-cell-actions">
+                      <button className="batch-icon-btn" title={t('batch.reroll')} aria-label={t('batch.reroll')} onClick={() => rerollRow(row.id)}>{dieIcon}</button>
+                      <button className="batch-icon-btn" title={t('batch.downloadOne')} aria-label={t('batch.downloadOne')} onClick={() => downloadRow(row)}>
+                        {/* 下载箭头 */}
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <path d="M12 3v12" /><path d="M7 10l5 5 5-5" /><path d="M4 19h16" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+            <button className="batch-btn batch-btn--primary" onClick={downloadZip} disabled={doneCount === 0}>
+              {t('batch.downloadZip', { n: doneCount })}
+            </button>
+          </div>
         )}
       </div>
-      {/* 关闭确认弹窗 —— Task 7 接 ConfirmDialog */}
-      {confirmClose && null}
+      {/* 灯箱按"已完成行"打开:格子点击传 done 序号,列表收缩时 clamp 上界 */}
+      {lightboxIdx !== null && lightboxItems.length > 0 && (
+        <Lightbox
+          items={lightboxItems}
+          index={Math.min(lightboxIdx, lightboxItems.length - 1)}
+          onClose={() => setLightboxIdx(null)}
+          onNavigate={setLightboxIdx}
+        />
+      )}
+      {/* 处理中关闭:确认后取消队列再走 onClose(App2D 置 null 卸载面板) */}
+      {confirmClose && (
+        <ConfirmDialog
+          message={t('batch.closeConfirm')}
+          onConfirm={() => { runnerRef.current.cancel(); onClose() }}
+          onCancel={() => setConfirmClose(false)}
+        />
+      )}
     </div>
   )
 }

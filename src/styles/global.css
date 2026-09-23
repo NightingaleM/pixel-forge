@@ -1705,3 +1705,31 @@ body {
 /* 非法种子红框,色值同 .seed-bar-error */
 .batch-seed-input--err { border-color: #c00; }
 .batch-seed-error { color: #c00; font-size: 11px; }
+/* ----- Batch 结果 tab(画廊/进度条) ----- */
+.batch-progress-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.batch-progress { flex: 1; height: 6px; border-radius: 3px; background: rgba(128, 128, 128, 0.25); overflow: hidden; }
+/* 进度填充与主 CTA(.batch-btn--primary)同款绿 */
+.batch-progress-fill { height: 100%; background: #00ff66; transition: width 0.25s; }
+.batch-progress-label { font-size: 11px; white-space: nowrap; }
+.batch-gallery { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; max-height: 320px; overflow-y: auto; margin-bottom: 8px; }
+.batch-cell { position: relative; aspect-ratio: 1; border-radius: 4px; overflow: hidden; background: rgba(128, 128, 128, 0.12); display: flex; align-items: center; justify-content: center; }
+.batch-cell img { width: 100%; height: 100%; object-fit: cover; cursor: zoom-in; }
+.batch-cell-actions { position: absolute; right: 4px; top: 4px; display: flex; gap: 2px; opacity: 0; transition: opacity 0.15s; }
+.batch-cell:hover .batch-cell-actions { opacity: 1; }
+/* 悬停浮层压在缩略图上,深底白图标保证对比 */
+.batch-cell-actions .batch-icon-btn { background: rgba(0, 0, 0, 0.55); color: #fff; }
+.batch-cell-actions .batch-icon-btn:hover { background: rgba(0, 0, 0, 0.75); }
+.batch-cell-msg { font-size: 11px; color: #999; text-align: center; padding: 4px; }
+.batch-cell-err { color: #c00; display: block; margin-bottom: 4px; }
+/* 旋转顶色与 .batch-tab--active 同黑 */
+.batch-spinner { width: 22px; height: 22px; border: 3px solid rgba(128, 128, 128, 0.3); border-top-color: #000; border-radius: 50%; animation: batch-spin 0.9s linear infinite; }
+@keyframes batch-spin { to { transform: rotate(360deg); } }
+/* ----- Batch 灯箱(Lightbox 组件,固定全屏遮罩不随面板主题) ----- */
+.batch-lightbox { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.88); z-index: 1000; display: flex; align-items: center; justify-content: center; }
+.batch-lightbox-stage { max-width: 92vw; max-height: 88vh; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.batch-lightbox-stage img { max-width: 92vw; max-height: 80vh; object-fit: contain; }
+.batch-lightbox-info { color: #ddd; font-size: 12px; }
+.batch-lightbox-close { position: fixed; top: 14px; right: 16px; background: transparent; border: none; color: #ddd; cursor: pointer; padding: 6px; }
+.batch-lightbox-nav { position: fixed; top: 50%; transform: translateY(-50%); background: rgba(0, 0, 0, 0.5); border: none; color: #ddd; cursor: pointer; padding: 10px 8px; }
+.batch-lightbox-nav--prev { left: 8px; }
+.batch-lightbox-nav--next { right: 8px; }
