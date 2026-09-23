@@ -1629,3 +1629,79 @@ body {
   align-items: center;
   gap: 6px;
 }
+
+/* ----- Batch panel (复用 .param-panel 骨架,色值取自 .seed-bar/.action-btn/.param-select 体系) ----- */
+.batch-panel { width: 380px; max-width: calc(100vw - 24px); }
+.batch-tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+.batch-tab {
+  flex: 1;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-family: inherit;
+  border: 1px solid #000;
+  background: #fff;
+  color: #000;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.batch-tab--active { background: #000; color: #fff; }
+.batch-config-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.batch-format { display: flex; align-items: center; gap: 4px; font-size: 12px; }
+.batch-format select {
+  padding: 4px 6px;
+  font-size: 12px;
+  font-family: inherit;
+  border: 1px solid #000;
+  border-radius: 4px;
+  background: #fff;
+  color: #000;
+  cursor: pointer;
+}
+.batch-seed-mode { display: flex; gap: 6px; margin-bottom: 8px; }
+.batch-unified-seed { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 12px; flex-wrap: wrap; }
+.batch-rows { max-height: 260px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
+.batch-row { display: flex; align-items: center; gap: 6px; padding: 4px; border-radius: 4px; }
+.batch-row:hover { background: rgba(0, 0, 0, 0.05); }
+.batch-row-thumb { width: 44px; height: 44px; object-fit: cover; border: 1px solid rgba(0, 0, 0, 0.15); border-radius: 4px; flex-shrink: 0; }
+.batch-row-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.batch-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  font-family: inherit;
+  border: 1px solid #000;
+  border-radius: 4px;
+  background: #fff;
+  color: #000;
+  cursor: pointer;
+}
+/* 主 CTA 与 .action-btn--primary(SVG 导出)同款绿 */
+.batch-btn--primary { width: 100%; background: #00ff66; border: none; color: #000; font-weight: 600; }
+.batch-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.batch-icon-btn { background: transparent; border: none; color: inherit; cursor: pointer; padding: 3px; border-radius: 4px; display: inline-flex; }
+.batch-icon-btn:hover { background: rgba(0, 0, 0, 0.08); }
+.batch-empty { color: #999; font-size: 12px; padding: 18px 0; text-align: center; }
+.batch-limit-hint { font-size: 11px; color: #c00; }
+.batch-seed { display: inline-flex; align-items: center; gap: 4px; min-width: 0; }
+.batch-seed-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  cursor: pointer;
+  user-select: all;
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.batch-seed-input {
+  width: 110px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  padding: 2px 4px;
+  border: 1px solid #000;
+  border-radius: 4px;
+  background: #fff;
+  color: #000;
+}
+/* 非法种子红框,色值同 .seed-bar-error */
+.batch-seed-input--err { border-color: #c00; }
+.batch-seed-error { color: #c00; font-size: 11px; }
