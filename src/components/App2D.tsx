@@ -15,7 +15,7 @@ import { findMatchingBuiltInPreset, resolveBuiltInPreset } from '../lib/builtInP
 import type { BuiltInPresetDefinition, StyleId } from '../types'
 import type { BatchImage, BatchBase } from '../lib/batch/imageList'
 import {
-  rowEffectiveSeed, syncRowSeed, loadWorking, randomizeRowSeed, snapshotTaskSeeds,
+  rowEffectiveSeed, syncRowSeed, loadWorking, randomizeRowSeed, assembleProcessingTasks,
   seedMatchesStyle, blobExt, type BatchFormat,
 } from '../lib/batch/imageList'
 import { BATCH_MAX_ROWS, canRunBatch, dedupeName, zipEntryName } from '../lib/batch/batchJob'
@@ -199,7 +199,6 @@ function App2D() {
       const { activeStyle: snapStyle, base, format: snapFormat, fontParams: snapFonts } = jobInputsRef.current
       const def = getStyle(snapStyle)
       if (!def) return
-      const seeds = new Map(snapshotTaskSeeds(batchImagesRef.current, base, def).map((s) => [s.id, s.seed]))
       // run 只吃 pending 行(重试/重骰都先 patch 回 pending);循环直到没有
       // pending(处理中新追加的行自动续跑)
       while (true) {
@@ -208,9 +207,11 @@ function App2D() {
         const queue = rows.filter((r) => r.status === 'pending')
         if (queue.length === 0) break
         const job: ProcessingJob = {
-          // 行种子按启动快照:中途换基线/换风格不溅射进行中批次;快照外的
+          // 行种子每轮组装时逐行现取(见 assembleProcessingTasks 的 why):drain
+          // 期间被重骰/全部随机改写的行以新种子重跑,不再吃启动时的陈旧 Map;
+          // base/def 仍是启动定格快照,未改写的行取值与快照确定性等价,快照外
           // 新追加行以定格基线编码,与 v1"追加行跟随冻结基线"同口径
-          tasks: queue.map((r) => ({ id: r.id, image: r.image, seed: seeds.get(r.id) ?? rowEffectiveSeed(r, base, def) })),
+          tasks: assembleProcessingTasks(queue, base, def),
           format: snapFormat,
           baseline: { params: { ...base.params }, textParams: { ...base.textParams }, fontParams: snapFonts },
         }

@@ -76,14 +76,17 @@ export function randomizeRowSeed(
   return { ...img, seed: randomSeed(def, base.params, base.textParams, rand) }
 }
 
-/** 开始处理快照:定格每行 effective seed(id 顺序保留)。之后调参只影响
- *  下一次处理,进行中任务不受影响——快照即隔离边界。 */
-export function snapshotTaskSeeds(
-  images: BatchImage[],
+/** drain 单轮任务组装:对给定行「此刻」逐行取生效种子(id/image 顺序保留)。
+ *  why 不能在 drain 外先建一份种子 Map 快照再进循环:drain 运行期间行种子会被
+ *  重骰/「全部随机」改写(改写即回 pending 等下一轮),陈旧 Map 会让改写后的行
+ *  仍按旧种子跑、重跑出同图。base/def 由调用方传入 drain 启动时的定格快照,
+ *  对未改写的行,此刻逐行取值与启动快照确定性等价(不引入新的漂移)。 */
+export function assembleProcessingTasks(
+  rows: BatchImage[],
   base: BatchBase,
   def: StyleDefinition,
-): { id: string; seed: string }[] {
-  return images.map((img) => ({ id: img.id, seed: rowEffectiveSeed(img, base, def) }))
+): { id: string; image: HTMLImageElement; seed: string }[] {
+  return rows.map((r) => ({ id: r.id, image: r.image, seed: rowEffectiveSeed(r, base, def) }))
 }
 
 /** SeedBar 粘贴校验:种子风格与目标一致才放行(批量行不随种子切风格,

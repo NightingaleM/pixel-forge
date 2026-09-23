@@ -4,7 +4,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   rowEffectiveSeed, syncRowSeed, loadWorking, randomizeRowSeed,
-  snapshotTaskSeeds, seedMatchesStyle, blobExt,
+  assembleProcessingTasks, seedMatchesStyle, blobExt,
   type BatchImage, type BatchBase,
 } from './imageList'
 import { getStyle } from '../StyleRegistry'
@@ -139,19 +139,36 @@ describe('randomizeRowSeed', () => {
   })
 })
 
-describe('snapshotTaskSeeds', () => {
-  it('每行 effective seed,id 顺序保留(null 行编码基线,非 null 原样)', () => {
-    const snap = snapshotTaskSeeds(
-      [makeRow({ id: 'a', seed: null }), makeRow({ id: 'b', seed: '0A5' })],
+describe('assembleProcessingTasks', () => {
+  it('逐行 effective seed,id/image 顺序保留(null 行编码基线,非 null 原样)', () => {
+    const imgA = {} as HTMLImageElement
+    const imgB = {} as HTMLImageElement
+    const tasks = assembleProcessingTasks(
+      [makeRow({ id: 'a', image: imgA, seed: null }), makeRow({ id: 'b', image: imgB, seed: '0A5' })],
       base, def,
     )
-    expect(snap).toEqual([
-      { id: 'a', seed: encodeSeed('halftone', base.params, def, base.textParams) },
-      { id: 'b', seed: '0A5' },
+    expect(tasks).toEqual([
+      { id: 'a', image: imgA, seed: encodeSeed('halftone', base.params, def, base.textParams) },
+      { id: 'b', image: imgB, seed: '0A5' },
     ])
   })
+  it('回归:drain 期间行种子被改写后,再次组装取新种子(不用启动时的陈旧快照)', () => {
+    // 场景:drain 首轮跑完 r1 后,用户对 r1 重骰(row.seed 被改写并回 pending),
+    // 下一轮组装必须用新种子,否则重跑出同图
+    const row = makeRow({ id: 'r1', seed: null })
+    const first = assembleProcessingTasks([row], base, def)
+    const rerolled = { ...row, seed: '0B7' }
+    const second = assembleProcessingTasks([rerolled], base, def)
+    expect(second[0].seed).toBe('0B7')
+    expect(second[0].seed).not.toBe(first[0].seed)
+  })
+  it('base/def 定格下对未改写的行确定性等价(同输入两次组装结果相同)', () => {
+    const row = makeRow({ id: 'r1' })
+    expect(assembleProcessingTasks([row], base, def)[0].seed)
+      .toBe(assembleProcessingTasks([row], base, def)[0].seed)
+  })
   it('空列表返回空', () => {
-    expect(snapshotTaskSeeds([], base, def)).toEqual([])
+    expect(assembleProcessingTasks([], base, def)).toEqual([])
   })
 })
 
