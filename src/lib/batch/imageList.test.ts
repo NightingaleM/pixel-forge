@@ -226,9 +226,8 @@ describe('displaySeed', () => {
     expect(displaySeed(makeRow(), 'unified', base, def))
       .toBe(encodeSeed('halftone', base.params, def, base.textParams))
   })
-  it('统一模式:忽略残留的行 seed(统一语义下行恒跟随,残留值容错一律基线码)', () => {
-    expect(displaySeed(makeRow({ seed: '0A5' }), 'unified', base, def))
-      .toBe(encodeSeed('halftone', base.params, def, base.textParams))
+  it('统一模式:重骰残留的行 seed 原样透传(与处理链 assembleProcessingTasks/renderedSeed 消费同值,展示=实际出图种子)', () => {
+    expect(displaySeed(makeRow({ seed: '0A5' }), 'unified', base, def)).toBe('0A5')
   })
   it('独立模式:seed 非 null 原样透传(不校验,校验职责在上游)', () => {
     expect(displaySeed(makeRow({ seed: '0A5' }), 'perImage', base, def)).toBe('0A5')

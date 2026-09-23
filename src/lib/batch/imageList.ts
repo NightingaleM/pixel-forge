@@ -117,10 +117,12 @@ export function blobExt(b: Blob): string {
   return b.type === 'image/svg+xml' ? 'svg' : b.type === 'image/jpeg' ? 'jpg' : 'png'
 }
 
-/** 行种子展示语义(v3):统一模式一律返回基线编码码(统一语义下行 seed 恒为
- *  跟随,残留非 null 值容错忽略);独立模式非 null 行原样透传(不校验,校验在
- *  上游),null 返回 null 由视图层渲染「跟随」短标。与 rowEffectiveSeed 的
- *  区别:后者把 null 编码成基线码供处理任务消费,前者把「跟随」语义保留给 UI。 */
+/** 行种子展示语义(v3):统一模式返回 rowEffectiveSeed——展示当前生效种子,
+ *  行有重骰残留 seed 时透传、否则编码基线;与处理链(assembleProcessingTasks /
+ *  renderedSeed 定格 / ZIP 命名)消费同值,展示=实际出图种子。独立模式非 null
+ *  行原样透传(不校验,校验在上游),null 返回 null 由视图层渲染「跟随」短标。
+ *  与 rowEffectiveSeed 的区别仅在独立模式:后者把 null 编码成基线码供处理任务
+ *  消费,前者把「跟随」语义保留给 UI。 */
 export function displaySeed(
   img: BatchImage,
   mode: 'unified' | 'perImage',
@@ -128,7 +130,7 @@ export function displaySeed(
   def: StyleDefinition,
 ): string | null {
   if (mode === 'perImage') return img.seed
-  return encodeSeed(def.id, base.params, def, base.textParams)
+  return rowEffectiveSeed(img, base, def)
 }
 
 /** 种子码截断:保前缀(版本位+风格位在头部,保前缀即可辨),超出加省略号。 */
