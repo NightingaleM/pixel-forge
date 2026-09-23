@@ -815,9 +815,10 @@ function App2D() {
 
   const handleApplySeed = useCallback((code: string): boolean => {
     if (!image) return false
-    // 批量+独立:行种子限定当前风格,异风格种子拒绝(批量行不随种子切风格,
-    // activeStyle 全局唯一;SeedBar 自带 invalid 提示)。单图/统一保持 v1 语义
-    if (isBatch && seedMode === 'perImage' && !seedMatchesStyle(code, activeStyle)) return false
+    // 批量(任何种子模式):行种子限定当前风格,异风格种子拒绝(批量行不随种子
+    // 切风格,activeStyle 全局唯一;统一模式 base 同样不该被异风格种子切走。
+    // SeedBar 自带 invalid 提示)。单图保持 v1 语义可跨风格
+    if (isBatch && !seedMatchesStyle(code, activeStyle)) return false
     const decoded = decodeSeed(code)
     if (!decoded) return false
     const def = getStyle(decoded.styleId)
