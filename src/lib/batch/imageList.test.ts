@@ -1,0 +1,168 @@
+// src/lib/batch/imageList.test.ts
+// v2 行状态纯逻辑测试:行种子(null=跟随基线)与工作副本的编解码往返、
+// 容错回退、随机与快照。构造方式参考 batchJob.test.ts(halftone 造基线与种子)。
+import { describe, it, expect } from 'vitest'
+import {
+  rowEffectiveSeed, syncRowSeed, loadWorking, randomizeRowSeed,
+  snapshotTaskSeeds, seedMatchesStyle,
+  type BatchImage, type BatchBase,
+} from './imageList'
+import { getStyle } from '../StyleRegistry'
+// 静态 import(describe 回调内的顶层 await import 在 vitest 不合法)
+import { encodeSeed, decodeSeed } from '../seedCodec'
+import { randomSeed } from '../randomSeed'
+
+const def = getStyle('halftone')!
+// 基线含非默认值(uColorMode=0/uShape=2),用于区分「回基线」与「回风格默认」两种兜底
+const base: BatchBase = {
+  params: { uCellSize: 9, uDotScale: 1.2, uColorMode: 0, uAngle: 45, uShape: 2, uHueShift: 30 },
+  textParams: {},
+}
+
+/** 构造最小行:纯逻辑不触达 DOM,image 用空对象顶替(测试环境无 HTMLImageElement)。 */
+function makeRow(overrides: Partial<BatchImage> = {}): BatchImage {
+  return {
+    id: 'r1',
+    fileName: 'cake.jpg',
+    image: {} as HTMLImageElement,
+    seed: null,
+    status: 'pending',
+    blob: null,
+    objectUrl: null,
+    error: null,
+    renderedSeed: null,
+    renderedStyleId: null,
+    ...overrides,
+  }
+}
+
+describe('rowEffectiveSeed', () => {
+  it('seed=null 时按需编码基线', () => {
+    expect(rowEffectiveSeed(makeRow(), base, def))
+      .toBe(encodeSeed('halftone', base.params, def, base.textParams))
+  })
+  it('seed 非 null 时原样返回行种子(不校验,校验职责在上游)', () => {
+    expect(rowEffectiveSeed(makeRow({ seed: '0A5' }), base, def)).toBe('0A5')
+  })
+})
+
+describe('syncRowSeed', () => {
+  it('工作副本编回行种子:seed 恒非 null,decode 往返保留 seedable 值', () => {
+    const working = { params: { ...base.params, uCellSize: 33 }, textParams: {} }
+    const synced = syncRowSeed(makeRow(), def, working)
+    expect(synced.seed).not.toBeNull()
+    const decoded = decodeSeed(synced.seed!)!
+    expect(decoded.styleId).toBe('halftone')
+    expect(decoded.params.uCellSize).toBe(33)
+    expect(decoded.params.uAngle).toBe(45)
+  })
+  it('返回新对象,原行不被改动(React 不可变更新依赖)', () => {
+    const row = makeRow()
+    const synced = syncRowSeed(row, def, { params: {}, textParams: {} })
+    expect(synced).not.toBe(row)
+    expect(row.seed).toBeNull()
+    // 空 working 也合法:encodeSeed 对缺失参数取风格默认
+    expect(decodeSeed(synced.seed!)).not.toBeNull()
+  })
+})
+
+describe('loadWorking', () => {
+  it('seed=null 回基线', () => {
+    const w = loadWorking(makeRow(), base, def)
+    expect(w.params).toEqual(base.params)
+    expect(w.textParams).toEqual(base.textParams)
+  })
+  it('非法 seed 回基线且不抛错', () => {
+    // 版本错/长度不足/非法字符/空串,decodeSeed 一律 null
+    for (const bad of ['zz', '', '0', '9ZZZ']) {
+      const w = loadWorking(makeRow({ seed: bad }), base, def)
+      expect(w.params).toEqual(base.params)
+      expect(w.textParams).toEqual(base.textParams)
+    }
+  })
+  it('有 seed 行解析为工作副本:seedable 项取种子值', () => {
+    const seed = encodeSeed('halftone', { ...base.params, uCellSize: 33 }, def, {})
+    const w = loadWorking(makeRow({ seed }), base, def)
+    expect(w.params.uCellSize).toBe(33)
+    expect(w.params.uAngle).toBe(45)
+  })
+  it('与 handleApplySeed 同 merge 语义:种子不携带项(toggle/select)回风格默认而非基线', () => {
+    // 种子按基线值编码,但 uColorMode/uShape 不参与编码 → 解析后回风格默认 1/0,
+    // 与单图模式粘贴种子的行为一致(不是 v1 resolveRowRenderState 的基线打底)
+    const seed = encodeSeed('halftone', base.params, def, {})
+    const w = loadWorking(makeRow({ seed }), base, def)
+    expect(w.params.uColorMode).toBe(1)
+    expect(w.params.uShape).toBe(0)
+  })
+  it('异风格种子容错解析:不抛错,参数集按传入 def 补齐', () => {
+    // 上游(SeedBar 粘贴校验)会拒绝异风格;此处只保证拿到种子不崩:
+    // popart 专属 uniform 被丢弃,同名 uniform(uHueShift)数值仍可用
+    const seed = encodeSeed('popart', {}, getStyle('popart')!, {})
+    const w = loadWorking(makeRow({ seed }), base, def)
+    expect(w.params).toHaveProperty('uCellSize')
+    expect(w.params).not.toHaveProperty('uSaturation')
+    expect(w.params.uHueShift).toBe(88) // popart 默认值经种子带过来
+  })
+  it('往返:loadWorking(syncRowSeed(working)) 保留 working 的 seedable 键值', () => {
+    // sketch 带 color 档(存于 textParams),覆盖 color 的编码往返
+    const sketchDef = getStyle('sketch')!
+    const working = {
+      params: { uEdgeWidth: 2.5, uSensitivity: 0.5, uDetail: 0.8, uHatchDensity: 6, uEdgeMethod: 0 },
+      textParams: { uBgColor: '#102030', uLineColor: '#ff8800' },
+    }
+    const synced = syncRowSeed(makeRow(), sketchDef, working)
+    const w = loadWorking(synced, { params: {}, textParams: {} }, sketchDef)
+    expect(w).toMatchObject({
+      params: { uEdgeWidth: 2.5, uSensitivity: 0.5, uDetail: 0.8, uHatchDensity: 6 },
+      textParams: { uBgColor: '#102030', uLineColor: '#ff8800' },
+    })
+    // toggle(uHatching)/select(uEdgeMethod)不在种子内 → 回风格默认
+    expect(w.params.uHatching).toBe(0)
+    expect(w.params.uEdgeMethod).toBe(1)
+  })
+})
+
+describe('randomizeRowSeed', () => {
+  it('产出合法种子,与 randomSeed(def, base, rand) 一致,原行不改', () => {
+    const rand = () => 0.42
+    const row = makeRow()
+    const r = randomizeRowSeed(row, def, base, rand)
+    expect(decodeSeed(r.seed!)).not.toBeNull()
+    expect(r.seed).toBe(randomSeed(def, base.params, base.textParams, rand))
+    expect(r).not.toBe(row)
+    expect(row.seed).toBeNull()
+  })
+  it('缺省 rand 可用(默认 Math.random)', () => {
+    const r = randomizeRowSeed(makeRow(), def, base)
+    expect(decodeSeed(r.seed!)).not.toBeNull()
+  })
+})
+
+describe('snapshotTaskSeeds', () => {
+  it('每行 effective seed,id 顺序保留(null 行编码基线,非 null 原样)', () => {
+    const snap = snapshotTaskSeeds(
+      [makeRow({ id: 'a', seed: null }), makeRow({ id: 'b', seed: '0A5' })],
+      base, def,
+    )
+    expect(snap).toEqual([
+      { id: 'a', seed: encodeSeed('halftone', base.params, def, base.textParams) },
+      { id: 'b', seed: '0A5' },
+    ])
+  })
+  it('空列表返回空', () => {
+    expect(snapshotTaskSeeds([], base, def)).toEqual([])
+  })
+})
+
+describe('seedMatchesStyle', () => {
+  it('本风格 true', () => {
+    expect(seedMatchesStyle(encodeSeed('halftone', base.params, def, {}), 'halftone')).toBe(true)
+  })
+  it('异风格 false', () => {
+    expect(seedMatchesStyle(encodeSeed('popart', {}, getStyle('popart')!, {}), 'halftone')).toBe(false)
+  })
+  it('非法种子 false(decode 失败按不匹配处理)', () => {
+    expect(seedMatchesStyle('zz', 'halftone')).toBe(false)
+    expect(seedMatchesStyle('', 'halftone')).toBe(false)
+  })
+})
