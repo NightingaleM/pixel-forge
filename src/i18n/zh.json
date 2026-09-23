@@ -496,6 +496,7 @@
     "tabConfig": "配置",
     "tabResults": "结果",
     "add": "添加图片",
+    "apply": "批量应用",
     "format": "格式",
     "seedModeUnified": "统一种子",
     "seedModePerImage": "每图独立",

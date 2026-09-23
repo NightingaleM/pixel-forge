@@ -496,6 +496,7 @@
     "tabConfig": "Setup",
     "tabResults": "Results",
     "add": "Add images",
+    "apply": "Batch apply",
     "format": "Format",
     "seedModeUnified": "Same seed",
     "seedModePerImage": "Per image",

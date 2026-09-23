@@ -21,6 +21,8 @@ import BuiltInPresetBar from './BuiltInPresetBar'
 import ActionBar from './ActionBar'
 import { CompareSlider } from './CompareSlider'
 import ConfirmDialog from './ConfirmDialog'
+import BatchPanel from './BatchPanel'
+import type { BatchJob, BatchBaseline } from '../lib/batch/batchJob'
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return bytes + ' B'
@@ -438,6 +440,69 @@ function App2D() {
     return `${t(currentStyle.label)} ${p(d.getHours())}:${p(d.getMinutes())}`
   }, [currentStyle, t])
 
+  // ---------------------------------------------------------------------------
+  // Batch（批量处理面板）
+  // ---------------------------------------------------------------------------
+
+  const [batchJob, setBatchJob] = useState<BatchJob | null>(null)
+  const [showBatchReplaceDialog, setShowBatchReplaceDialog] = useState(false)
+
+  // 快照当前完整状态（含 textParams/fontParams——种子不携带这些，批量基线必须补齐）
+  const makeBaseline = useCallback((): BatchBaseline => ({
+    styleId: activeStyle,
+    params: { ...params },
+    textParams: { ...textParams },
+    fontParams: { ...fontParams },
+  }), [activeStyle, params, textParams, fontParams])
+
+  // 批量应用：无图不动作；面板已开走替换确认，未开则以当前图 + 当前状态建新任务。
+  // 「已开」用闭包判断而非 setBatchJob updater 内副作用——StrictMode 会双调 updater，
+  // updater 里 setShowBatchReplaceDialog 会把弹窗状态打两次
+  const handleBatchApply = useCallback(() => {
+    if (!image) return
+    if (batchJob) {
+      setShowBatchReplaceDialog(true)
+      return
+    }
+    const baseline = makeBaseline()
+    const seedCode = encodeSeed(activeStyle, params, currentStyle!, textParams)
+    // 当前图占位名：ImageUploader 不回传文件名；输出名仍有风格+种子可辨识
+    setBatchJob({
+      baseline,
+      unifiedSeed: seedCode,
+      seedMode: 'unified',
+      format: 'png',
+      rows: [{
+        id: crypto.randomUUID(),
+        fileName: 'current.png',
+        image,
+        seedOverride: null,
+        status: 'pending',
+        blob: null,
+        objectUrl: null,
+        error: null,
+      }],
+    })
+  }, [image, batchJob, activeStyle, params, textParams, currentStyle, makeBaseline])
+
+  // 替换基线：面板保留（已生成结果不动），仅换基线与统一种子，重跑后生效
+  const replaceBaseline = useCallback(() => {
+    const baseline = makeBaseline()
+    const seedCode = encodeSeed(activeStyle, params, currentStyle!, textParams)
+    setBatchJob((j) => (j ? { ...j, baseline, unifiedSeed: seedCode } : j))
+    setShowBatchReplaceDialog(false)
+  }, [activeStyle, params, textParams, currentStyle, makeBaseline])
+
+  // 关闭批量：终止 + revoke 全部结果 URL（App2D 是 job 生命周期唯一所有者）
+  const closeBatch = useCallback(() => {
+    setBatchJob((j) => {
+      j?.rows.forEach((r) => {
+        if (r.objectUrl) URL.revokeObjectURL(r.objectUrl)
+      })
+      return null
+    })
+  }, [])
+
   return (
     <div className="app-container">
       <div className="left-sidebar">
@@ -477,6 +542,7 @@ function App2D() {
         renderMode={currentStyle?.renderMode}
         onReset={handleReset}
         onRandom={handleRandom}
+        onBatchApply={handleBatchApply}
         imageInfo={imageInfo}
       />
       {image && currentStyle && (
@@ -528,6 +594,16 @@ function App2D() {
           onApply={handleApplyPreset}
           onDelete={handleDeletePreset}
           onClose={() => setShowPresetPanel(false)}
+        />
+      )}
+      {batchJob && (
+        <BatchPanel job={batchJob} setJob={setBatchJob} onClose={closeBatch} />
+      )}
+      {showBatchReplaceDialog && (
+        <ConfirmDialog
+          message={t('batch.replaceBaseline')}
+          onConfirm={replaceBaseline}
+          onCancel={() => setShowBatchReplaceDialog(false)}
         />
       )}
       {showCloseDialog && (

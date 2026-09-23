@@ -130,8 +130,14 @@ function BatchPanel({ job, setJob, onClose }: BatchPanelProps) {
   // 卸载标记:runner.cancel() 单独拦不住 drain 的 while 循环(run 每次进入会重置
   // cancelled 标志),面板卸载后靠它让循环退出,避免"僵尸批量"继续离屏渲染
   const aliveRef = useRef(true)
-  // 基线在面板创建时定格:批量结果不随主界面后续调参漂移(Task 8 的"替换基线"才更新)
-  const runnerRef = useRef(createBatchRunner(createCanvasRenderTask(job.baseline)))
+  // 基线在面板创建时定格:批量结果不随主界面后续调参漂移(Task 8 的"替换基线"才更新)。
+  // params/textParams 由 run(job) 每轮读最新 job.baseline,但渲染任务闭包捕获的
+  // baseline.fontParams 不会跟着更新——替换基线后须重建任务,否则新字体永远不生效
+  const renderTaskRef = useRef(createCanvasRenderTask(job.baseline))
+  useEffect(() => {
+    renderTaskRef.current = createCanvasRenderTask(job.baseline)
+  }, [job.baseline])
+  const runnerRef = useRef(createBatchRunner((t) => renderTaskRef.current(t)))
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const baselineDef = getStyle(job.baseline.styleId)
@@ -454,11 +460,12 @@ function BatchPanel({ job, setJob, onClose }: BatchPanelProps) {
           onNavigate={setLightboxIdx}
         />
       )}
-      {/* 处理中关闭:确认后取消队列再走 onClose(App2D 置 null 卸载面板) */}
+      {/* 处理中关闭:确认后取消队列再走 onClose(App2D 置 null 卸载面板)。
+          onClose 前同步 aliveRef=false:不等卸载 effect,关掉 drain 复查的亚毫秒竞态窗口 */}
       {confirmClose && (
         <ConfirmDialog
           message={t('batch.closeConfirm')}
-          onConfirm={() => { runnerRef.current.cancel(); onClose() }}
+          onConfirm={() => { runnerRef.current.cancel(); aliveRef.current = false; onClose() }}
           onCancel={() => setConfirmClose(false)}
         />
       )}
