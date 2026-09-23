@@ -169,9 +169,10 @@ function BatchPanel({ job, setJob, onClose }: BatchPanelProps) {
   // done 时建 objectUrl、移除/重跑时 revoke —— objectUrl 生命周期统一在此管理
   const updateRow = useCallback((id: string, patch: Partial<BatchRow>) => {
     if (patch.status === 'done' && patch.blob) {
-      // 迟到的 done 更新:行已被移除的话 setJob 对未知 id 是 no-op,
-      // 但 objectUrl 已经创建出来没人 revoke —— 先查行还在不在
-      if (!jobRef.current.rows.some((r) => r.id === id)) return
+      // 迟到的 done 更新两种来源都要拦:行已被移除(setJob 对未知 id 是 no-op),
+      // 或面板已卸载(确认关闭后 jobRef 的同步 effect 已死、永远停在旧快照,行"看似还在",
+      // 但 patchRow 对 null 同样 no-op)—— 两种情况 objectUrl 建出来都没人 revoke
+      if (!aliveRef.current || !jobRef.current.rows.some((r) => r.id === id)) return
       patch.objectUrl = URL.createObjectURL(patch.blob)
     }
     patchRow(id, patch)
