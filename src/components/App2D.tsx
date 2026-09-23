@@ -425,12 +425,15 @@ function App2D() {
   // 首次上传(仅上传页挂载的 ImageUploader 触发,images 必为空):
   // 1 张走数组但单图行为不变;≥2 张即批量模式,选中第 0 行。
   // 首传同样受 20 行上限:multiple 一次选/拖超量时按序截断——[+] 与测试图
-  // 追加路径各有守卫,此处不截会让 strip 计数击穿(如 25/20)且再无回落入口
+  // 追加路径各有守卫,此处不截会让 strip 计数击穿(如 25/20)且再无回落入口。
+  // v3:首载 ≥2 张自动打开批量浮窗;追加路径([+]/测试图)不碰 showBatchPanel,
+  // 手动关闭后本会话不再自动弹。删到 0 张回上传页再传会再弹(视为新会话)
   const handleImagesLoad = useCallback((imgs: HTMLImageElement[], names: string[]) => {
     if (imgs.length === 0) return
     const capped = imgs.slice(0, BATCH_MAX_ROWS)
     setImages(capped.map((img, i) => makeRow(img, names[i] ?? '')))
     setSelectedIndex(0)
+    if (capped.length >= 2) setShowBatchPanel(true)
   }, [])
 
   // ImageStrip [+] 追加:20 上限双重守卫——入口 slice 截断 + updater 内复查
