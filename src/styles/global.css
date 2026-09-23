@@ -1858,3 +1858,105 @@ body {
 .batch-lightbox-nav { position: fixed; top: 50%; transform: translateY(-50%); background: rgba(0, 0, 0, 0.5); border: none; color: #ddd; cursor: pointer; padding: 10px 8px; }
 .batch-lightbox-nav--prev { left: 8px; }
 .batch-lightbox-nav--next { right: 8px; }
+
+/* --- v3:批量浮窗配置 tab 行列表(只读) --- */
+.batch-rowlist {
+  margin-top: 10px;
+  border: 1px solid #DDD;
+}
+
+.batch-rowlist-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+  background: #F5F5F5;
+  border-bottom: 1px solid #DDD;
+  font-size: 11px;
+  color: #666;
+}
+
+.batch-rowlist-body {
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.batch-rowlist-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-bottom: 1px solid #EEE;
+}
+
+.batch-rowlist-row:last-child {
+  border-bottom: none;
+}
+
+.batch-rowlist-row:hover {
+  background: #F9F9F9;
+}
+
+.batch-rowlist-row--selected {
+  background: #F0F0F0;
+  box-shadow: inset 2px 0 0 #000;
+}
+
+.batch-rowlist-thumb {
+  width: 32px;
+  height: 24px;
+  object-fit: cover;
+  border: 1px solid #CCC;
+  flex-shrink: 0;
+}
+
+/* 状态点:与结果 tab 色系一致(灰/蓝/绿/红) */
+.batch-rowlist-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: #CCC;
+}
+
+.batch-rowlist-dot--processing {
+  background: #2B7CDF;
+  animation: batch-rowlist-blink 0.9s infinite alternate;
+}
+
+.batch-rowlist-dot--done {
+  background: #2FA84F;
+}
+
+.batch-rowlist-dot--failed {
+  background: #E5484D;
+}
+
+@keyframes batch-rowlist-blink {
+  from { opacity: 1; }
+  to { opacity: 0.35; }
+}
+
+.batch-rowlist-seed {
+  flex: 1;
+  min-width: 0;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 10px;
+  color: #333;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: copy;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.batch-rowlist-seed--follow {
+  cursor: default;
+  color: #999;
+  font-style: italic;
+  font-family: inherit;
+}

@@ -519,7 +519,8 @@
     "confirmUnifiedBtn": "切回统一",
     "styleMismatch": "种子码与当前风格不匹配",
     "pending": "待处理",
-    "followBase": "跟随"
+    "followBase": "跟随",
+    "rowListTitle": "图片与种子"
   },
   "seed": {
     "label": "种子",

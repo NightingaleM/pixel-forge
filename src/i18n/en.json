@@ -519,7 +519,8 @@
     "confirmUnifiedBtn": "Use shared seed",
     "styleMismatch": "Seed does not match the current style",
     "pending": "Pending",
-    "followBase": "Follow"
+    "followBase": "Follow",
+    "rowListTitle": "Images & Seeds"
   },
   "seed": {
     "label": "Seed",

@@ -2,13 +2,15 @@
 // v2 批量面板:纯 props 视图。配置 tab(格式/种子模式/全部随机/开始处理)+
 // 结果 tab(进度/画廊/重试/重骰/单张与 ZIP 下载/灯箱)。行状态(images)与队列
 // 调度(runner/drain)的唯一所有者是 App2D,本组件不持业务状态,全部经回调上交。
-// 种子编辑回归主界面 SeedBar(ParamPanel 顶部),面板内不再有种子位与行列表。
+// 种子编辑回归主界面 SeedBar(ParamPanel 顶部);v3 配置 tab 另设只读行列表
+// (缩略图+种子码点击复制+状态点,编辑仍不在面板内)。
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useDraggable } from '../lib/useDraggable'
+import { useCopyFeedback } from '../lib/useCopyFeedback'
 import { getStyle } from '../lib/StyleRegistry'
 import { canRunBatch, type BatchFormat } from '../lib/batch/batchJob'
-import { blobExt, type BatchImage } from '../lib/batch/imageList'
+import { blobExt, type BatchImage, type RowSeedView } from '../lib/batch/imageList'
 import type { StyleId } from '../types'
 import Lightbox, { type LightboxItem } from './Lightbox'
 import ConfirmDialog from './ConfirmDialog'
@@ -18,6 +20,10 @@ export type BatchSeedMode = 'unified' | 'perImage'
 export interface BatchPanelProps {
   /** 行状态全集(含 done 结果),由 App2D 持有;结果 tab 直接按行渲染 */
   images: BatchImage[]
+  /** 当前选中行(行列表高亮;点击行=切换主画布选中,与底部栏同语义) */
+  selectedIndex: number
+  /** 行种子展示视图(App2D 统一计算,id 与 images 对齐):full=null 渲染「跟随」 */
+  seedViews: RowSeedView[]
   seedMode: BatchSeedMode
   format: BatchFormat
   /** svg 选项只对 canvas2d(ASCII)风格开放,与 effectiveFormat 回退规则一致 */
@@ -27,6 +33,8 @@ export interface BatchPanelProps {
   onFormatChange: (f: BatchFormat) => void
   onRandomizeAll: () => void
   onStart: () => void
+  /** 行列表点击行=切换选中(App2D handleSelect,含独立模式懒同步) */
+  onRowSelect: (i: number) => void
   onRetryRow: (id: string) => void
   onRerollRow: (id: string) => void
   onDownloadRow: (img: BatchImage) => void
@@ -47,6 +55,8 @@ const dieIcon = (
 
 function BatchPanel({
   images,
+  selectedIndex,
+  seedViews,
   seedMode,
   format,
   activeStyleId,
@@ -55,6 +65,7 @@ function BatchPanel({
   onFormatChange,
   onRandomizeAll,
   onStart,
+  onRowSelect,
   onRetryRow,
   onRerollRow,
   onDownloadRow,
@@ -62,6 +73,7 @@ function BatchPanel({
   onClose,
 }: BatchPanelProps) {
   const { t } = useTranslation()
+  const { feedback, copy } = useCopyFeedback()
   const { ref: panelRef, pos, onHeaderMouseDown } = useDraggable(
     { x: 90, y: 130 }, 'pixel-forge.panelPos.batch.v1',
   )
@@ -142,6 +154,41 @@ function BatchPanel({
             <button className="batch-btn batch-btn--primary" onClick={() => { setTab('results'); onStart() }} disabled={isRunning || !canRunBatch(images.length)}>
               {t('batch.start', { n: images.length })}
             </button>
+            {/* v3 行列表(只读):缩略图+生效种子+状态点;点击行=切换主画布选中。
+                种子编辑仍集中在主界面 SeedBar(v2 语义),本列表不提供编辑 */}
+            <div className="batch-rowlist">
+              <div className="batch-rowlist-head">
+                <span>{t('batch.rowListTitle')}</span>
+                {/* Task 5 在此加 PresetMenu 入口 */}
+              </div>
+              <div className="batch-rowlist-body">
+                {images.map((row, i) => {
+                  const sv = seedViews.find((v) => v.id === row.id)
+                  return (
+                    <div
+                      key={row.id}
+                      className={`batch-rowlist-row${i === selectedIndex ? ' batch-rowlist-row--selected' : ''}`}
+                      onClick={() => onRowSelect(i)}
+                    >
+                      <img className="batch-rowlist-thumb" src={row.image.src} alt="" aria-hidden="true" />
+                      <span className={`batch-rowlist-dot batch-rowlist-dot--${row.status}`} aria-hidden="true" />
+                      {sv && sv.full !== null ? (
+                        <button
+                          type="button"
+                          className="batch-rowlist-seed"
+                          title={sv.full}
+                          onClick={(e) => { e.stopPropagation(); void copy(row.id, sv.full!) }}
+                        >
+                          {feedback?.id === row.id ? (feedback.ok ? t('seed.copied') : t('seed.copyFailed')) : sv.short}
+                        </button>
+                      ) : (
+                        <span className="batch-rowlist-seed batch-rowlist-seed--follow">{t('batch.followBase')}</span>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
           </div>
         ) : (
           <div className="batch-results">

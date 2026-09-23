@@ -1027,6 +1027,9 @@ function App2D() {
       {showBatchPanel && images.length > 0 && (
         <BatchPanel
           images={images}
+          selectedIndex={selectedIndex}
+          seedViews={rowsSeedView}
+          onRowSelect={handleSelect}
           seedMode={seedMode}
           format={format}
           activeStyleId={activeStyle}
