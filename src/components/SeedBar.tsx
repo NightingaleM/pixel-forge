@@ -84,7 +84,7 @@ export function SeedBar({ seed, onApply, presets, onApplyPreset }: SeedBarProps)
       <code className="seed-bar-code" title={t('seed.hint')} onClick={startEdit}>{seed}</code>
       <button className="seed-bar-btn" onClick={copy}>{copyLabel}</button>
       <button className="seed-bar-btn" onClick={startEdit}>{t('seed.edit')}</button>
-      <div className="seed-bar-preset-anchor">
+      <div className="seed-bar-preset-anchor" data-preset-anchor>
         <button
           className="seed-bar-btn"
           title={t('batch.seedList')}

@@ -169,7 +169,7 @@ function BatchPanel({
             <div className="batch-rowlist">
               <div className="batch-rowlist-head">
                 <span>{t('batch.rowListTitle')}</span>
-                <div className="batch-rowlist-preset-anchor">
+                <div className="batch-rowlist-preset-anchor" data-preset-anchor>
                   <button
                     className="batch-icon-btn"
                     title={t('batch.seedList')}

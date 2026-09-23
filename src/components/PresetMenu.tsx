@@ -2,7 +2,9 @@
 // 种子/配置下拉菜单(v3):数据源复用 localStorage 预设系统(presetStore),
 // 点击=应用该配置(与 PresetPanel 点条目完全同语义,含切风格/整批基线双写),
 // 应用后关闭;不含删除——管理仍在 PresetPanel(单一职责)。锚定入口按钮绝对
-// 定位,点击外部/Esc 关闭。SeedBar 与 BatchPanel 行列表头两处复用。
+// 定位,点击外部/Esc 关闭。锚按钮(data-preset-anchor)不算外部——menu 开着
+// 时点锚走 click toggle 收起,否则 mousedown 先关+click 重开导致永远关不掉。
+// SeedBar 与 BatchPanel 行列表头两处复用。
 import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { getStyle } from '../lib/StyleRegistry'
@@ -28,7 +30,8 @@ export default function PresetMenu({ presets, onApply, onClose }: PresetMenuProp
 
   useEffect(() => {
     const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose()
+      const t = e.target as HTMLElement
+      if (ref.current && !ref.current.contains(t) && !t.closest('[data-preset-anchor]')) onClose()
     }
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
