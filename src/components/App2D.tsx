@@ -6,8 +6,8 @@ import { AsciiCanvasRenderer } from '../lib/AsciiCanvasRenderer'
 import { styles, getStyle, defaultParams, defaultTextParams } from '../lib/StyleRegistry'
 import { encodeSeed, decodeSeed } from '../lib/seedCodec'
 import { findBrightestPoint } from '../lib/brightPoint'
-import { hexToRgb } from '../lib/paramValue'
 import { randomizeParams } from '../lib/randomSeed'
+import { renderImage, exportCanvasBlob, exportJpgWithBlackBg } from '../lib/renderImage'
 import { loadPresets, savePreset, removePreset, mergeWithDefaults, type PresetEntry } from '../lib/presetStore'
 import { findMatchingBuiltInPreset, resolveBuiltInPreset } from '../lib/builtInPreset'
 import type { BuiltInPresetDefinition, StyleId } from '../types'
@@ -59,120 +59,39 @@ function App2D() {
   // Render pipeline
   // ---------------------------------------------------------------------------
 
+  // 渲染薄壳:只做组件层守卫(画布挂载/图片/ASCII 挂载检查),渲染语义全部
+  // 委托 lib/renderImage,供批量队列(Task 4)复用同一份逻辑
   const renderWithStyle = useCallback(
     async (styleId: StyleId, currentParams: Record<string, number>, currentTextParams: Record<string, string>, currentFontParams: Record<string, FontFace | null>) => {
       const canvas = canvasRef.current
       if (!canvas) return
-      const renderer = rendererRef.current
-
       const styleDef = getStyle(styleId)
       if (!styleDef) return
-
-      // ----- canvas2d branch (ASCII) — must return BEFORE the WebGL text-texture block -----
-      // ASCII renders to a SEPARATE canvas (asciiCanvasRef). canvasRef is locked to a WebGL
-      // context by ShaderRenderer, and a single canvas element cannot host both contexts.
+      // ASCII 挂载守卫留在组件层:lib 收到 canvas 即渲染,组件负责确认它真的挂着
+      // (canvasRef 被 ShaderRenderer 锁定 WebGL,ASCII 只能画到独立的 asciiCanvas)
       if (styleDef.renderMode === 'canvas2d') {
-        const aCanvas = asciiCanvasRef.current
         if (!image) {
           console.warn('[ASCII] renderWithStyle skipped: no image')
           return
         }
-        if (!aCanvas) {
+        if (!asciiCanvasRef.current) {
           console.warn('[ASCII] renderWithStyle skipped: asciiCanvas not mounted')
           return
         }
-        if (!asciiRendererRef.current) asciiRendererRef.current = new AsciiCanvasRenderer()
-        const fp = currentFontParams['uFont'] ?? null
-        asciiRendererRef.current.render(aCanvas, image, {
-          charset: currentTextParams['uCharset'] ?? '',
-          caseMode: currentParams['uCaseMode'] ?? 0,
-          // 数值回退与 StyleRegistry ascii 默认保持一致（正常路径 state 必有值，纯防御）
-          charColor: currentTextParams['uCharColor'] ?? '#0af5a7',
-          showBg: currentParams['uShowBg'] ?? 1,
-          charScale: currentParams['uCharScale'] ?? 0.85,
-          cellSize: currentParams['uCellSize'] ?? 14,
-          randomScale: currentParams['uRandomScale'] ?? 0.55,
-          bgFilter: currentParams['uBgFilter'] ?? 0.07,
-        }, fp)
-        return
       }
-      // ----- end canvas2d branch -----
-
-      // shader branch: ASCII already returned; renderer required here
-      if (!renderer) return
-
-      // Handle text params: generate text textures
-      const textTextures: WebGLTexture[] = []
-      const textParamDefs = styleDef.params.filter((p): p is typeof p & { type: 'text' } => p.type === 'text')
-      let atlasCount = 0
-
-      for (const tp of textParamDefs) {
-        const text = currentTextParams[tp.uniform] || tp.textDefault
-        const fontSize = currentParams['uFontSize'] || 24
-        // 图集按码点切字（emoji 算 1 格）且超宽时整体缩放，格数以
-        // loadTextTexture 的实际产出为准——uAtlasCount 必须等于图集真实
-        // 格数，否则 shader 的 atlasU 映射会错位
-        const atlas = renderer.loadTextTexture(text, fontSize)
-        textTextures.push(atlas.texture)
-        atlasCount = atlas.cellCount
-      }
-
-      // Merge atlas count into params
-      const mergedParams = { ...currentParams }
-      if (textTextures.length > 0) {
-        renderer.bindTexture(textTextures[0], 2)
-        mergedParams['uAtlasCount'] = atlasCount
-      }
-
-      // color 参数（色板 hex）拆 R/G/B 并入数字 uniform——shader 端声明 uXxxR/G/B，
-      // 模式同 ParticleEngine 的 3D color 处理。setUniform 对未声明 uniform 静默跳过，
-      // 故 multi-pass 中非 composite pass 自动忽略，无副作用。
-      for (const p of styleDef.params) {
-        if (p.type !== 'color') continue
-        const [r, g, b] = hexToRgb(currentTextParams[p.uniform] ?? p.default)
-        mergedParams[`${p.uniform}R`] = r
-        mergedParams[`${p.uniform}G`] = g
-        mergedParams[`${p.uniform}B`] = b
-      }
-
-      // 体积光自动光源:animelight 开启自动时用检测到的最亮点覆盖光源参数。
-      // 守卫必须用 === 1 而非 !== 0:其他风格(如 kaleidoscope 也有 uCenterX/Y,
-      // 范围 -1..1)的 params 里没有 uGodRayAuto,undefined !== 0 为 true 会跨风格
-      // 污染它们的光源/中心参数。animelight 的 uGodRayAuto 由 defaultParams 与
-      // mergeWithDefaults 保证始终存在,=== 1 判断足够。
-      if (currentParams['uGodRayAuto'] === 1 && brightest) {
-        mergedParams['uCenterX'] = brightest.x
-        mergedParams['uCenterY'] = brightest.y
-      }
-
-      const shaderSources = await Promise.all(styleDef.shaderImports.map((fn) => fn()))
-
-      if (styleDef.isMultiPass && shaderSources.length > 1) {
-        const passes = shaderSources.map((src) => ({
-          fragSource: src,
-          uniforms: { ...mergedParams },
-        }))
-        renderer.renderMultiPass(passes)
-      } else {
-        renderer.useShader(shaderSources[0])
-        // 文字图集采样器指向单元 2：sampler 型 uniform 必须用 uniform1i 赋值
-        // （setUniform 的 uniform1f 路径对其无效，采样器保持默认值 0，会误采
-        // 单元 0 上的原图——textraster 曾因此从未显示过文字）。图集本身已在
-        // 上方 bindTexture(tex, 2) 绑定；每次 useShader 重链接后默认值复位，
-        // 故必须逐帧重新赋值。
-        if (textTextures.length > 0) renderer.setSampler('uCharAtlas', 2)
-        renderer.setUniform('uResolution', [canvas.width, canvas.height])
-        for (const [key, val] of Object.entries(mergedParams)) {
-          renderer.setUniform(key, val)
-        }
-        renderer.render()
-      }
-
-      // Clean up text textures
-      for (const tex of textTextures) {
-        const gl = renderer.getGl()
-        if (gl) gl.deleteTexture(tex)
-      }
+      if (!asciiRendererRef.current) asciiRendererRef.current = new AsciiCanvasRenderer()
+      await renderImage({
+        canvas,
+        asciiCanvas: asciiCanvasRef.current ?? document.createElement('canvas'),
+        renderer: rendererRef.current,
+        asciiRenderer: asciiRendererRef.current,
+        image,
+        styleDef,
+        params: currentParams,
+        textParams: currentTextParams,
+        fontParams: currentFontParams,
+        brightest,
+      })
     },
     [image, brightest],
   )
@@ -369,28 +288,28 @@ function App2D() {
     return styleDef?.renderMode === 'canvas2d' ? asciiCanvasRef.current : canvasRef.current
   }, [activeStyle])
 
-  const handleDownloadPng = useCallback(() => {
-    getExportCanvas()?.toBlob((b) => downloadBlob(b, 'png'), 'image/png')
+  const handleDownloadPng = useCallback(async () => {
+    const src = getExportCanvas()
+    if (!src) return
+    const b = await exportCanvasBlob(src, 'image/png')
+    downloadBlob(b, 'png')
   }, [getExportCanvas, downloadBlob])
 
-  const handleDownloadJpg = useCallback(() => {
+  const handleDownloadJpg = useCallback(async () => {
     // JPG has no alpha: composite onto black if background is off.
     const styleDef = getStyle(activeStyle)
     const showBg = params['uShowBg'] ?? 1
     if (styleDef?.renderMode === 'canvas2d' && showBg !== 1) {
       const src = getExportCanvas()
       if (!src) return
-      const tmp = document.createElement('canvas')
-      tmp.width = src.width; tmp.height = src.height
-      const ctx = tmp.getContext('2d')
-      if (!ctx) return
-      ctx.fillStyle = '#000'
-      ctx.fillRect(0, 0, tmp.width, tmp.height)
-      ctx.drawImage(src, 0, 0)
-      tmp.toBlob((b) => downloadBlob(b, 'jpg'), 'image/jpeg')
+      const b = await exportJpgWithBlackBg(src)
+      downloadBlob(b, 'jpg')
       return
     }
-    getExportCanvas()?.toBlob((b) => downloadBlob(b, 'jpg'), 'image/jpeg')
+    const src = getExportCanvas()
+    if (!src) return
+    const b = await exportCanvasBlob(src, 'image/jpeg')
+    downloadBlob(b, 'jpg')
   }, [activeStyle, params, getExportCanvas, downloadBlob])
 
   const handleDownloadSvg = useCallback(() => {
