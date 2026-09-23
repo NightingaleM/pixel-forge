@@ -9,6 +9,7 @@ import { findBrightestPoint } from '../lib/brightPoint'
 import { randomizeParams } from '../lib/randomSeed'
 import { renderImage, exportCanvasBlob, exportJpgWithBlackBg } from '../lib/renderImage'
 import { loadPresets, savePreset, removePreset, mergeWithDefaults, type PresetEntry } from '../lib/presetStore'
+import { randomId } from '../lib/randomId'
 import { findMatchingBuiltInPreset, resolveBuiltInPreset } from '../lib/builtInPreset'
 import type { BuiltInPresetDefinition, StyleId } from '../types'
 import ImageUploader from './ImageUploader'
@@ -473,7 +474,7 @@ function App2D() {
       seedMode: 'unified',
       format: 'png',
       rows: [{
-        id: crypto.randomUUID(),
+        id: randomId(),
         fileName: 'current.png',
         image,
         seedOverride: null,

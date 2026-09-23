@@ -9,6 +9,7 @@ import { randomSeed } from '../lib/randomSeed'
 import { decodeSeed } from '../lib/seedCodec'
 import { BATCH_MAX_ROWS, canRunBatch, dedupeName, rowSeed, zipEntryName, type BatchJob, type BatchRow } from '../lib/batch/batchJob'
 import { buildBatchZip, createBatchRunner, createCanvasRenderTask } from '../lib/batch/runBatch'
+import { randomId } from '../lib/randomId'
 import Lightbox, { type LightboxItem } from './Lightbox'
 import ConfirmDialog from './ConfirmDialog'
 
@@ -227,7 +228,7 @@ function BatchPanel({ job, setJob, onClose }: BatchPanelProps) {
             if (!j) return j
             if (j.rows.length >= BATCH_MAX_ROWS) return j   // 并发读完可能超限,updater 里再守一次
             return { ...j, rows: [...j.rows, {
-              id: crypto.randomUUID(), fileName: file.name, image: img,
+              id: randomId(), fileName: file.name, image: img,
               seedOverride: null, status: 'pending', blob: null, objectUrl: null, error: null,
             }] }
           })

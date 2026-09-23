@@ -1,6 +1,7 @@
 import type { StyleDefinition, StyleId } from '../types'
 import { styles } from './StyleRegistry'
 import { resolvePresetValues } from './builtInPreset'
+import { randomId } from './randomId'
 
 export interface PresetEntry {
   id: string        // 唯一 id
@@ -71,9 +72,7 @@ export function loadPresets(): PresetEntry[] {
 /** 追加保存；成功返回完整条目，失败（存储不可用/配额满）返回 null。 */
 export function savePreset(input: PresetInput): PresetEntry | null {
   if (!storage) return null
-  const id = (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
-    ? crypto.randomUUID()
-    : `${Date.now()}-${Math.random().toString(36).slice(2)}`
+  const id = randomId()
   const entry: PresetEntry = { ...input, id, createdAt: Date.now() }
   try {
     storage.setItem(STORAGE_KEY, JSON.stringify([entry, ...loadPresets()]))
