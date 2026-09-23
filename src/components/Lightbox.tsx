@@ -16,6 +16,8 @@ function Lightbox({ items, index, onClose, onNavigate }: {
   onNavigate: (index: number) => void
 }) {
   const nav = useCallback((d: number) => {
+    // 空列表时组件虽返回 null 但仍保持挂载,键盘事件仍会触发,直接忽略避免取模得到 NaN
+    if (items.length === 0) return
     onNavigate((index + d + items.length) % items.length)
   }, [index, items.length, onNavigate])
 
