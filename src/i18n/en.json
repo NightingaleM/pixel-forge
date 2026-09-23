@@ -512,6 +512,7 @@
     "closeConfirm": "A job is running. Closing the panel cancels unfinished tasks (images and finished results are kept). Continue?",
     "confirmClose": "Cancel and close",
     "addMore": "Add more",
+    "addMoreHint": "Add more images to batch process",
     "confirmCloseSession": "Closing this batch session removes all images. Continue?",
     "confirmCloseSessionBtn": "Close session",
     "confirmUnified": "Switching to a shared seed discards per-image settings and adopts the current selection as the batch baseline. Continue?",

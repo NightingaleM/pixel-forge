@@ -121,6 +121,8 @@ function BatchPanel({
         </div>
         {tab === 'config' ? (
           <div className="batch-config">
+            {/* 单图开面板(spec 字面:打开并提示可继续追加)——底部栏 [+] 可加图进批量 */}
+            {images.length === 1 && <div className="batch-hint">{t('batch.addMoreHint')}</div>}
             <label className="batch-format">
               {t('batch.format')}
               <select value={format} onChange={(e) => onFormatChange(e.target.value as BatchFormat)} disabled={isRunning}>
@@ -136,7 +138,8 @@ function BatchPanel({
                 onClick={() => onSeedModeChange('perImage')}>{t('batch.seedModePerImage')}</button>
             </div>
             <button className="batch-btn" onClick={onRandomizeAll}>{t('batch.randomizeAll')}</button>
-            <button className="batch-btn batch-btn--primary" onClick={() => { setTab('results'); onStart() }} disabled={!canRunBatch(images.length)}>
+            {/* 运行中禁用:再点开始会以新快照整批重跑,与"等本轮结束再重跑"的既有语义冲突 */}
+            <button className="batch-btn batch-btn--primary" onClick={() => { setTab('results'); onStart() }} disabled={isRunning || !canRunBatch(images.length)}>
               {t('batch.start', { n: images.length })}
             </button>
           </div>

@@ -1735,6 +1735,8 @@ body {
 .batch-tab--active { background: #000; color: #fff; }
 /* v2 配置 tab 纯纵向排布:格式/模式开关/全部随机/开始处理(行列表与种子位已退役) */
 .batch-config { display: flex; flex-direction: column; gap: 8px; }
+/* 单图开批量面板时的追加提示(spec:打开并提示可继续追加) */
+.batch-hint { font-size: 11px; color: #999; text-align: center; }
 .batch-format { display: flex; align-items: center; gap: 4px; font-size: 12px; }
 .batch-format select {
   padding: 4px 6px;

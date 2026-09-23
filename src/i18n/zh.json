@@ -512,6 +512,7 @@
     "closeConfirm": "正在处理中,关闭面板将终止未完成的任务(图片与已完成结果保留)。确定关闭?",
     "confirmClose": "终止并关闭",
     "addMore": "追加图片",
+    "addMoreHint": "再添加图片即可批量处理",
     "confirmCloseSession": "关闭批量会话将移除全部图片,确定关闭?",
     "confirmCloseSessionBtn": "关闭会话",
     "confirmUnified": "切回统一种子将丢弃各图的独立设置,以当前选中状态为整批基线。确定切换?",
