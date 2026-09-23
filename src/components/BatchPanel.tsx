@@ -124,6 +124,8 @@ function BatchPanel({ job, setJob, onClose }: BatchPanelProps) {
     { x: 90, y: 130 }, 'pixel-forge.panelPos.batch.v1',
   )
   const [tab, setTab] = useState<'config' | 'results'>('config')
+  // 最小化:收成标题条只留头部,批量任务后台继续跑;与 ParamPanel/PresetPanel 的折叠 affordance 一致
+  const [collapsed, setCollapsed] = useState(false)
   // 处理中点关闭应走确认弹窗;灯箱记录的是"已完成行列表"的序号(非全行序号)
   const [confirmClose, setConfirmClose] = useState(false)
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null)
@@ -331,10 +333,15 @@ function BatchPanel({ job, setJob, onClose }: BatchPanelProps) {
         <div className="param-panel-title-row">
           <div className="param-panel-title">{t('batch.title')}</div>
           <div className="param-panel-actions">
+            <button className="param-panel-collapse" onClick={() => setCollapsed(c => !c)}>
+              {collapsed ? '▸' : '▾'}
+            </button>
             <button className="param-panel-close" onClick={() => (isRunning ? setConfirmClose(true) : onClose())}>x</button>
           </div>
         </div>
       </div>
+      {/* 折叠时隐藏面板主体(runner/refs 挂在组件层,队列不受影响) */}
+      {!collapsed && (
       <div className="param-panel-body">
         <div className="batch-tabs">
           <button className={`batch-tab ${tab === 'config' ? 'batch-tab--active' : ''}`} onClick={() => setTab('config')}>{t('batch.tabConfig')}</button>
@@ -454,6 +461,7 @@ function BatchPanel({ job, setJob, onClose }: BatchPanelProps) {
           </div>
         )}
       </div>
+      )}
       {/* 灯箱按"已完成行"打开:格子点击传 done 序号,列表收缩时 clamp 上界 */}
       {lightboxIdx !== null && lightboxItems.length > 0 && (
         <Lightbox
