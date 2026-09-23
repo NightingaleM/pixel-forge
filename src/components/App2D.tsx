@@ -16,7 +16,7 @@ import type { BuiltInPresetDefinition, StyleId } from '../types'
 import type { BatchImage, BatchBase } from '../lib/batch/imageList'
 import {
   rowEffectiveSeed, syncRowSeed, loadWorking, randomizeRowSeed, assembleProcessingTasks,
-  isTaskSharedEdit, seedMatchesStyle, blobExt, displaySeed, truncateSeed, type RowSeedView,
+  isTaskSharedEdit, seedMatchesStyle, blobExt, rowDisplaySeed, truncateSeed, type RowSeedView,
   type BatchFormat,
 } from '../lib/batch/imageList'
 import { BATCH_MAX_ROWS, canRunBatch, dedupeName, zipEntryName } from '../lib/batch/batchJob'
@@ -139,6 +139,13 @@ function App2D() {
   const [baseTextParams, setBaseTextParams] = useState<Record<string, string>>(() => defaultTextParams('halftone'))
   const [format, setFormat] = useState<BatchFormat>('png')
   const [showBatchPanel, setShowBatchPanel] = useState(false)
+  // 自动开面板判定(v3.1):图片数跨越到 ≥2(上传页首载 / [+] 追加 / 测试图追加)
+  // 且本会话未手动关闭过面板 → 自动弹出。手动关闭置 dismissed,此后追加不再自动
+  // 弹(避免打扰);会话清空复位——回上传页再建列视为新会话
+  const batchDismissedRef = useRef(false)
+  const maybeAutoOpenBatch = useCallback((prevCount: number, added: number) => {
+    if (prevCount < 2 && prevCount + added >= 2 && !batchDismissedRef.current) setShowBatchPanel(true)
+  }, [])
   // 独立→统一切换的确认弹窗(丢弃全部行种子,以选中行为准)
   const [confirmUnifiedDialog, setConfirmUnifiedDialog] = useState(false)
 
@@ -257,9 +264,11 @@ function App2D() {
     void drain()
   }, [images, selectedIndex, seedMode, activeStyle, params, textParams, drain])
 
-  // 面板关闭(确认后的确定性关闭):终止队列 + 收面板,不清图片与已完成结果
+  // 面板关闭(确认后的确定性关闭):终止队列 + 收面板,不清图片与已完成结果;
+  // 手动关闭视为"本会话不再自动弹"的意愿表达
   const closeBatchPanel = useCallback(() => {
     stopBatch()
+    batchDismissedRef.current = true
     setShowBatchPanel(false)
   }, [stopBatch])
 
@@ -434,21 +443,27 @@ function App2D() {
     const capped = imgs.slice(0, BATCH_MAX_ROWS)
     setImages(capped.map((img, i) => makeRow(img, names[i] ?? '')))
     setSelectedIndex(0)
-    if (capped.length >= 2) setShowBatchPanel(true)
-  }, [])
+    maybeAutoOpenBatch(0, capped.length)
+  }, [maybeAutoOpenBatch])
 
   // ImageStrip [+] 追加:20 上限双重守卫——入口 slice 截断 + updater 内复查
-  // (异步解码落定时会话可能已被关闭或填满)
+  // (异步解码落定时会话可能已被关闭或填满)。v3.1:上传页也能直接用底部 [+]
+  // 选图建列,追加跨越到 ≥2 张同样走自动开面板判定(此前只有拖入上传页才弹)
   const handleAddFiles = useCallback((files: FileList | File[]) => {
     void readImageFiles(files).then((loaded) => {
       if (loaded.length === 0) return
-      setImages((prev) => {
-        const room = BATCH_MAX_ROWS - prev.length
-        if (room <= 0) return prev
-        return [...prev, ...loaded.slice(0, room).map((l) => makeRow(l.image, l.name))]
+      // batchImagesRef 是已提交镜像,此刻(setImages 异步提交前)读到的正是
+      // "追加前"数量
+      const prev = batchImagesRef.current.length
+      setImages((prevImages) => {
+        const room = BATCH_MAX_ROWS - prevImages.length
+        if (room <= 0) return prevImages
+        return [...prevImages, ...loaded.slice(0, room).map((l) => makeRow(l.image, l.name))]
       })
+      const room = Math.max(0, BATCH_MAX_ROWS - prev)
+      maybeAutoOpenBatch(prev, Math.min(loaded.length, room))
     })
-  }, [])
+  }, [maybeAutoOpenBatch])
 
   // 切换选中行:统一模式参数全行共享,只改 selectedIndex,渲染 effect 依赖派生
   // image 自然重绘;独立模式走懒同步——旧行工作副本编回行种子,新行种子解析载入
@@ -474,6 +489,8 @@ function App2D() {
   // 批量队列一并终止(删到 0 张也走此清场,面板收起避免空画廊残留)
   const resetSession = useCallback(() => {
     stopBatch()
+    // 会话清空 = 新会话:自动开面板判定恢复初始(回上传页再建列会再弹)
+    batchDismissedRef.current = false
     setImages([])
     setSelectedIndex(0)
     setCompareMode(false)
@@ -770,9 +787,11 @@ function App2D() {
       img.crossOrigin = 'anonymous'
       img.onload = () => {
         if (isBatch) {
-          setImages((prev) =>
-            prev.length >= BATCH_MAX_ROWS ? prev : [...prev, makeRow(img, testImageName(src))],
+          const prev = batchImagesRef.current.length
+          setImages((prevImgs) =>
+            prevImgs.length >= BATCH_MAX_ROWS ? prevImgs : [...prevImgs, makeRow(img, testImageName(src))],
           )
+          if (prev < BATCH_MAX_ROWS) maybeAutoOpenBatch(prev, 1)
         } else {
           // 替换唯一图前防御性回收旧结果的 objectUrl:单图也能开批量面板跑出 done
           // 结果,直接丢弃行引用会让该 URL 无人 revoke 而泄漏(批量分支是追加、
@@ -786,7 +805,7 @@ function App2D() {
       }
       img.src = src
     },
-    [isBatch],
+    [isBatch, maybeAutoOpenBatch],
   )
 
   const testImages = [
@@ -801,13 +820,15 @@ function App2D() {
 
   const currentStyle = getStyle(activeStyle)
 
-  // 行种子展示视图(v3):displaySeed 统一计算,底部栏种子条与批量浮窗行列表
-  // 共用同一份(TASK 共享消费),两处显示永不漂移。full=null ⇔ 「跟随」短标
-  const rowsSeedView: RowSeedView[] = useMemo(() => images.map((row) => {
+  // 行种子展示视图(v3):底部栏种子条与批量浮窗行列表共用同一份(TASK 共享
+  // 消费),两处显示永不漂移。独立模式选中行 = 工作副本实时编码(编辑即所见,
+  // 与 SeedBar 顶码同源,不等懒同步点);其余行走 displaySeed(统一:基线/重骰
+  // 残留透传;独立:行码或「跟随」)。full=null ⇔ 「跟随」短标
+  const rowsSeedView: RowSeedView[] = useMemo(() => images.map((row, i) => {
     if (!currentStyle) return { id: row.id, full: null, short: null }
-    const full = displaySeed(row, seedMode, batchBase, currentStyle)
+    const full = rowDisplaySeed(row, i === selectedIndex, { params, textParams }, seedMode, batchBase, currentStyle)
     return { id: row.id, full, short: full === null ? null : truncateSeed(full) }
-  }), [images, seedMode, batchBase, currentStyle])
+  }), [images, selectedIndex, params, textParams, seedMode, batchBase, currentStyle])
 
   const activeBuiltInPresetId = useMemo(
     () => currentStyle ? findMatchingBuiltInPreset(currentStyle, params, textParams) : null,

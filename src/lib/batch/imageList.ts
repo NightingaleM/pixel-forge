@@ -133,6 +133,24 @@ export function displaySeed(
   return rowEffectiveSeed(img, base, def)
 }
 
+/** 行种子展示(v3.1 修正):独立模式**选中行**返回工作副本的实时编码——与主界面
+ *  SeedBar 顶码同源,编辑参数即所见(行列表/种子条立刻跟上),不等懒同步点(切行/
+ *  开始处理)编回;null 行选中时同样显示实时码(工作副本即该行当前状态)。其余
+ *  情形(独立模式未选中行、统一模式)回退 displaySeed 语义。 */
+export function rowDisplaySeed(
+  row: BatchImage,
+  isSelected: boolean,
+  working: { params: Record<string, number>; textParams: Record<string, string> },
+  mode: 'unified' | 'perImage',
+  base: BatchBase,
+  def: StyleDefinition,
+): string | null {
+  if (mode === 'perImage' && isSelected) {
+    return encodeSeed(def.id, working.params, def, working.textParams)
+  }
+  return displaySeed(row, mode, base, def)
+}
+
 /** 种子码截断:保前缀(版本位+风格位在头部,保前缀即可辨),超出加省略号。 */
 export function truncateSeed(code: string, keep = 7): string {
   return code.length <= keep ? code : code.slice(0, keep) + '…'

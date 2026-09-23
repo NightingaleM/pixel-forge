@@ -5,7 +5,7 @@ import { describe, it, expect } from 'vitest'
 import {
   rowEffectiveSeed, syncRowSeed, loadWorking, randomizeRowSeed,
   assembleProcessingTasks, isTaskSharedEdit, seedMatchesStyle, blobExt,
-  displaySeed, truncateSeed,
+  displaySeed, rowDisplaySeed, truncateSeed,
   type BatchImage, type BatchBase,
 } from './imageList'
 import { getStyle } from '../StyleRegistry'
@@ -234,6 +234,25 @@ describe('displaySeed', () => {
   })
   it('独立模式:seed=null 返回 null(视图层渲染「跟随」短标)', () => {
     expect(displaySeed(makeRow(), 'perImage', base, def)).toBeNull()
+  })
+})
+
+describe('rowDisplaySeed', () => {
+  const working = { params: { ...base.params, uCellSize: 33 }, textParams: {} }
+  it('独立模式选中行:工作副本实时编码(编辑即所见,不等懒同步点)', () => {
+    expect(rowDisplaySeed(makeRow(), true, working, 'perImage', base, def))
+      .toBe(encodeSeed('halftone', working.params, def, working.textParams))
+  })
+  it('独立模式选中行 seed=null 也显示实时码(工作副本即该行当前状态,与 SeedBar 同源)', () => {
+    expect(rowDisplaySeed(makeRow(), true, working, 'perImage', base, def))
+      .toBe(encodeSeed('halftone', working.params, def, working.textParams))
+  })
+  it('独立模式未选中行:行种子透传(null → null 渲染「跟随」)', () => {
+    expect(rowDisplaySeed(makeRow({ seed: '0A5' }), false, working, 'perImage', base, def)).toBe('0A5')
+    expect(rowDisplaySeed(makeRow(), false, working, 'perImage', base, def)).toBeNull()
+  })
+  it('统一模式不受选中影响:与 displaySeed 同值(重骰残留透传)', () => {
+    expect(rowDisplaySeed(makeRow({ seed: '0A5' }), true, working, 'unified', base, def)).toBe('0A5')
   })
 })
 
