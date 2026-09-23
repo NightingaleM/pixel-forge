@@ -793,18 +793,26 @@ body {
   color: #FFF;
 }
 
-/* --- Test Images Bar --- */
+/* --- Image Strip（底部多图栏，v2 替代 test-images-bar） --- */
 
-.test-images-bar {
+.image-strip {
   display: flex;
+  align-items: center;
   gap: 8px;
   padding: 8px;
   border-top: 1px solid #000;
   background: #FFF;
   flex-shrink: 0;
+  overflow-x: auto;
 }
 
-.test-image-thumb {
+.image-strip-cell {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.image-strip-thumb {
+  display: block;
   width: 80px;
   height: 56px;
   object-fit: cover;
@@ -813,8 +821,88 @@ body {
   transition: border-color 0.1s ease;
 }
 
-.test-image-thumb:hover {
+.image-strip-thumb:hover {
   border-color: #000;
+}
+
+/* 选中高亮：外描边不占布局（改边框宽度会推动横向滚动条抖动） */
+.image-strip-cell--selected .image-strip-thumb {
+  border-color: #000;
+  outline: 2px solid #000;
+}
+
+/* hover 移除钮：缩略图右上角小方块，× 为内联 SVG（禁 emoji） */
+.image-strip-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  background: #FFF;
+  color: #000;
+  border: 1px solid #000;
+  border-radius: 0;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.image-strip-cell:hover .image-strip-remove {
+  display: flex;
+}
+
+.image-strip-remove:hover {
+  background: #000;
+  color: #FFF;
+}
+
+/* [+] 追加钮：虚线框示意"可添加"，与上传区同语义 */
+.image-strip-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  background: #FFF;
+  color: #000;
+  border: 1px dashed #999;
+  border-radius: 0;
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 0.1s ease;
+}
+
+.image-strip-add:hover:not(:disabled) {
+  border-color: #000;
+}
+
+.image-strip-add:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.image-strip-count {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: #666;
+}
+
+/* 上传图与测试图之间的分隔线 */
+.image-strip-divider {
+  flex-shrink: 0;
+  width: 1px;
+  height: 40px;
+  background: #CCC;
+}
+
+/* 批量模式：测试图虚线边框，示意点击是"追加新行"而非"替换当前图" */
+.image-strip--batch .image-strip-thumb--test {
+  border-style: dashed;
 }
 
 /* --- Confirm Dialog --- */

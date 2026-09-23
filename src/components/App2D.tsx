@@ -10,9 +10,12 @@ import { randomizeParams } from '../lib/randomSeed'
 import { renderImage, exportCanvasBlob, exportJpgWithBlackBg } from '../lib/renderImage'
 import { loadPresets, savePreset, removePreset, mergeWithDefaults, type PresetEntry } from '../lib/presetStore'
 import { randomId } from '../lib/randomId'
+import { readImageFiles } from '../lib/readImageFiles'
 import { findMatchingBuiltInPreset, resolveBuiltInPreset } from '../lib/builtInPreset'
 import type { BuiltInPresetDefinition, StyleId } from '../types'
+import type { BatchImage } from '../lib/batch/imageList'
 import ImageUploader from './ImageUploader'
+import ImageStrip from './ImageStrip'
 import StyleSelector from './StyleSelector'
 import ParamPanel from './ParamPanel'
 import PresetBar from './PresetBar'
@@ -23,7 +26,7 @@ import ActionBar from './ActionBar'
 import { CompareSlider } from './CompareSlider'
 import ConfirmDialog from './ConfirmDialog'
 import BatchPanel from './BatchPanel'
-import type { BatchJob, BatchBaseline } from '../lib/batch/batchJob'
+import { BATCH_MAX_ROWS, type BatchJob, type BatchBaseline } from '../lib/batch/batchJob'
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return bytes + ' B'
@@ -31,17 +34,46 @@ function formatFileSize(bytes: number): string {
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
 }
 
+// 新建批量图片行(v2 状态从 BatchJob 上移 App2D,上传即建行):
+// seed=null 跟随整批基线;blob/objectUrl 等处理字段留空(T2 尚无处理能力,T3/T4 写入)
+function makeRow(image: HTMLImageElement, fileName: string): BatchImage {
+  return {
+    id: randomId(),
+    fileName,
+    image,
+    seed: null,
+    status: 'pending',
+    blob: null,
+    objectUrl: null,
+    error: null,
+    renderedSeed: null,
+    renderedStyleId: null,
+  }
+}
+
+// 测试图行名:从 /local_test_pic/cake.jpg 一类路径取末段,批量输出命名可辨识
+function testImageName(src: string): string {
+  return src.split('/').pop() || 'test-image'
+}
+
 function App2D() {
   const { t } = useTranslation()
-  const [image, setImage] = useState<HTMLImageElement | null>(null)
+  // 多图地基(v2):行状态唯一所有者是 App2D。0 张=上传页,1 张=单图模式(零回归,
+  // 既有 handler 语义不变),≥2 张=批量模式(主画布渲染选中行)。
+  // 派生 image 替代 v1 的独立 image state:渲染 effect / brightest 检测 / CompareSlider
+  // 均消费派生值,切行(统一模式只改 selectedIndex)即自然重绘与重检测。
+  const [images, setImages] = useState<BatchImage[]>([])
+  const [selectedIndex, setSelectedIndex] = useState(0)
+  const image = images[selectedIndex]?.image ?? null
+  const isBatch = images.length > 1
   const [activeStyle, setActiveStyle] = useState<StyleId>('halftone')
   const [params, setParams] = useState<Record<string, number>>(() => defaultParams('halftone'))
   const [textParams, setTextParams] = useState<Record<string, string>>(() => defaultTextParams('halftone'))
   const [compareMode, setCompareMode] = useState(false)
-  const [imageInfo, setImageInfo] = useState<{ width: number; height: number; size: string } | null>(null)
   // 体积光自动光源:图片最亮点的 UV 坐标(检测失败为 null)
   const [brightest, setBrightest] = useState<{ x: number; y: number } | null>(null)
-  const [showCloseDialog, setShowCloseDialog] = useState(false)
+  // 主画布 × 的关闭确认:单图=v1 退出确认;批量=批量会话关闭确认(清全部图片)
+  const [closeDialog, setCloseDialog] = useState<'single' | 'batch' | null>(null)
   // 本地预设（localStorage 持久化，见 lib/presetStore）
   const [presets, setPresets] = useState<PresetEntry[]>(() => loadPresets())
   const [showPresetPanel, setShowPresetPanel] = useState(false)
@@ -100,19 +132,73 @@ function App2D() {
   )
 
   // ---------------------------------------------------------------------------
-  // Image load handler
+  // Multi-image session handlers(v2 地基;≤1 张时语义与 v1 单图一致)
   // ---------------------------------------------------------------------------
 
-  const handleImageLoad = useCallback(
-    (img: HTMLImageElement) => {
-      setImage(img)
-      setImageInfo({
-        width: img.naturalWidth || img.width,
-        height: img.naturalHeight || img.height,
-        size: formatFileSize(Math.round((img.naturalWidth || img.width) * (img.naturalHeight || img.height) * 4 / 1024) * 1024),
+  // 尺寸/体积信息改为派生值:天然跟随选中行,切行/换图自动刷新,不再随 load 手动同步
+  const imageInfo = useMemo(() => {
+    if (!image) return null
+    const w = image.naturalWidth || image.width
+    const h = image.naturalHeight || image.height
+    return { width: w, height: h, size: formatFileSize(Math.round(w * h * 4 / 1024) * 1024) }
+  }, [image])
+
+  // 首次上传(仅上传页挂载的 ImageUploader 触发,images 必为空):
+  // 1 张走数组但单图行为不变;≥2 张即批量模式,选中第 0 行
+  const handleImagesLoad = useCallback((imgs: HTMLImageElement[], names: string[]) => {
+    if (imgs.length === 0) return
+    setImages(imgs.map((img, i) => makeRow(img, names[i] ?? '')))
+    setSelectedIndex(0)
+  }, [])
+
+  // ImageStrip [+] 追加:20 上限双重守卫——入口 slice 截断 + updater 内复查
+  // (异步解码落定时会话可能已被关闭或填满)
+  const handleAddFiles = useCallback((files: FileList | File[]) => {
+    void readImageFiles(files).then((loaded) => {
+      if (loaded.length === 0) return
+      setImages((prev) => {
+        const room = BATCH_MAX_ROWS - prev.length
+        if (room <= 0) return prev
+        return [...prev, ...loaded.slice(0, room).map((l) => makeRow(l.image, l.name))]
       })
+    })
+  }, [])
+
+  // 切换选中行(T2 统一模式语义):参数全行共享,只改 selectedIndex,
+  // 渲染 effect 依赖派生 image 自然重绘;独立模式的懒同步回写在 T3
+  const handleSelect = useCallback((i: number) => {
+    setSelectedIndex(i)
+  }, [])
+
+  // 清空会话回上传页:画布随 CompareSlider 卸载,renderer 绑定的 WebGL 上下文
+  // 必须销毁,否则再上传时 loadImage 仍画向已脱离 DOM 的旧 canvas
+  const resetSession = useCallback(() => {
+    setImages([])
+    setSelectedIndex(0)
+    setCompareMode(false)
+    if (rendererRef.current) {
+      rendererRef.current.destroy()
+      rendererRef.current = null
+    }
+  }, [])
+
+  // 移除单行:revoke 该行结果 URL;删选中行 → 选中指向前一行(或 0),
+  // 删选中行之前的行 → 索引左移一位保持指向原行;剩 1 张自然退化单图;
+  // 删到 0 张走会话清空(销毁 renderer)
+  const handleRemove = useCallback(
+    (i: number) => {
+      const row = images[i]
+      if (!row) return
+      if (row.objectUrl) URL.revokeObjectURL(row.objectUrl)
+      const next = images.filter((_, idx) => idx !== i)
+      if (next.length === 0) {
+        resetSession()
+        return
+      }
+      setImages(next)
+      setSelectedIndex((s) => (i <= s ? Math.max(0, s - 1) : s))
     },
-    [],
+    [images, resetSession],
   )
 
   // ---------------------------------------------------------------------------
@@ -322,27 +408,35 @@ function App2D() {
     downloadBlob(new Blob([svg], { type: 'image/svg+xml' }), 'svg')
   }, [fontParams, downloadBlob])
 
+  // 主画布 × 的确认回调:单图=退出编辑(v1 语义);批量=关闭批量会话。
+  // 批量下 revoke 全部行的结果 URL 再清数据(T2 尚无处理能力,runner 终止在 T3 上移)
   const handleClose = useCallback(() => {
-    setImage(null)
-    setImageInfo(null)
-    setCompareMode(false)
-    setShowCloseDialog(false)
-    if (rendererRef.current) {
-      rendererRef.current.destroy()
-      rendererRef.current = null
-    }
-  }, [])
+    images.forEach((row) => {
+      if (row.objectUrl) URL.revokeObjectURL(row.objectUrl)
+    })
+    resetSession()
+    setCloseDialog(null)
+  }, [images, resetSession])
 
+  // 测试图点击:ImageStrip 只透传 src,由 App2D 按模式分派——
+  // 单图(含上传页)= v1 行为加载为唯一图;批量 = 追加为新行(受 20 上限)
   const handleTestImageClick = useCallback(
     (src: string) => {
       const img = new Image()
       img.crossOrigin = 'anonymous'
       img.onload = () => {
-        handleImageLoad(img)
+        if (isBatch) {
+          setImages((prev) =>
+            prev.length >= BATCH_MAX_ROWS ? prev : [...prev, makeRow(img, testImageName(src))],
+          )
+        } else {
+          setImages([makeRow(img, testImageName(src))])
+          setSelectedIndex(0)
+        }
       }
       img.src = src
     },
-    [handleImageLoad],
+    [isBatch],
   )
 
   const testImages = [
@@ -467,7 +561,7 @@ function App2D() {
     }
     const baseline = makeBaseline()
     const seedCode = encodeSeed(activeStyle, params, currentStyle!, textParams)
-    // 当前图占位名：ImageUploader 不回传文件名；输出名仍有风格+种子可辨识
+    // v2 起上传回传文件名,批量占位行用选中行真名(测试图/异常回落占位名)
     setBatchJob({
       baseline,
       unifiedSeed: seedCode,
@@ -475,7 +569,7 @@ function App2D() {
       format: 'png',
       rows: [{
         id: randomId(),
-        fileName: 'current.png',
+        fileName: images[selectedIndex]?.fileName ?? 'current.png',
         image,
         seedOverride: null,
         status: 'pending',
@@ -486,7 +580,7 @@ function App2D() {
         renderedStyleId: null,
       }],
     })
-  }, [image, batchJob, activeStyle, params, textParams, currentStyle, makeBaseline])
+  }, [image, images, selectedIndex, batchJob, activeStyle, params, textParams, currentStyle, makeBaseline])
 
   // 替换基线：面板保留（已生成结果不动），仅换基线与统一种子，重跑后生效
   const replaceBaseline = useCallback(() => {
@@ -521,22 +615,23 @@ function App2D() {
             originalImage={image}
             compareMode={compareMode}
             onToggleCompare={() => setCompareMode((prev) => !prev)}
-            onClose={() => setShowCloseDialog(true)}
+            onClose={() => setCloseDialog(isBatch ? 'batch' : 'single')}
           />
         ) : (
-          <ImageUploader onImageLoad={handleImageLoad} />
+          <ImageUploader onImagesLoad={handleImagesLoad} />
         )}
-        <div className="test-images-bar">
-          {testImages.map((ti) => (
-            <img
-              key={ti.label}
-              className="test-image-thumb"
-              src={ti.src}
-              alt={ti.label}
-              onClick={() => handleTestImageClick(ti.src)}
-            />
-          ))}
-        </div>
+        {/* 底部多图栏(v2 替代 test-images-bar):0 张时仅测试图,1 张单图态,≥2 张批量态 */}
+        <ImageStrip
+          images={images}
+          selectedIndex={selectedIndex}
+          mode={isBatch ? 'batch' : 'single'}
+          atLimit={images.length >= BATCH_MAX_ROWS}
+          onSelect={handleSelect}
+          onRemove={handleRemove}
+          onAddFiles={handleAddFiles}
+          testImages={testImages}
+          onTestImage={handleTestImageClick}
+        />
       </div>
       <ActionBar
         onDownloadPng={handleDownloadPng}
@@ -610,11 +705,13 @@ function App2D() {
           onCancel={() => setShowBatchReplaceDialog(false)}
         />
       )}
-      {showCloseDialog && (
+      {/* 主画布 ×:单图=v1 退出确认(确认钮回落 confirmExitBtn);批量=会话关闭确认 */}
+      {closeDialog && (
         <ConfirmDialog
-          message={t('app2d.confirmExit')}
+          message={closeDialog === 'batch' ? t('batch.confirmCloseSession') : t('app2d.confirmExit')}
+          confirmLabel={closeDialog === 'batch' ? t('batch.confirmCloseSessionBtn') : undefined}
           onConfirm={handleClose}
-          onCancel={() => setShowCloseDialog(false)}
+          onCancel={() => setCloseDialog(null)}
         />
       )}
     </div>
