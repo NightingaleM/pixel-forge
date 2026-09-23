@@ -14,6 +14,8 @@ import { blobExt, type BatchImage, type RowSeedView } from '../lib/batch/imageLi
 import type { StyleId } from '../types'
 import Lightbox, { type LightboxItem } from './Lightbox'
 import ConfirmDialog from './ConfirmDialog'
+import PresetMenu, { presetListIcon } from './PresetMenu'
+import type { PresetEntry } from '../lib/presetStore'
 
 export type BatchSeedMode = 'unified' | 'perImage'
 
@@ -35,6 +37,10 @@ export interface BatchPanelProps {
   onStart: () => void
   /** 行列表点击行=切换选中(App2D handleSelect,含独立模式懒同步) */
   onRowSelect: (i: number) => void
+  /** 已保存配置(种子列表数据源,App2D presets) */
+  presets: PresetEntry[]
+  /** 应用配置(与 PresetPanel 同语义;App2D handleApplyPreset) */
+  onApplyPreset: (entry: PresetEntry) => void
   onRetryRow: (id: string) => void
   onRerollRow: (id: string) => void
   onDownloadRow: (img: BatchImage) => void
@@ -66,6 +72,8 @@ function BatchPanel({
   onRandomizeAll,
   onStart,
   onRowSelect,
+  presets,
+  onApplyPreset,
   onRetryRow,
   onRerollRow,
   onDownloadRow,
@@ -83,6 +91,8 @@ function BatchPanel({
   // 处理中点关闭应走确认弹窗(终止在 App2D 侧执行);灯箱记录的是"已完成行列表"的序号
   const [confirmClose, setConfirmClose] = useState(false)
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null)
+  // v3:行列表头 PresetMenu 开关(种子/配置下拉,与 SeedBar 入口同语义)
+  const [presetMenuOpen, setPresetMenuOpen] = useState(false)
 
   // SVG 导出只对 canvas2d(ASCII)风格开放,与 effectiveFormat 的回退规则一致
   const isStyleCanvas2d = getStyle(activeStyleId)?.renderMode === 'canvas2d'
@@ -159,7 +169,24 @@ function BatchPanel({
             <div className="batch-rowlist">
               <div className="batch-rowlist-head">
                 <span>{t('batch.rowListTitle')}</span>
-                {/* Task 5 在此加 PresetMenu 入口 */}
+                <div className="batch-rowlist-preset-anchor">
+                  <button
+                    className="batch-icon-btn"
+                    title={t('batch.seedList')}
+                    aria-label={t('batch.seedList')}
+                    aria-expanded={presetMenuOpen}
+                    onClick={() => setPresetMenuOpen((v) => !v)}
+                  >
+                    {presetListIcon}
+                  </button>
+                  {presetMenuOpen && (
+                    <PresetMenu
+                      presets={presets}
+                      onApply={(e) => { onApplyPreset(e); setPresetMenuOpen(false) }}
+                      onClose={() => setPresetMenuOpen(false)}
+                    />
+                  )}
+                </div>
               </div>
               <div className="batch-rowlist-body">
                 {images.map((row, i) => {

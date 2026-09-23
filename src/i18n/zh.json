@@ -520,7 +520,8 @@
     "styleMismatch": "种子码与当前风格不匹配",
     "pending": "待处理",
     "followBase": "跟随",
-    "rowListTitle": "图片与种子"
+    "rowListTitle": "图片与种子",
+    "seedList": "配置列表"
   },
   "seed": {
     "label": "种子",
@@ -544,7 +545,8 @@
     "list": "我的配置",
     "empty": "暂无保存的配置，调整参数后点「保存配置」",
     "apply": "应用",
-    "delete": "删除"
+    "delete": "删除",
+    "menuEmpty": "暂无保存的配置"
   },
   "meta": {
     "home": {

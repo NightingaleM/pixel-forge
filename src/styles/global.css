@@ -1960,3 +1960,61 @@ body {
   font-style: italic;
   font-family: inherit;
 }
+
+/* --- v3:种子/配置下拉菜单(PresetMenu,SeedBar 与 BatchPanel 行列表头共用) --- */
+.seed-bar-preset-anchor,
+.batch-rowlist-preset-anchor {
+  position: relative;
+  display: inline-flex;
+}
+
+.preset-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 60;
+  min-width: 180px;
+  max-height: 260px;
+  overflow-y: auto;
+  background: #FFF;
+  border: 1px solid #000;
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.15);
+}
+
+.preset-menu-empty {
+  padding: 10px 12px;
+  font-size: 11px;
+  color: #999;
+}
+
+.preset-menu-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 6px 12px;
+  background: none;
+  border: none;
+  border-bottom: 1px solid #EEE;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+}
+
+.preset-menu-item:last-child {
+  border-bottom: none;
+}
+
+.preset-menu-item:hover {
+  background: #F0F0F0;
+}
+
+.preset-menu-name {
+  font-size: 12px;
+  color: #000;
+}
+
+.preset-menu-style {
+  font-size: 10px;
+  color: #999;
+}

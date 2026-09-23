@@ -1,17 +1,24 @@
 import { useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
+import type { PresetEntry } from '../lib/presetStore'
+import PresetMenu, { presetListIcon } from './PresetMenu'
 
 interface SeedBarProps {
   seed: string
   onApply: (code: string) => boolean
+  /** 已保存配置(种子列表数据源,App2D presets) */
+  presets: PresetEntry[]
+  /** 应用配置(与 PresetPanel 同语义) */
+  onApplyPreset: (entry: PresetEntry) => void
 }
 
-export function SeedBar({ seed, onApply }: SeedBarProps) {
+export function SeedBar({ seed, onApply, presets, onApplyPreset }: SeedBarProps) {
   const { t } = useTranslation()
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(seed)
   const [applyError, setApplyError] = useState(false)
   const [copyMsg, setCopyMsg] = useState<string | null>(null)
+  const [presetOpen, setPresetOpen] = useState(false)
 
   const startEdit = useCallback(() => {
     setDraft(seed)
@@ -77,6 +84,24 @@ export function SeedBar({ seed, onApply }: SeedBarProps) {
       <code className="seed-bar-code" title={t('seed.hint')} onClick={startEdit}>{seed}</code>
       <button className="seed-bar-btn" onClick={copy}>{copyLabel}</button>
       <button className="seed-bar-btn" onClick={startEdit}>{t('seed.edit')}</button>
+      <div className="seed-bar-preset-anchor">
+        <button
+          className="seed-bar-btn"
+          title={t('batch.seedList')}
+          aria-label={t('batch.seedList')}
+          aria-expanded={presetOpen}
+          onClick={() => setPresetOpen((v) => !v)}
+        >
+          {presetListIcon}
+        </button>
+        {presetOpen && (
+          <PresetMenu
+            presets={presets}
+            onApply={(e) => { onApplyPreset(e); setPresetOpen(false) }}
+            onClose={() => setPresetOpen(false)}
+          />
+        )}
+      </div>
     </div>
   )
 }

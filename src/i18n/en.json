@@ -520,7 +520,8 @@
     "styleMismatch": "Seed does not match the current style",
     "pending": "Pending",
     "followBase": "Follow",
-    "rowListTitle": "Images & Seeds"
+    "rowListTitle": "Images & Seeds",
+    "seedList": "Preset List"
   },
   "seed": {
     "label": "Seed",
@@ -544,7 +545,8 @@
     "list": "My Presets",
     "empty": "No presets yet — tweak params and click \"Save Preset\"",
     "apply": "Apply",
-    "delete": "Delete"
+    "delete": "Delete",
+    "menuEmpty": "No saved presets yet"
   },
   "meta": {
     "home": {

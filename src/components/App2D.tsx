@@ -998,7 +998,7 @@ function App2D() {
           onRandom={handleRandom}
           top={
             <>
-              <SeedBar seed={seed} onApply={handleApplySeed} />
+              <SeedBar seed={seed} onApply={handleApplySeed} presets={presets} onApplyPreset={handleApplyPreset} />
               <BuiltInPresetBar
                 presets={currentStyle.presets ?? []}
                 activeId={activeBuiltInPresetId}
@@ -1030,6 +1030,8 @@ function App2D() {
           selectedIndex={selectedIndex}
           seedViews={rowsSeedView}
           onRowSelect={handleSelect}
+          presets={presets}
+          onApplyPreset={handleApplyPreset}
           seedMode={seedMode}
           format={format}
           activeStyleId={activeStyle}
