@@ -4,7 +4,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   rowEffectiveSeed, syncRowSeed, loadWorking, randomizeRowSeed,
-  assembleProcessingTasks, seedMatchesStyle, blobExt,
+  assembleProcessingTasks, isTaskSharedEdit, seedMatchesStyle, blobExt,
   type BatchImage, type BatchBase,
 } from './imageList'
 import { getStyle } from '../StyleRegistry'
@@ -169,6 +169,32 @@ describe('assembleProcessingTasks', () => {
   })
   it('空列表返回空', () => {
     expect(assembleProcessingTasks([], base, def)).toEqual([])
+  })
+})
+
+describe('isTaskSharedEdit', () => {
+  it('数值流:toggle/select 回 true(不参与种子编码,须双写基线)', () => {
+    expect(isTaskSharedEdit(def, 'uColorMode', 'number')).toBe(true)   // halftone select
+    expect(isTaskSharedEdit(getStyle('diffusion')!, 'uGrayscale', 'number')).toBe(true) // toggle
+  })
+  it('数值流:seedable 数值参数回 false(由种子携带,只写工作副本)', () => {
+    expect(isTaskSharedEdit(def, 'uCellSize', 'number')).toBe(false)
+  })
+  it('文本流:text 回 true(如 ascii 字符集,不参与种子编码)', () => {
+    expect(isTaskSharedEdit(getStyle('ascii')!, 'uCharset', 'text')).toBe(true)
+    expect(isTaskSharedEdit(getStyle('textraster')!, 'uTextContent', 'text')).toBe(true)
+  })
+  it('文本流:color 由种子携带回 false', () => {
+    expect(isTaskSharedEdit(getStyle('sketch')!, 'uBgColor', 'text')).toBe(false)
+    expect(isTaskSharedEdit(getStyle('ascii')!, 'uCharColor', 'text')).toBe(false)
+  })
+  it('流别交叉:toggle/select 走文本流回 false,text 走数值流回 false', () => {
+    expect(isTaskSharedEdit(def, 'uColorMode', 'text')).toBe(false)
+    expect(isTaskSharedEdit(getStyle('ascii')!, 'uCharset', 'number')).toBe(false)
+  })
+  it('未注册 uniform 或 def 缺失回 false(维持只写工作副本的既有行为)', () => {
+    expect(isTaskSharedEdit(def, 'uNotExist', 'number')).toBe(false)
+    expect(isTaskSharedEdit(undefined, 'uColorMode', 'number')).toBe(false)
   })
 })
 

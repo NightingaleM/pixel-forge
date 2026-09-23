@@ -89,6 +89,22 @@ export function assembleProcessingTasks(
   return rows.map((r) => ({ id: r.id, image: r.image, seed: rowEffectiveSeed(r, base, def) }))
 }
 
+/** perImage 模式「类型感知双写」分派(纯):被编辑 uniform 是否必须同时写整批基线。
+ *  toggle/select(数值流)与 text(文本流)不参与种子编码,批量渲染只能从基线
+ *  取值(runBatch.resolveRowRenderState 基线打底),不双写 base 即 WYSIWYG 失守
+ *  ——预览变了、批量出图仍是旧值;这些参数按任务级共享语义与 base 同步(spec
+ *  「整批共享一份」)。数值/color 由种子携带,仍只写工作副本(编回行种子)。
+ *  def 缺失或 uniform 不在风格参数表中回 false,维持既有「只写工作副本」行为。 */
+export function isTaskSharedEdit(
+  def: StyleDefinition | undefined,
+  uniform: string,
+  kind: 'number' | 'text',
+): boolean {
+  const p = def?.params.find((q) => q.uniform === uniform)
+  if (!p) return false
+  return kind === 'number' ? p.type === 'toggle' || p.type === 'select' : p.type === 'text'
+}
+
 /** SeedBar 粘贴校验:种子风格与目标一致才放行(批量行不随种子切风格,
  *  activeStyle 全局唯一);decode 失败视为不匹配。 */
 export function seedMatchesStyle(seed: string, styleId: StyleId): boolean {

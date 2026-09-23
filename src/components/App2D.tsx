@@ -16,7 +16,7 @@ import type { BuiltInPresetDefinition, StyleId } from '../types'
 import type { BatchImage, BatchBase } from '../lib/batch/imageList'
 import {
   rowEffectiveSeed, syncRowSeed, loadWorking, randomizeRowSeed, assembleProcessingTasks,
-  seedMatchesStyle, blobExt, type BatchFormat,
+  isTaskSharedEdit, seedMatchesStyle, blobExt, type BatchFormat,
 } from '../lib/batch/imageList'
 import { BATCH_MAX_ROWS, canRunBatch, dedupeName, zipEntryName } from '../lib/batch/batchJob'
 import {
@@ -646,7 +646,11 @@ function App2D() {
   // ---------------------------------------------------------------------------
 
   // 统一模式双写:工作副本即整批活基线,base 与 params 用同一个纯 updater 推导
-  // (StrictMode 双调 updater 结果幂等);独立模式编辑只写工作副本,基线不动
+  // (StrictMode 双调 updater 结果幂等);独立模式编辑默认只写工作副本,但类型
+  // 感知双写例外——toggle/select 不参与种子编码,批量渲染只能从整批基线取值
+  // (runBatch.resolveRowRenderState 基线打底),不双写 base 就是"预览变了、批量
+  // 出图还是旧值"的 WYSIWYG 失守,故按任务级共享语义同步 base(spec"整批共享
+  // 一份");数值参数由种子携带,仍只写工作副本(懒同步点编回行种子)
   const handleParamChange = useCallback((uniform: string, value: number) => {
     const apply = (prev: Record<string, number>) => {
       const next = { ...prev, [uniform]: value }
@@ -658,14 +662,16 @@ function App2D() {
       return next
     }
     setParams(apply)
-    if (seedMode === 'unified') setBaseParams(apply)
-  }, [seedMode])
+    if (seedMode === 'unified' || isTaskSharedEdit(getStyle(activeStyle), uniform, 'number')) setBaseParams(apply)
+  }, [seedMode, activeStyle])
 
+  // 同款类型感知双写:text 类(如 ascii 字符集)不参与种子编码须共享基线;
+  // color 由种子携带,只写工作副本
   const handleTextChange = useCallback((uniform: string, value: string) => {
     const apply = (prev: Record<string, string>) => ({ ...prev, [uniform]: value })
     setTextParams(apply)
-    if (seedMode === 'unified') setBaseTextParams(apply)
-  }, [seedMode])
+    if (seedMode === 'unified' || isTaskSharedEdit(getStyle(activeStyle), uniform, 'text')) setBaseTextParams(apply)
+  }, [seedMode, activeStyle])
 
   const handleFontChange = useCallback((uniform: string, font: FontFace | null) => {
     setFontParams((prev) => ({ ...prev, [uniform]: font }))
