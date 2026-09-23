@@ -4,7 +4,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   rowEffectiveSeed, syncRowSeed, loadWorking, randomizeRowSeed,
-  snapshotTaskSeeds, seedMatchesStyle,
+  snapshotTaskSeeds, seedMatchesStyle, blobExt,
   type BatchImage, type BatchBase,
 } from './imageList'
 import { getStyle } from '../StyleRegistry'
@@ -164,5 +164,14 @@ describe('seedMatchesStyle', () => {
   it('非法种子 false(decode 失败按不匹配处理)', () => {
     expect(seedMatchesStyle('zz', 'halftone')).toBe(false)
     expect(seedMatchesStyle('', 'halftone')).toBe(false)
+  })
+})
+
+describe('blobExt', () => {
+  it('按 MIME 推导扩展名,未知类型兜底 png', () => {
+    expect(blobExt(new Blob([], { type: 'image/svg+xml' }))).toBe('svg')
+    expect(blobExt(new Blob([], { type: 'image/jpeg' }))).toBe('jpg')
+    expect(blobExt(new Blob([], { type: 'image/png' }))).toBe('png')
+    expect(blobExt(new Blob([]))).toBe('png')
   })
 })

@@ -91,3 +91,9 @@ export function snapshotTaskSeeds(
 export function seedMatchesStyle(seed: string, styleId: StyleId): boolean {
   return decodeSeed(seed)?.styleId === styleId
 }
+
+/** blob MIME → 扩展名。行的实际格式可能与面板所选不同(effectiveFormat 会按
+ *  风格把 svg 回退 png),下载命名与灯箱标注以 blob 为准。 */
+export function blobExt(b: Blob): string {
+  return b.type === 'image/svg+xml' ? 'svg' : b.type === 'image/jpeg' ? 'jpg' : 'png'
+}
