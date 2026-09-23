@@ -6,7 +6,8 @@ import { AsciiCanvasRenderer } from '../lib/AsciiCanvasRenderer'
 import { styles, getStyle, defaultParams, defaultTextParams } from '../lib/StyleRegistry'
 import { encodeSeed, decodeSeed } from '../lib/seedCodec'
 import { findBrightestPoint } from '../lib/brightPoint'
-import { hexToRgb, snapToStep } from '../lib/paramValue'
+import { hexToRgb } from '../lib/paramValue'
+import { randomizeParams } from '../lib/randomSeed'
 import { loadPresets, savePreset, removePreset, mergeWithDefaults, type PresetEntry } from '../lib/presetStore'
 import { findMatchingBuiltInPreset, resolveBuiltInPreset } from '../lib/builtInPreset'
 import type { BuiltInPresetDefinition, StyleId } from '../types'
@@ -20,9 +21,6 @@ import BuiltInPresetBar from './BuiltInPresetBar'
 import ActionBar from './ActionBar'
 import { CompareSlider } from './CompareSlider'
 import ConfirmDialog from './ConfirmDialog'
-
-// 这些 uniform 随机会产生不可用结果（居中/旋转类），随机时保持不动
-const SKIP_RANDOM_UNIFORMS = ['uCenterX', 'uCenterY', 'uRotation', 'uAngle']
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return bytes + ' B'
@@ -349,29 +347,10 @@ function App2D() {
   const handleRandom = useCallback(() => {
     const styleDef = getStyle(activeStyle)
     if (!styleDef) return
-    // 以当前参数为底:toggle/select 类参数保留现值;text/font 不随机;
-    // color 参数随机生成(与 3D 随机一致)
-    const randomParams: Record<string, number> = { ...params }
-    const randomColors: Record<string, string> = {}
-    for (const p of styleDef.params) {
-      if (p.type === 'text' || p.type === 'toggle' || p.type === 'select' || p.type === 'font') continue
-      if (SKIP_RANDOM_UNIFORMS.includes(p.uniform)) continue
-      if (p.type === 'color') {
-        // 均匀随机 RGB(与 3D 随机一致),16777216 覆盖含 #FFFFFF 的全值域
-        randomColors[p.uniform] = '#' + Math.floor(Math.random() * 16777216).toString(16).padStart(6, '0')
-        continue
-      }
-      const range = p.max - p.min
-      const raw = p.min + Math.random() * range
-      // 相对 min 对齐 + clamp + 修浮点尾——与手输路径共用同一把 snapToStep 尺子，
-      // 避免按 0 网格对齐的基准偏差与 0.7300000000000002 式浮点噪声
-      randomParams[p.uniform] = snapToStep(raw, p.min, p.max, p.step, p.default)
-    }
-    setParams(randomParams)
-    if (Object.keys(randomColors).length > 0) {
-      setTextParams((prev) => ({ ...prev, ...randomColors }))
-    }
-  }, [activeStyle, params])
+    const r = randomizeParams(styleDef, params, textParams)
+    setParams(r.params)
+    setTextParams(r.textParams)
+  }, [activeStyle, params, textParams])
 
   const downloadBlob = useCallback((blob: Blob | null, ext: string) => {
     if (!blob) return
