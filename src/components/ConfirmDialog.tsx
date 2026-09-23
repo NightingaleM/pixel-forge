@@ -3,11 +3,13 @@ import { useTranslation } from 'react-i18next'
 
 interface ConfirmDialogProps {
   message: string
+  /** 确认钮文案;缺省沿用「确认退出」(退出编辑场景),批量等场景按语义传入 */
+  confirmLabel?: string
   onConfirm: () => void
   onCancel: () => void
 }
 
-export default function ConfirmDialog({ message, onConfirm, onCancel }: ConfirmDialogProps) {
+export default function ConfirmDialog({ message, confirmLabel, onConfirm, onCancel }: ConfirmDialogProps) {
   const { t } = useTranslation()
 
   const handleKeyDown = useCallback(
@@ -31,7 +33,7 @@ export default function ConfirmDialog({ message, onConfirm, onCancel }: ConfirmD
             {t('common.cancel')}
           </button>
           <button className="dialog-btn dialog-btn--primary" onClick={onConfirm}>
-            {t('app2d.confirmExitBtn')}
+            {confirmLabel ?? t('app2d.confirmExitBtn')}
           </button>
         </div>
       </div>

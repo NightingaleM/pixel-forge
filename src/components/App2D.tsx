@@ -603,6 +603,7 @@ function App2D() {
       {showBatchReplaceDialog && (
         <ConfirmDialog
           message={t('batch.replaceBaseline')}
+          confirmLabel={t('batch.confirmReplace')}
           onConfirm={replaceBaseline}
           onCancel={() => setShowBatchReplaceDialog(false)}
         />

@@ -466,6 +466,7 @@ function BatchPanel({ job, setJob, onClose }: BatchPanelProps) {
       {confirmClose && (
         <ConfirmDialog
           message={t('batch.closeConfirm')}
+          confirmLabel={t('batch.confirmClose')}
           onConfirm={() => { runnerRef.current.cancel(); aliveRef.current = false; onClose() }}
           onCancel={() => setConfirmClose(false)}
         />
