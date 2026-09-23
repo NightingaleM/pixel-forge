@@ -88,7 +88,8 @@ describe('loadWorking', () => {
   })
   it('与 handleApplySeed 同 merge 语义:种子不携带项(toggle/select)回风格默认而非基线', () => {
     // 种子按基线值编码,但 uColorMode/uShape 不参与编码 → 解析后回风格默认 1/0,
-    // 与单图模式粘贴种子的行为一致(不是 v1 resolveRowRenderState 的基线打底)
+    // 与单图模式粘贴种子的行为一致(不是 runBatch.resolveRowRenderState 的基线
+    // 打底——那条路供批量渲染延续调参现场)
     const seed = encodeSeed('halftone', base.params, def, {})
     const w = loadWorking(makeRow({ seed }), base, def)
     expect(w.params.uColorMode).toBe(1)

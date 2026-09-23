@@ -8,10 +8,37 @@ import { AsciiCanvasRenderer } from '../AsciiCanvasRenderer'
 import { findBrightestPoint } from '../brightPoint'
 import { renderImage, exportCanvasBlob, exportJpgWithBlackBg } from '../renderImage'
 import { getStyle } from '../StyleRegistry'
-import { resolveRowRenderState, rowSeed, effectiveFormat, type BatchBaseline, type BatchFormat, type BatchJob, type BatchRow } from './batchJob'
+import { decodeSeed } from '../seedCodec'
+import { mergeWithDefaults } from '../presetStore'
+import { effectiveFormat, type BatchFormat } from './batchJob'
+import type { BatchImage } from './imageList'
+
+/** 处理任务快照:一行一任务。seed 为调用方(drain)定格的生效种子,
+ *  处理中调参只影响下一次处理,进行中任务不受影响。 */
+export interface ProcessingTask {
+  id: string
+  image: HTMLImageElement
+  seed: string
+}
+
+/** 处理基线快照:params/textParams 供种子解析打底(非 seedable 项延续调参现场);
+ *  fontParams 由渲染任务闭包消费(字体不参与种子编码)。 */
+export interface ProcessingBaseline {
+  params: Record<string, number>
+  textParams: Record<string, string>
+  fontParams: Record<string, FontFace | null>
+}
+
+/** v2 处理任务集(v1 BatchJob 已退役):tasks 即队列,行状态归 App2D/images。 */
+export interface ProcessingJob {
+  tasks: ProcessingTask[]
+  format: BatchFormat
+  baseline: ProcessingBaseline
+}
 
 export interface RenderTask {
-  row: BatchRow
+  id: string
+  image: HTMLImageElement
   styleId: StyleId
   params: Record<string, number>
   textParams: Record<string, string>
@@ -26,27 +53,48 @@ const nextFrame = () =>
     typeof requestAnimationFrame === 'function' ? requestAnimationFrame(() => r()) : setTimeout(r, 0),
   )
 
+/** 种子→渲染状态(base 打底)。与 imageList.loadWorking 的「风格默认打底」刻意
+ *  不同(T1 concern):批量渲染的非 seedable 项(toggle/select/text)必须延续整批
+ *  基线快照——处理结果要的是调参现场,不是风格默认;而 UI 载入工作副本要与单图
+ *  粘贴种子行为一致才回默认。种子携带其他风格时跟随种子(种子是完整状态)。
+ *  非法返回 null。 */
+export function resolveRowRenderState(
+  baseline: ProcessingBaseline,
+  seedCode: string,
+): { styleId: StyleId; params: Record<string, number>; textParams: Record<string, string> } | null {
+  const decoded = decodeSeed(seedCode)
+  if (!decoded) return null
+  const def = getStyle(decoded.styleId)
+  if (!def) return null
+  const merged = mergeWithDefaults(
+    def,
+    { ...baseline.params, ...decoded.params },
+    { ...baseline.textParams, ...decoded.colorParams },
+  )
+  return { styleId: decoded.styleId, params: merged.params, textParams: merged.textParams }
+}
+
 export function createBatchRunner(renderTask: RenderTaskFn) {
   let cancelled = false
-  async function run(job: BatchJob, cb: { onRowUpdate: (id: string, patch: Partial<BatchRow>) => void }): Promise<void> {
+  async function run(job: ProcessingJob, cb: { onRowUpdate: (id: string, patch: Partial<BatchImage>) => void }): Promise<void> {
     cancelled = false
-    // 快照待处理行:run 期间 rows 追加不影响本轮,后续 run 再 drain
-    const queue = job.rows.filter((r) => r.status === 'pending' || r.status === 'failed')
-    for (const row of queue) {
+    // 迭代快照:run 期间调用方往 tasks 数组追加不影响本轮(数组迭代器是活的,
+    // 拷贝一份与 v1 rows.filter 同语义),后续 run 由外层 drain 复查续跑
+    const queue = [...job.tasks]
+    for (const task of queue) {
       if (cancelled) break
       // 重渲染前先清空旧快照:重跑/重骰/重试都必经 processing,单一闸口
       // 保证非 done 行不携带上一轮的渲染元数据
-      cb.onRowUpdate(row.id, { status: 'processing', error: null, renderedSeed: null, renderedStyleId: null })
+      cb.onRowUpdate(task.id, { status: 'processing', error: null, renderedSeed: null, renderedStyleId: null })
       await nextFrame()   // 行处理前让出一帧,UI 先绘出 processing 态
       try {
-        const seed = rowSeed(job, row)
-        const state = resolveRowRenderState(job.baseline, seed)
+        const state = resolveRowRenderState(job.baseline, task.seed)
         if (!state) throw new Error('invalid seed')
-        const blob = await renderTask({ row, ...state, format: effectiveFormat(state.styleId, job.format) })
+        const blob = await renderTask({ id: task.id, image: task.image, ...state, format: effectiveFormat(state.styleId, job.format) })
         // done 快照:定格实际用于渲染的种子与解析出的风格(种子可携带其他风格)
-        cb.onRowUpdate(row.id, { status: 'done', blob, renderedSeed: seed, renderedStyleId: state.styleId })
+        cb.onRowUpdate(task.id, { status: 'done', blob, renderedSeed: task.seed, renderedStyleId: state.styleId })
       } catch (e) {
-        cb.onRowUpdate(row.id, { status: 'failed', error: e instanceof Error ? e.message : String(e) })
+        cb.onRowUpdate(task.id, { status: 'failed', error: e instanceof Error ? e.message : String(e) })
       }
     }
   }
@@ -54,7 +102,7 @@ export function createBatchRunner(renderTask: RenderTaskFn) {
 }
 
 /** 离屏渲染任务:懒建 renderer,行间复用;异常时销毁重建(WebGL context lost 自愈)。 */
-export function createCanvasRenderTask(baseline: BatchBaseline): RenderTaskFn {
+export function createCanvasRenderTask(baseline: ProcessingBaseline): RenderTaskFn {
   let renderer: ShaderRenderer | null = null
   let asciiRenderer: AsciiCanvasRenderer | null = null
   let canvas: HTMLCanvasElement | null = null
@@ -78,21 +126,21 @@ export function createCanvasRenderTask(baseline: BatchBaseline): RenderTaskFn {
       canvas = document.createElement('canvas')
       renderer = new ShaderRenderer(canvas)
     }
-    if (!isCanvas2d) renderer!.loadImage(t.row.image)
+    if (!isCanvas2d) renderer!.loadImage(t.image)
 
     // animelight 自动光源:逐图检测(每图最亮点不同)
     let brightest: { x: number; y: number } | null = null
     try {
       const THUMB = 32
-      const nw = t.row.image.naturalWidth || t.row.image.width
-      const nh = t.row.image.naturalHeight || t.row.image.height
+      const nw = t.image.naturalWidth || t.image.width
+      const nh = t.image.naturalHeight || t.image.height
       const s = Math.min(1, THUMB / Math.max(nw, nh))
       const c = document.createElement('canvas')
       c.width = Math.max(1, Math.round(nw * s))
       c.height = Math.max(1, Math.round(nh * s))
       const ctx = c.getContext('2d', { willReadFrequently: true })
       if (ctx) {
-        ctx.drawImage(t.row.image, 0, 0, c.width, c.height)
+        ctx.drawImage(t.image, 0, 0, c.width, c.height)
         brightest = findBrightestPoint(ctx.getImageData(0, 0, c.width, c.height).data, c.width, c.height)
       }
     } catch { /* 跨域等失败回落默认光源 */ }
@@ -103,7 +151,7 @@ export function createCanvasRenderTask(baseline: BatchBaseline): RenderTaskFn {
         asciiCanvas: asciiCanvas ?? document.createElement('canvas'),
         renderer,
         asciiRenderer,
-        image: t.row.image,
+        image: t.image,
         styleDef: def,
         params: t.params,
         textParams: t.textParams,

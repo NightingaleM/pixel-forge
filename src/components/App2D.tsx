@@ -18,8 +18,11 @@ import {
   rowEffectiveSeed, syncRowSeed, loadWorking, randomizeRowSeed, snapshotTaskSeeds,
   seedMatchesStyle, blobExt, type BatchFormat,
 } from '../lib/batch/imageList'
-import { BATCH_MAX_ROWS, canRunBatch, dedupeName, zipEntryName, type BatchJob, type BatchBaseline, type BatchRow } from '../lib/batch/batchJob'
-import { buildBatchZip, createBatchRunner, createCanvasRenderTask, type RenderTaskFn } from '../lib/batch/runBatch'
+import { BATCH_MAX_ROWS, canRunBatch, dedupeName, zipEntryName } from '../lib/batch/batchJob'
+import {
+  buildBatchZip, createBatchRunner, createCanvasRenderTask,
+  type ProcessingBaseline, type ProcessingJob, type RenderTaskFn,
+} from '../lib/batch/runBatch'
 import ImageUploader from './ImageUploader'
 import ImageStrip from './ImageStrip'
 import StyleSelector from './StyleSelector'
@@ -39,8 +42,8 @@ function formatFileSize(bytes: number): string {
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
 }
 
-// 新建批量图片行(v2 状态从 BatchJob 上移 App2D,上传即建行):
-// seed=null 跟随整批基线;blob/objectUrl 等处理字段留空(T2 尚无处理能力,T3/T4 写入)
+// 新建批量图片行(v2 状态从 v1 BatchJob 上移 App2D,上传即建行):
+// seed=null 跟随整批基线;blob/objectUrl 等处理字段由队列写入
 function makeRow(image: HTMLImageElement, fileName: string): BatchImage {
   return {
     id: randomId(),
@@ -82,8 +85,7 @@ function saveBlob(blob: Blob, name: string) {
 // createCanvasRenderTask 实际只消费 baseline.fontParams(行级风格/参数/种子经
 // RenderTask 逐行传入),其余字段传空壳占位:任务重建只挂在字体变化上,避免无关
 // 状态触发重建而弃掉闭包内行间复用的离屏 renderer(WebGL 上下文无人 destroy 会泄漏)
-const RENDER_TASK_BASE_SHELL: Omit<BatchBaseline, 'fontParams'> = {
-  styleId: 'halftone',
+const RENDER_TASK_BASE_SHELL: Pick<ProcessingBaseline, 'params' | 'textParams'> = {
   params: {},
   textParams: {},
 }
@@ -146,10 +148,10 @@ function App2D() {
 
   // drain 的 while 循环要读最新状态(异步长循环闭包会 stale),经 ref 规避:
   // 基线/格式/字体在 drain 启动时定格快照,循环内只刷新行状态
-  const jobInputsRef = useRef({ activeStyle, base: batchBase, format, fontParams, seedMode })
+  const jobInputsRef = useRef({ activeStyle, base: batchBase, format, fontParams })
   useEffect(() => {
-    jobInputsRef.current = { activeStyle, base: batchBase, format, fontParams, seedMode }
-  }, [activeStyle, batchBase, format, fontParams, seedMode])
+    jobInputsRef.current = { activeStyle, base: batchBase, format, fontParams }
+  }, [activeStyle, batchBase, format, fontParams])
 
   // 队列调度(v1 BatchPanel 上移,images 是行状态唯一所有者):
   // - batchRunningRef:串行守卫,run 会重置共享 cancelled 标志,并发 drain 互相取消
@@ -173,7 +175,7 @@ function App2D() {
   // done 时建 objectUrl —— objectUrl 生命周期统一在此管理。迟到的 done 更新两种
   // 来源都要拦:行已被移除(map 对未知 id 是 no-op),或批量已终止(alive=false 后
   // 不再产出无人 revoke 的 URL)—— 两种情况 objectUrl 建出来都会泄漏
-  const updateRow = useCallback((id: string, patch: Partial<BatchRow>) => {
+  const updateRow = useCallback((id: string, patch: Partial<BatchImage>) => {
     if (patch.status === 'done' && patch.blob) {
       if (!batchAliveRef.current || !batchImagesRef.current.some((r) => r.id === id)) return
       patch.objectUrl = URL.createObjectURL(patch.blob)
@@ -192,36 +194,25 @@ function App2D() {
       // 重试/重骰在同一点击里"先 patch 再 drain",ref 要等 effect 提交后才更新;
       // 不让出一帧,首轮就会读到旧快照误判"无待处理"而提前退出(行卡在 pending)
       await yieldFrame()
-      // 快照即隔离边界(Ruling 1:临时以 v1 BatchJob 形状调用现有 run,T4 迁移
-      // ProcessingJob):种子/基线/格式在 drain 启动时定格,处理中调参只影响下一次
-      const { activeStyle: snapStyle, base, format: snapFormat, fontParams: snapFonts, seedMode: snapMode } = jobInputsRef.current
+      // 快照即隔离边界:种子/基线/格式在 drain 启动时定格(ProcessingJob 的
+      // tasks/baseline),处理中调参只影响下一次处理
+      const { activeStyle: snapStyle, base, format: snapFormat, fontParams: snapFonts } = jobInputsRef.current
       const def = getStyle(snapStyle)
       if (!def) return
       const seeds = new Map(snapshotTaskSeeds(batchImagesRef.current, base, def).map((s) => [s.id, s.seed]))
-      // run 只吃 pending/failed 行;循环直到没有 pending(处理中新追加的行自动续跑)
+      // run 只吃 pending 行(重试/重骰都先 patch 回 pending);循环直到没有
+      // pending(处理中新追加的行自动续跑)
       while (true) {
         const rows = batchImagesRef.current
         if (!batchAliveRef.current) break
-        if (!rows.some((r) => r.status === 'pending')) break
-        const job: BatchJob = {
-          baseline: { styleId: snapStyle, params: { ...base.params }, textParams: { ...base.textParams }, fontParams: snapFonts },
-          unifiedSeed: encodeSeed(snapStyle, base.params, def, base.textParams),
-          seedMode: snapMode,
+        const queue = rows.filter((r) => r.status === 'pending')
+        if (queue.length === 0) break
+        const job: ProcessingJob = {
+          // 行种子按启动快照:中途换基线/换风格不溅射进行中批次;快照外的
+          // 新追加行以定格基线编码,与 v1"追加行跟随冻结基线"同口径
+          tasks: queue.map((r) => ({ id: r.id, image: r.image, seed: seeds.get(r.id) ?? rowEffectiveSeed(r, base, def) })),
           format: snapFormat,
-          rows: rows.map((r) => ({
-            id: r.id,
-            fileName: r.fileName,
-            image: r.image,
-            // 行种子按启动快照:中途换基线/换风格不溅射进行中批次;快照外的
-            // 新追加行以定格基线编码,与 v1"追加行跟随冻结基线"同口径
-            seedOverride: seeds.get(r.id) ?? rowEffectiveSeed(r, base, def),
-            status: r.status,
-            blob: r.blob,
-            objectUrl: r.objectUrl,
-            error: r.error,
-            renderedSeed: r.renderedSeed,
-            renderedStyleId: r.renderedStyleId,
-          })),
+          baseline: { params: { ...base.params }, textParams: { ...base.textParams }, fontParams: snapFonts },
         }
         await runnerRef.current.run(job, { onRowUpdate: updateRow })
         await yieldFrame()  // 等 React 提交 + ref 同步后再复查,避免整批重跑
@@ -240,7 +231,9 @@ function App2D() {
     setImages((prev) => prev.map((r) => (r.status === 'processing' ? { ...r, status: 'pending', error: null } : r)))
   }, [])
 
-  // 开始处理:独立模式先做懒同步(选中行工作副本编回行种子),再启队列
+  // 开始处理:独立模式先做懒同步(选中行工作副本编回行种子),再把全部行重置
+  // pending 并清旧结果(revoke objectUrl)——全 done 行集(如"全部随机"后)由此
+  // 也能重跑,不再是无 pending 可跑的死路;组队快照与调度统一在 drain 内
   // (batchAliveRef 的复活在 drain 内,重试/重骰路径同样受益)
   const startProcessing = useCallback(() => {
     if (!canRunBatch(images.length)) return
@@ -250,7 +243,16 @@ function App2D() {
       const synced = syncRowSeed(cur, def, { params, textParams })
       setImages((prev) => prev.map((r) => (r.id === synced.id ? synced : r)))
     }
-    if (!batchRunningRef.current) void drain()
+    // 运行中不重置:进行中批次的快照已定格,重置只会让在跑的 drain 以旧快照
+    // 重跑全部行;调参后想重跑,等本轮结束再点开始
+    if (batchRunningRef.current) return
+    images.forEach((r) => {
+      if (r.objectUrl) URL.revokeObjectURL(r.objectUrl)
+    })
+    setImages((prev) => prev.map((r) => ({
+      ...r, status: 'pending', blob: null, objectUrl: null, error: null, renderedSeed: null, renderedStyleId: null,
+    })))
+    void drain()
   }, [images, selectedIndex, seedMode, activeStyle, params, textParams, drain])
 
   // 面板关闭(确认后的确定性关闭):终止队列 + 收面板,不清图片与已完成结果

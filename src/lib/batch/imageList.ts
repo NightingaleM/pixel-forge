@@ -7,8 +7,8 @@ import { encodeSeed, decodeSeed } from '../seedCodec'
 import { mergeWithDefaults } from '../presetStore'
 import { randomSeed } from '../randomSeed'
 
-// v2 期间 batchJob 仍持有 BatchFormat(T4 才退役重排);在此转发,
-// 让 T2/T3 与 BatchImage 从同一入口消费,避免两处 import 路径
+// BatchFormat 的定义家在 batchJob(与上限/命名等纯逻辑同处);在此转发,
+// 让 App2D/BatchPanel 与本模块的消费者从同一入口拿,避免两处 import 路径
 export type { BatchFormat } from './batchJob'
 
 /** 批量图片行(替代 v1 BatchRow:行状态从 BatchJob 上移到 App2D)。 */

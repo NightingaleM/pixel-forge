@@ -1,66 +1,9 @@
 // src/lib/batch/batchJob.test.ts
+// v1 行状态模型(BatchJob/BatchRow/种子解析)退役后,此处只测保留的纯逻辑:
+// 格式回退、导出命名与上限校验。行种子/工作副本见 imageList.test.ts,
+// 队列执行与渲染态解析见 runBatch.test.ts。
 import { describe, it, expect } from 'vitest'
-import {
-  BATCH_MAX_ROWS, canRunBatch, dedupeName, effectiveFormat,
-  resolveRowRenderState, rowSeed, rowRenderedSeed, rowRenderedStyleId, zipEntryName,
-  type BatchJob, type BatchRow,
-} from './batchJob'
-import { getStyle } from '../StyleRegistry'
-// 静态 import（describe 回调内的顶层 await import 在 vitest 不合法）
-import { encodeSeed } from '../seedCodec'
-
-const baseline = {
-  styleId: 'halftone' as const,
-  params: { uCellSize: 9 },
-  textParams: {},
-  fontParams: {},
-}
-
-describe('resolveRowRenderState', () => {
-  it('合法种子:seedable 项被种子覆盖,其余走基线', () => {
-    // 用 encodeSeed 造一个 uCellSize=max 的种子
-    const def = getStyle('halftone')!
-    const p = def.params.find((x) => x.uniform === 'uCellSize') as { min: number; max: number }
-    const seed = encodeSeed('halftone', { uCellSize: p.max }, def, {})
-    const st = resolveRowRenderState(baseline, seed)!
-    expect(st.styleId).toBe('halftone')
-    expect(st.params.uCellSize).toBe(p.max)
-  })
-
-  it('非法种子返回 null', () => {
-    expect(resolveRowRenderState(baseline, 'zz')).toBeNull()
-    expect(resolveRowRenderState(baseline, '')).toBeNull()
-  })
-
-  it('种子携带其他风格时跟随种子的 styleId', () => {
-    const seed = encodeSeed('popart', {}, getStyle('popart')!, {})
-    const st = resolveRowRenderState(baseline, seed)!
-    expect(st.styleId).toBe('popart')
-  })
-})
-
-describe('rowSeed', () => {
-  const job = { baseline, unifiedSeed: '0A1', seedMode: 'unified', format: 'png', rows: [] } as BatchJob
-  const row = { id: 'r1', seedOverride: null } as BatchRow
-  it('override 优先,否则统一值', () => {
-    expect(rowSeed(job, row)).toBe('0A1')
-    expect(rowSeed(job, { ...row, seedOverride: '9z' })).toBe('9z')
-  })
-})
-
-describe('rowRenderedSeed / rowRenderedStyleId', () => {
-  const job = { baseline, unifiedSeed: '0A1', seedMode: 'unified', format: 'png', rows: [] } as BatchJob
-  const row = { id: 'r1', seedOverride: null, renderedSeed: null, renderedStyleId: null } as BatchRow
-  it('无快照时回退当前生效种子与基线风格', () => {
-    expect(rowRenderedSeed(job, row)).toBe('0A1')
-    expect(rowRenderedStyleId(job, row)).toBe('halftone')
-  })
-  it('有快照时优先快照:替换基线/重骰后旧结果按生成时刻标注', () => {
-    const r2 = { ...row, renderedSeed: '9z', renderedStyleId: 'popart' } as BatchRow
-    expect(rowRenderedSeed(job, r2)).toBe('9z')
-    expect(rowRenderedStyleId(job, r2)).toBe('popart')
-  })
-})
+import { BATCH_MAX_ROWS, canRunBatch, dedupeName, effectiveFormat, zipEntryName } from './batchJob'
 
 describe('effectiveFormat', () => {
   it('svg 仅 canvas2d 风格有效,其余回退 png', () => {
