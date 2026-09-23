@@ -5,6 +5,7 @@ import { describe, it, expect } from 'vitest'
 import {
   rowEffectiveSeed, syncRowSeed, loadWorking, randomizeRowSeed,
   assembleProcessingTasks, isTaskSharedEdit, seedMatchesStyle, blobExt,
+  displaySeed, truncateSeed,
   type BatchImage, type BatchBase,
 } from './imageList'
 import { getStyle } from '../StyleRegistry'
@@ -217,5 +218,40 @@ describe('blobExt', () => {
     expect(blobExt(new Blob([], { type: 'image/jpeg' }))).toBe('jpg')
     expect(blobExt(new Blob([], { type: 'image/png' }))).toBe('png')
     expect(blobExt(new Blob([]))).toBe('png')
+  })
+})
+
+describe('displaySeed', () => {
+  it('统一模式:行 seed=null 返回基线编码码(与 rowEffectiveSeed 同值)', () => {
+    expect(displaySeed(makeRow(), 'unified', base, def))
+      .toBe(encodeSeed('halftone', base.params, def, base.textParams))
+  })
+  it('统一模式:忽略残留的行 seed(统一语义下行恒跟随,残留值容错一律基线码)', () => {
+    expect(displaySeed(makeRow({ seed: '0A5' }), 'unified', base, def))
+      .toBe(encodeSeed('halftone', base.params, def, base.textParams))
+  })
+  it('独立模式:seed 非 null 原样透传(不校验,校验职责在上游)', () => {
+    expect(displaySeed(makeRow({ seed: '0A5' }), 'perImage', base, def)).toBe('0A5')
+  })
+  it('独立模式:seed=null 返回 null(视图层渲染「跟随」短标)', () => {
+    expect(displaySeed(makeRow(), 'perImage', base, def)).toBeNull()
+  })
+})
+
+describe('truncateSeed', () => {
+  it('短码原样返回', () => {
+    expect(truncateSeed('0A5', 7)).toBe('0A5')
+  })
+  it('超长截断保前缀加 …', () => {
+    expect(truncateSeed('0A123456789', 7)).toBe('0A12345…')
+  })
+  it('长度恰等于 keep 原样(边界含等号)', () => {
+    expect(truncateSeed('0123456', 7)).toBe('0123456')
+  })
+  it('空串安全', () => {
+    expect(truncateSeed('', 7)).toBe('')
+  })
+  it('keep 缺省为 7', () => {
+    expect(truncateSeed('0A123456789')).toBe('0A12345…')
   })
 })

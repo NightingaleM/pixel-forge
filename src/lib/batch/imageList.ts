@@ -116,3 +116,30 @@ export function seedMatchesStyle(seed: string, styleId: StyleId): boolean {
 export function blobExt(b: Blob): string {
   return b.type === 'image/svg+xml' ? 'svg' : b.type === 'image/jpeg' ? 'jpg' : 'png'
 }
+
+/** 行种子展示语义(v3):统一模式一律返回基线编码码(统一语义下行 seed 恒为
+ *  跟随,残留非 null 值容错忽略);独立模式非 null 行原样透传(不校验,校验在
+ *  上游),null 返回 null 由视图层渲染「跟随」短标。与 rowEffectiveSeed 的
+ *  区别:后者把 null 编码成基线码供处理任务消费,前者把「跟随」语义保留给 UI。 */
+export function displaySeed(
+  img: BatchImage,
+  mode: 'unified' | 'perImage',
+  base: BatchBase,
+  def: StyleDefinition,
+): string | null {
+  if (mode === 'perImage') return img.seed
+  return encodeSeed(def.id, base.params, def, base.textParams)
+}
+
+/** 种子码截断:保前缀(版本位+风格位在头部,保前缀即可辨),超出加省略号。 */
+export function truncateSeed(code: string, keep = 7): string {
+  return code.length <= keep ? code : code.slice(0, keep) + '…'
+}
+
+/** 行种子展示视图(v3):App2D 统一计算后下发,ImageStrip 种子条与 BatchPanel
+ *  行列表共用同一份数据,两处显示永不漂移。full=null ⇔ 「跟随」短标。 */
+export interface RowSeedView {
+  id: string
+  full: string | null
+  short: string | null
+}
