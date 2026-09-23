@@ -518,7 +518,8 @@
     "confirmUnified": "切回统一种子将丢弃各图的独立设置,以当前选中状态为整批基线。确定切换?",
     "confirmUnifiedBtn": "切回统一",
     "styleMismatch": "种子码与当前风格不匹配",
-    "pending": "待处理"
+    "pending": "待处理",
+    "followBase": "跟随"
   },
   "seed": {
     "label": "种子",

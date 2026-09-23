@@ -518,7 +518,8 @@
     "confirmUnified": "Switching to a shared seed discards per-image settings and adopts the current selection as the batch baseline. Continue?",
     "confirmUnifiedBtn": "Use shared seed",
     "styleMismatch": "Seed does not match the current style",
-    "pending": "Pending"
+    "pending": "Pending",
+    "followBase": "Follow"
   },
   "seed": {
     "label": "Seed",

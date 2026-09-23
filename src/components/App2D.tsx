@@ -16,7 +16,8 @@ import type { BuiltInPresetDefinition, StyleId } from '../types'
 import type { BatchImage, BatchBase } from '../lib/batch/imageList'
 import {
   rowEffectiveSeed, syncRowSeed, loadWorking, randomizeRowSeed, assembleProcessingTasks,
-  isTaskSharedEdit, seedMatchesStyle, blobExt, type BatchFormat,
+  isTaskSharedEdit, seedMatchesStyle, blobExt, displaySeed, truncateSeed, type RowSeedView,
+  type BatchFormat,
 } from '../lib/batch/imageList'
 import { BATCH_MAX_ROWS, canRunBatch, dedupeName, zipEntryName } from '../lib/batch/batchJob'
 import {
@@ -800,6 +801,14 @@ function App2D() {
 
   const currentStyle = getStyle(activeStyle)
 
+  // 行种子展示视图(v3):displaySeed 统一计算,底部栏种子条与批量浮窗行列表
+  // 共用同一份(TASK 共享消费),两处显示永不漂移。full=null ⇔ 「跟随」短标
+  const rowsSeedView: RowSeedView[] = useMemo(() => images.map((row) => {
+    if (!currentStyle) return { id: row.id, full: null, short: null }
+    const full = displaySeed(row, seedMode, batchBase, currentStyle)
+    return { id: row.id, full, short: full === null ? null : truncateSeed(full) }
+  }), [images, seedMode, batchBase, currentStyle])
+
   const activeBuiltInPresetId = useMemo(
     () => currentStyle ? findMatchingBuiltInPreset(currentStyle, params, textParams) : null,
     [currentStyle, params, textParams],
@@ -942,6 +951,7 @@ function App2D() {
         {/* 底部多图栏(v2 替代 test-images-bar):0 张时仅测试图,1 张单图态,≥2 张批量态 */}
         <ImageStrip
           images={images}
+          seedViews={rowsSeedView}
           selectedIndex={selectedIndex}
           mode={isBatch ? 'batch' : 'single'}
           atLimit={images.length >= BATCH_MAX_ROWS}

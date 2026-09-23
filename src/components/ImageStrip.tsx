@@ -5,8 +5,9 @@
 // 回调里按模式分派,组件只透传 src。
 import { useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { BatchImage } from '../lib/batch/imageList'
+import type { BatchImage, RowSeedView } from '../lib/batch/imageList'
 import { BATCH_MAX_ROWS } from '../lib/batch/batchJob'
+import { useCopyFeedback } from '../lib/useCopyFeedback'
 
 export interface TestImage {
   src: string
@@ -15,6 +16,8 @@ export interface TestImage {
 
 export interface ImageStripProps {
   images: BatchImage[]
+  /** 行种子展示视图(App2D 统一计算,id 与 images 对齐):full=null 渲染「跟随」 */
+  seedViews: RowSeedView[]
   selectedIndex: number
   mode: 'single' | 'batch'
   /** 已达 20 行上限:禁用 [+](测试图追加上限守卫在 App2D 回调内) */
@@ -42,6 +45,7 @@ const addIcon = (
 
 function ImageStrip({
   images,
+  seedViews,
   selectedIndex,
   mode,
   atLimit,
@@ -53,32 +57,63 @@ function ImageStrip({
 }: ImageStripProps) {
   const { t } = useTranslation()
   const inputRef = useRef<HTMLInputElement>(null)
+  const { feedback, copy } = useCopyFeedback()
 
   return (
     <div className={`image-strip${mode === 'batch' ? ' image-strip--batch' : ''}`}>
-      {images.map((img, i) => (
-        <div
-          key={img.id}
-          className={`image-strip-cell${i === selectedIndex ? ' image-strip-cell--selected' : ''}`}
-        >
-          <img
-            className="image-strip-thumb"
-            src={img.image.src}
-            alt={img.fileName}
-            title={img.fileName}
-            onClick={() => onSelect(i)}
-          />
-          <button
-            type="button"
-            className="image-strip-remove"
-            title={t('batch.remove')}
-            aria-label={t('batch.remove')}
-            onClick={() => onRemove(i)}
+      {images.map((img, i) => {
+        const sv = seedViews.find((v) => v.id === img.id)
+        return (
+          <div
+            key={img.id}
+            className={`image-strip-cell${i === selectedIndex ? ' image-strip-cell--selected' : ''}`}
           >
-            {removeIcon}
-          </button>
-        </div>
-      ))}
+            <div className="image-strip-thumb-wrap">
+              <img
+                className="image-strip-thumb"
+                src={img.image.src}
+                alt={img.fileName}
+                title={img.fileName}
+                onClick={() => onSelect(i)}
+              />
+              {/* done 行对角线对比(v3):原图铺底,处理后图 clip 右上三角覆盖。
+                  ╲ 左上→右下分割:右上=处理后,左下露出原图;结果与原图同尺寸,
+                  cover 裁切一致;未完成/失败行维持原图 */}
+              {img.status === 'done' && img.objectUrl && (
+                <>
+                  <img className="image-strip-result" src={img.objectUrl} alt="" aria-hidden="true" />
+                  <svg className="image-strip-diagonal" viewBox="0 0 80 56" preserveAspectRatio="none" aria-hidden="true">
+                    <line x1="0" y1="0" x2="80" y2="56" stroke="rgba(255,255,255,0.85)" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+                  </svg>
+                </>
+              )}
+            </div>
+            <button
+              type="button"
+              className="image-strip-remove"
+              title={t('batch.remove')}
+              aria-label={t('batch.remove')}
+              onClick={() => onRemove(i)}
+            >
+              {removeIcon}
+            </button>
+            {/* 种子条:截断码 + title 全量 + 点击复制;独立模式未独立行显示「跟随」。
+                stopPropagation 防触发选中 */}
+            {sv && sv.full !== null ? (
+              <button
+                type="button"
+                className="image-strip-seed"
+                title={sv.full}
+                onClick={(e) => { e.stopPropagation(); void copy(img.id, sv.full!) }}
+              >
+                {feedback?.id === img.id ? (feedback.ok ? t('seed.copied') : t('seed.copyFailed')) : sv.short}
+              </button>
+            ) : (
+              <span className="image-strip-seed image-strip-seed--follow">{t('batch.followBase')}</span>
+            )}
+          </div>
+        )
+      })}
       <button
         type="button"
         className="image-strip-add"
