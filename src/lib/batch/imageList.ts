@@ -25,6 +25,11 @@ export interface BatchImage {
   /** done 时的渲染元数据快照(v1 语义沿用):结果定格时刻的种子/风格,
    *  重骰/换基线后旧结果仍按生成时刻标注。 */
   renderedSeed: string | null
+  /** 底部栏对比预览(v3.2):预览队列渲染的当前效果 objectURL,参数停稳后由
+   *  队列重渲染替换;done 结果(objectUrl)仅在无预览时兜底显示。 */
+  previewUrl: string | null
+  /** 上次预览渲染的签名(风格/整批 text/字体/行生效种子);当前签名不同=待渲染。 */
+  previewSig: string | null
   /** v2 行种子限定当前风格,此值恒等于 activeStyle;字段保留以兼容命名/灯箱。 */
   renderedStyleId: StyleId | null
 }
@@ -149,6 +154,22 @@ export function rowDisplaySeed(
     return encodeSeed(def.id, working.params, def, working.textParams)
   }
   return displaySeed(row, mode, base, def)
+}
+
+/** 预览签名(v3.2):行预览是否需要重渲染的判定依据 = 行的生效种子展示
+ *  (rowDisplaySeed:选中行=工作副本实时,其余=行码/基线)+ 调用方组好的任务级
+ *  共享段(风格/整批 textParams/字体)。任一输入变化签名即变,预览队列据此
+ *  挑选待渲染行——拖滑块只刷受影响行,不整批重跑。 */
+export function rowPreviewSig(
+  row: BatchImage,
+  isSelected: boolean,
+  working: { params: Record<string, number>; textParams: Record<string, string> },
+  mode: 'unified' | 'perImage',
+  base: BatchBase,
+  def: StyleDefinition,
+  shared: string,
+): string {
+  return `${shared}|${rowDisplaySeed(row, isSelected, working, mode, base, def)}`
 }
 
 /** 种子码截断:保前缀(版本位+风格位在头部,保前缀即可辨),超出加省略号。 */

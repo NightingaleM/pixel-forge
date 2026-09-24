@@ -5,7 +5,7 @@ import { describe, it, expect } from 'vitest'
 import {
   rowEffectiveSeed, syncRowSeed, loadWorking, randomizeRowSeed,
   assembleProcessingTasks, isTaskSharedEdit, seedMatchesStyle, blobExt,
-  displaySeed, rowDisplaySeed, truncateSeed,
+  displaySeed, rowDisplaySeed, rowPreviewSig, truncateSeed,
   type BatchImage, type BatchBase,
 } from './imageList'
 import { getStyle } from '../StyleRegistry'
@@ -33,6 +33,8 @@ function makeRow(overrides: Partial<BatchImage> = {}): BatchImage {
     error: null,
     renderedSeed: null,
     renderedStyleId: null,
+    previewUrl: null,
+    previewSig: null,
     ...overrides,
   }
 }
@@ -253,6 +255,29 @@ describe('rowDisplaySeed', () => {
   })
   it('统一模式不受选中影响:与 displaySeed 同值(重骰残留透传)', () => {
     expect(rowDisplaySeed(makeRow({ seed: '0A5' }), true, working, 'unified', base, def)).toBe('0A5')
+  })
+})
+
+describe('rowPreviewSig', () => {
+  const working = { params: { ...base.params, uCellSize: 33 }, textParams: {} }
+  it('选中行工作副本变化 → 签名变化(预览需重渲染)', () => {
+    const a = rowPreviewSig(makeRow(), true, working, 'perImage', base, def, 'S')
+    const b = rowPreviewSig(makeRow(), true, { ...working, params: { ...working.params, uCellSize: 11 } }, 'perImage', base, def, 'S')
+    expect(a).not.toBe(b)
+  })
+  it('任务级共享段变化(风格/text/字体)→ 签名变化', () => {
+    const a = rowPreviewSig(makeRow(), false, working, 'perImage', base, def, 'S1')
+    expect(a).not.toBe(rowPreviewSig(makeRow(), false, working, 'perImage', base, def, 'S2'))
+  })
+  it('非选中行:行种子变化 → 签名变化;同一输入签名稳定(幂等)', () => {
+    const a = rowPreviewSig(makeRow({ seed: '0A5' }), false, working, 'perImage', base, def, 'S')
+    expect(a).toBe(rowPreviewSig(makeRow({ seed: '0A5' }), false, working, 'perImage', base, def, 'S'))
+    expect(a).not.toBe(rowPreviewSig(makeRow({ seed: '0A6' }), false, working, 'perImage', base, def, 'S'))
+  })
+  it('统一模式:基线变化 → 签名变化(基线编码进种子展示)', () => {
+    const a = rowPreviewSig(makeRow(), false, working, 'unified', base, def, 'S')
+    const b = rowPreviewSig(makeRow(), false, working, 'unified', { params: { ...base.params, uCellSize: 55 }, textParams: {} }, def, 'S')
+    expect(a).not.toBe(b)
   })
 })
 

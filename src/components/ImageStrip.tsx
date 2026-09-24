@@ -74,12 +74,12 @@ function ImageStrip({
                 title={img.fileName}
                 onClick={() => onSelect(i)}
               />
-              {/* done 行对角线对比(v3):原图铺底,处理后图 clip 右上三角覆盖。
-                  ╲ 左上→右下分割:右上=处理后,左下露出原图;结果与原图同尺寸,
-                  cover 裁切一致;未完成/失败行维持原图 */}
-              {img.status === 'done' && img.objectUrl && (
+              {/* 对角线对比(v3.2):首选实时预览(后台预览队列渲染,上传后即有、
+                  随调参刷新),done 处理结果仅在无预览时兜底。╲ 左上→右下分割:
+                  右上=效果,左下露出原图;两图同 object-fit:cover 裁切一致 */}
+              {(img.previewUrl || (img.status === 'done' && img.objectUrl)) && (
                 <>
-                  <img className="image-strip-result" src={img.objectUrl} alt="" aria-hidden="true" />
+                  <img className="image-strip-result" src={img.previewUrl ?? img.objectUrl!} alt="" aria-hidden="true" />
                   <svg className="image-strip-diagonal" viewBox="0 0 80 56" preserveAspectRatio="none" aria-hidden="true">
                     <line x1="0" y1="0" x2="80" y2="56" stroke="rgba(255,255,255,0.85)" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
                   </svg>

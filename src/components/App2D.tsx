@@ -16,12 +16,12 @@ import type { BuiltInPresetDefinition, StyleId } from '../types'
 import type { BatchImage, BatchBase } from '../lib/batch/imageList'
 import {
   rowEffectiveSeed, syncRowSeed, loadWorking, randomizeRowSeed, assembleProcessingTasks,
-  isTaskSharedEdit, seedMatchesStyle, blobExt, rowDisplaySeed, truncateSeed, type RowSeedView,
+  isTaskSharedEdit, seedMatchesStyle, blobExt, rowDisplaySeed, rowPreviewSig, truncateSeed, type RowSeedView,
   type BatchFormat,
 } from '../lib/batch/imageList'
 import { BATCH_MAX_ROWS, canRunBatch, dedupeName, zipEntryName } from '../lib/batch/batchJob'
 import {
-  buildBatchZip, createBatchRunner, createCanvasRenderTask,
+  buildBatchZip, createBatchRunner, createCanvasRenderTask, resolveRowRenderState,
   type ProcessingBaseline, type ProcessingJob, type RenderTaskFn,
 } from '../lib/batch/runBatch'
 import ImageUploader from './ImageUploader'
@@ -57,6 +57,8 @@ function makeRow(image: HTMLImageElement, fileName: string): BatchImage {
     error: null,
     renderedSeed: null,
     renderedStyleId: null,
+    previewUrl: null,
+    previewSig: null,
   }
 }
 
@@ -191,6 +193,100 @@ function App2D() {
     setImages((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)))
   }, [])
 
+  // ---------------------------------------------------------------------------
+  // 底部栏对比预览队列(v3.2):参数停稳(防抖)后逐行离屏渲染当前效果——上传后
+  // 即有对角线预览,不等「开始处理」。复用批量渲染任务(同一离屏 renderer,串行
+  // 让帧),与 drain 互斥:批量运行中退避,drain 收尾 re-kick。签名(rowPreviewSig)
+  // 不匹配的行才渲染,拖滑块只刷受影响行;渲染种子与种子条/处理链同源
+  // (rowDisplaySeed:选中行=工作副本实时,其余=行码/基线)。
+  // ---------------------------------------------------------------------------
+  const previewTickRef = useRef(0)
+  const previewRunningRef = useRef(false)
+  const previewTimerRef = useRef<number | undefined>(undefined)
+  // runPreview 与 schedulePreview 循环引用,经 ref 打破(触发时取最新实现)
+  const runPreviewRef = useRef<() => void>(() => {})
+  // 预览循环跨 tick 读最新输入(与 jobInputsRef 同模式;多存工作副本/模式/选中)
+  const previewInputsRef = useRef({ activeStyle, base: batchBase, fontParams, params, textParams, seedMode, selectedIndex })
+  useEffect(() => {
+    previewInputsRef.current = { activeStyle, base: batchBase, fontParams, params, textParams, seedMode, selectedIndex }
+  }, [activeStyle, batchBase, fontParams, params, textParams, seedMode, selectedIndex])
+
+  const schedulePreview = useCallback(() => {
+    window.clearTimeout(previewTimerRef.current)
+    previewTimerRef.current = window.setTimeout(() => runPreviewRef.current(), 400)
+  }, [])
+
+  const runPreview = useCallback(async () => {
+    if (previewRunningRef.current) {
+      // 已在跑:作废旧循环(其 while 检测 tick 退出,收尾时 re-schedule)
+      previewTickRef.current++
+      return
+    }
+    previewRunningRef.current = true
+    const myTick = ++previewTickRef.current
+    let superseded = false
+    try {
+      await yieldFrame()
+      // 本轮已渲染记忆:previewSig 经 setImages→effect→batchImagesRef 的同步链
+      // 滞后于循环节奏(让帧的 rAF 可能先于 React 提交跑),find 若只读行上的
+      // previewSig 会把同一行无限重渲染——本地 Map 即时挡住
+      const rendered = new Map<string, string>()
+      while (myTick === previewTickRef.current) {
+        // 批量处理优先(drain 持有同一离屏渲染任务,并发会互踩);收尾 re-kick
+        if (batchRunningRef.current) break
+        const rows = batchImagesRef.current
+        const { activeStyle, base, fontParams, params, textParams, seedMode, selectedIndex } = previewInputsRef.current
+        const def = getStyle(activeStyle)
+        if (rows.length === 0 || !def) break
+        const fontSig = Object.entries(fontParams).map(([k, v]) => `${k}:${v?.family ?? ''}`).join(';')
+        const shared = `${activeStyle}|${JSON.stringify(base.textParams)}|${fontSig}`
+        let target: { row: BatchImage; sig: string; i: number } | null = null
+        for (let i = 0; i < rows.length; i++) {
+          const sig = rowPreviewSig(rows[i], i === selectedIndex, { params, textParams }, seedMode, base, def, shared)
+          if (rows[i].previewSig !== sig && rendered.get(rows[i].id) !== sig) { target = { row: rows[i], sig, i }; break }
+        }
+        if (!target) break
+        const { row, sig, i } = target
+        try {
+          const seed = rowDisplaySeed(row, i === selectedIndex, { params, textParams }, seedMode, base, def)
+            ?? rowEffectiveSeed(row, base, def)
+          const state = resolveRowRenderState(
+            { params: { ...base.params }, textParams: { ...base.textParams }, fontParams },
+            seed,
+          )
+          const task = renderTaskRef.current
+          if (!state || !task) throw new Error('preview task unavailable')
+          const blob = await task({ id: row.id, image: row.image, ...state, format: 'png' })
+          // tick 过期(参数又变/被顶替):丢弃陈旧 blob,不做无效写入
+          if (myTick !== previewTickRef.current) { superseded = true; break }
+          // 行已被移除/会话终止:建出的 URL 无人 revoke,不写
+          if (batchAliveRef.current && batchImagesRef.current.some((r) => r.id === row.id)) {
+            if (row.previewUrl) URL.revokeObjectURL(row.previewUrl)
+            updateRow(row.id, { previewUrl: URL.createObjectURL(blob), previewSig: sig })
+          }
+          rendered.set(row.id, sig)
+        } catch {
+          // 单行渲染失败:记签名防死循环重试(参数再变会重新入队)
+          rendered.set(row.id, sig)
+          updateRow(row.id, { previewSig: sig })
+        }
+        await yieldFrame()
+      }
+      if (myTick !== previewTickRef.current) superseded = true
+    } finally {
+      previewRunningRef.current = false
+      if (superseded) schedulePreview()
+    }
+  }, [updateRow, schedulePreview])
+  useEffect(() => { runPreviewRef.current = runPreview }, [runPreview])
+
+  // 预览重排触发:行集/参数/种子/风格/字体任一变化(防抖);previewSig 写入也会
+  // 触发本 effect(空转一轮找不到目标即退出,无害)
+  useEffect(() => {
+    if (images.length === 0) return
+    schedulePreview()
+  }, [images, activeStyle, params, textParams, fontParams, seedMode, batchBase, schedulePreview])
+
   const drain = useCallback(async () => {
     // 串行守卫:所有触发路径(开始处理/重试/重骰)都必须先过这道闸再进 while
     if (batchRunningRef.current) return
@@ -228,8 +324,10 @@ function App2D() {
       }
     } finally {
       batchRunningRef.current = false
+      // 处理期间退避的底部栏预览续跑(参数可能已变,签名机制自动挑行)
+      schedulePreview()
     }
-  }, [updateRow])
+  }, [updateRow, schedulePreview])
 
   // 终止队列并回收进行中行:面板确认关闭与会话关闭共用。cancel 单独拦不住 drain
   // 的 while 复查,alive=false 才关闸;processing 行回 pending(终止即丢弃,迟到
@@ -509,6 +607,7 @@ function App2D() {
       const row = images[i]
       if (!row) return
       if (row.objectUrl) URL.revokeObjectURL(row.objectUrl)
+      if (row.previewUrl) URL.revokeObjectURL(row.previewUrl)
       const next = images.filter((_, idx) => idx !== i)
       if (next.length === 0) {
         resetSession()
@@ -651,6 +750,10 @@ function App2D() {
   // ---------------------------------------------------------------------------
 
   useEffect(() => {
+    // 挂载复活终止闸:StrictMode(dev)双挂载时首挂 cleanup 置 false 后不再自愈
+    // ——批量路径有 drain 复活闸无感,预览队列(v3.2,不经 drain)会被永久拦在
+    // updateRow 写入守卫外;真实卸载仍置 false
+    batchAliveRef.current = true
     // runner 终生不变,拷局部供 cleanup 使用(refs 规约,与 v1 BatchPanel 同款)
     const runner = runnerRef.current
     return () => {
@@ -798,6 +901,7 @@ function App2D() {
           // 不替换既有行,无需处理)。走 ref 读最新行,避免异步 onload 闭包 stale
           batchImagesRef.current.forEach((r) => {
             if (r.objectUrl) URL.revokeObjectURL(r.objectUrl)
+            if (r.previewUrl) URL.revokeObjectURL(r.previewUrl)
           })
           setImages([makeRow(img, testImageName(src))])
           setSelectedIndex(0)
@@ -944,6 +1048,7 @@ function App2D() {
     // 无人 revoke 而泄漏
     batchImagesRef.current.forEach((row) => {
       if (row.objectUrl) URL.revokeObjectURL(row.objectUrl)
+      if (row.previewUrl) URL.revokeObjectURL(row.previewUrl)
     })
     resetSession()
     setCloseDialog(null)
