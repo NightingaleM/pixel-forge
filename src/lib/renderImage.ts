@@ -127,15 +127,21 @@ export function exportCanvasBlob(canvas: HTMLCanvasElement, type: 'image/png' | 
   return new Promise((resolve) => canvas.toBlob(resolve, type))
 }
 
-/** JPG 无 alpha:先合成黑底(背景关闭时 ASCII 透明区域否则变白)。 */
-export async function exportJpgWithBlackBg(source: HTMLCanvasElement): Promise<Blob | null> {
+/** 黑底合成:返回新 canvas(不改源)。JPG 无 alpha,背景关闭时透明区否则变白。
+ *  独立导出供水印路径使用(JPG 水印顺序契约:渲染→黑底→水印→toBlob)。 */
+export function compositeOnBlack(source: HTMLCanvasElement): HTMLCanvasElement {
   const tmp = document.createElement('canvas')
   tmp.width = source.width
   tmp.height = source.height
   const ctx = tmp.getContext('2d')
-  if (!ctx) return null
+  if (!ctx) return tmp   // 调用方 toBlob 会得到空图,与原实现失败路径一致
   ctx.fillStyle = '#000'
   ctx.fillRect(0, 0, tmp.width, tmp.height)
   ctx.drawImage(source, 0, 0)
-  return exportCanvasBlob(tmp, 'image/jpeg')
+  return tmp
+}
+
+/** JPG 无 alpha:先合成黑底(背景关闭时 ASCII 透明区域否则变白)。 */
+export async function exportJpgWithBlackBg(source: HTMLCanvasElement): Promise<Blob | null> {
+  return exportCanvasBlob(compositeOnBlack(source), 'image/jpeg')
 }

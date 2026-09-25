@@ -521,7 +521,7 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 - Produces:
   - `WATERMARK_SITE = 'PixelForge'`、`WATERMARK_DOMAIN = 'pixelforge.oylz.site'`
   - `watermarkText(seed: string): string`
-  - `tiledLayout(w: number, h: number): { fontSize: number; gap: number }`
+  - `tiledLayout(w: number): { fontSize: number; gap: number }`
   - `applyCanvasWatermark(canvas: HTMLCanvasElement, mode: 'corner'|'tiled', seed: string): void`(就地画,导出副本上调用)
   - `exportWatermarked(src: HTMLCanvasElement, mode: 'corner'|'tiled', seed: string, type: 'image/png'|'image/jpeg'): Promise<Blob|null>`(copy→水印→toBlob,不污染 src)
   - `injectSvgWatermark(svg: string, mode: 'corner'|'tiled', seed: string): string`
@@ -543,8 +543,8 @@ describe('watermarkText', () => {
 
 describe('tiledLayout', () => {
   it('字号=gap/6.67 一类比例:大图字号大,小图有下限', () => {
-    const big = tiledLayout(4000, 3000)
-    const small = tiledLayout(400, 300)
+    const big = tiledLayout(4000)
+    const small = tiledLayout(400)
     expect(big.fontSize).toBeGreaterThan(small.fontSize)
     expect(big.gap).toBeGreaterThan(small.gap)
     expect(small.fontSize).toBeGreaterThanOrEqual(10)   // 小图可读下限
@@ -607,7 +607,7 @@ export function watermarkText(seed: string): string {
 }
 
 /** 平铺布局:字号≈图宽/40(下限 10),间距≈图宽/6。 */
-export function tiledLayout(w: number, _h: number): { fontSize: number; gap: number } {
+export function tiledLayout(w: number): { fontSize: number; gap: number } {
   return { fontSize: Math.max(10, Math.round(w / 40)), gap: Math.max(80, Math.round(w / 6)) }
 }
 
@@ -629,7 +629,7 @@ export function applyCanvasWatermark(canvas: HTMLCanvasElement, mode: 'corner' |
     ctx.restore()
     return
   }
-  const { fontSize, gap } = tiledLayout(canvas.width, canvas.height)
+  const { fontSize, gap } = tiledLayout(canvas.width)
   ctx.save()
   ctx.font = `${fontSize}px sans-serif`
   ctx.fillStyle = 'rgba(255,255,255,0.15)'
