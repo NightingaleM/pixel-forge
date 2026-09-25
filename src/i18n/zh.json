@@ -580,5 +580,8 @@
     "notFound": {
       "title": "页面不存在 - PixelForge"
     }
+  },
+  "license": {
+    "toastCorner": "今日无水印额度已用完,本次导出带水印"
   }
 }

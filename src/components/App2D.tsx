@@ -7,7 +7,9 @@ import { styles, getStyle, defaultParams, defaultTextParams } from '../lib/Style
 import { encodeSeed, decodeSeed } from '../lib/seedCodec'
 import { findBrightestPoint } from '../lib/brightPoint'
 import { randomizeParams } from '../lib/randomSeed'
-import { renderImage, exportCanvasBlob, exportJpgWithBlackBg } from '../lib/renderImage'
+import { renderImage, exportCanvasBlob, compositeOnBlack } from '../lib/renderImage'
+import { decideSingleExport } from '../lib/license/gating'
+import { exportWatermarked, injectSvgWatermark } from '../lib/license/watermark'
 import { loadPresets, savePreset, removePreset, mergeWithDefaults, type PresetEntry } from '../lib/presetStore'
 import { randomId } from '../lib/randomId'
 import { readImageFiles } from '../lib/readImageFiles'
@@ -111,6 +113,13 @@ function App2D() {
   const [brightest, setBrightest] = useState<{ x: number; y: number } | null>(null)
   // 主画布 × 的关闭确认:单图=v1 退出确认;批量=批量会话关闭确认(清全部图片)
   const [closeDialog, setCloseDialog] = useState<'single' | 'batch' | null>(null)
+  // 水印降级一次性提示:首次从"无水印"跌到"带水印"时弹一次,3s 自清,不反复骚扰
+  const [wmToast, setWmToast] = useState(false)
+  useEffect(() => {
+    if (!wmToast) return
+    const timer = setTimeout(() => setWmToast(false), 3000)
+    return () => clearTimeout(timer)
+  }, [wmToast])
   // 本地预设（localStorage 持久化，见 lib/presetStore）
   const [presets, setPresets] = useState<PresetEntry[]>(() => loadPresets())
   const [showPresetPanel, setShowPresetPanel] = useState(false)
@@ -834,6 +843,14 @@ function App2D() {
     }
   }, [activeStyle, params, textParams, seedMode])
 
+  // 风格定义与当前种子码:导出 handler(水印文本带种子码)与渲染/种子视图共用,
+  // 声明在 handler 之前(useCallback 引用不能前向)
+  const currentStyle = getStyle(activeStyle)
+  const seed = useMemo(
+    () => currentStyle ? encodeSeed(activeStyle, params, currentStyle, textParams) : '',
+    [activeStyle, params, textParams, currentStyle],
+  )
+
   const downloadBlob = useCallback((blob: Blob | null, ext: string) => {
     if (!blob) return
     const url = URL.createObjectURL(blob)
@@ -851,36 +868,52 @@ function App2D() {
     return styleDef?.renderMode === 'canvas2d' ? asciiCanvasRef.current : canvasRef.current
   }, [activeStyle])
 
+  // 会员 gating:额度内无水印(逐次消耗),超额起单图带角落水印;水印画在导出
+  // 副本上,预览画布永不污染。JPG 顺序契约:渲染→黑底→水印→toBlob。
   const handleDownloadPng = useCallback(async () => {
     const src = getExportCanvas()
     if (!src) return
-    const b = await exportCanvasBlob(src, 'image/png')
+    const d = decideSingleExport()
+    if (d.mode === 'none') {
+      const b = await exportCanvasBlob(src, 'image/png')
+      downloadBlob(b, 'png')
+      return
+    }
+    setWmToast(true)
+    const b = await exportWatermarked(src, 'corner', seed, 'image/png')
     downloadBlob(b, 'png')
-  }, [getExportCanvas, downloadBlob])
+  }, [getExportCanvas, downloadBlob, seed])
 
   const handleDownloadJpg = useCallback(async () => {
     // JPG has no alpha: composite onto black if background is off.
     const styleDef = getStyle(activeStyle)
     const showBg = params['uShowBg'] ?? 1
-    if (styleDef?.renderMode === 'canvas2d' && showBg !== 1) {
-      const src = getExportCanvas()
-      if (!src) return
-      const b = await exportJpgWithBlackBg(src)
+    const src = getExportCanvas()
+    if (!src) return
+    const base = styleDef?.renderMode === 'canvas2d' && showBg !== 1 ? compositeOnBlack(src) : src
+    const d = decideSingleExport()
+    if (d.mode === 'none') {
+      const b = await exportCanvasBlob(base, 'image/jpeg')
       downloadBlob(b, 'jpg')
       return
     }
-    const src = getExportCanvas()
-    if (!src) return
-    const b = await exportCanvasBlob(src, 'image/jpeg')
+    setWmToast(true)
+    const b = await exportWatermarked(base, 'corner', seed, 'image/jpeg')
     downloadBlob(b, 'jpg')
-  }, [activeStyle, params, getExportCanvas, downloadBlob])
+  }, [activeStyle, params, getExportCanvas, downloadBlob, seed])
 
   const handleDownloadSvg = useCallback(() => {
     const family = fontParams['uFont']?.family ?? 'monospace'
     const svg = asciiRendererRef.current?.exportSvg(family)
     if (!svg) return
+    const d = decideSingleExport()
+    if (d.mode === 'corner') {
+      setWmToast(true)
+      downloadBlob(new Blob([injectSvgWatermark(svg, 'corner', seed)], { type: 'image/svg+xml' }), 'svg')
+      return
+    }
     downloadBlob(new Blob([svg], { type: 'image/svg+xml' }), 'svg')
-  }, [fontParams, downloadBlob])
+  }, [fontParams, downloadBlob, seed])
 
   // 测试图点击:ImageStrip 只透传 src,由 App2D 按模式分派——
   // 单图(含上传页)= v1 行为加载为唯一图;批量 = 追加为新行(受 20 上限)
@@ -922,8 +955,6 @@ function App2D() {
   // Render
   // ---------------------------------------------------------------------------
 
-  const currentStyle = getStyle(activeStyle)
-
   // 行种子展示视图(v3):底部栏种子条与批量浮窗行列表共用同一份(TASK 共享
   // 消费),两处显示永不漂移。独立模式选中行 = 工作副本实时编码(编辑即所见,
   // 与 SeedBar 顶码同源,不等懒同步点);其余行走 displaySeed(统一:基线/重骰
@@ -944,11 +975,6 @@ function App2D() {
     if (activeStyle !== 'animelight' || params['uGodRayAuto'] !== 1 || !brightest) return params
     return { ...params, uCenterX: brightest.x, uCenterY: brightest.y }
   }, [activeStyle, params, brightest])
-
-  const seed = useMemo(
-    () => currentStyle ? encodeSeed(activeStyle, params, currentStyle, textParams) : '',
-    [activeStyle, params, textParams, currentStyle],
-  )
 
   const handleApplySeed = useCallback((code: string): boolean => {
     if (!image) return false
@@ -1190,6 +1216,17 @@ function App2D() {
           onConfirm={handleClose}
           onCancel={() => setCloseDialog(null)}
         />
+      )}
+      {/* 水印降级一次性提示(无障碍:纯通知,pointerEvents 关闭不抢焦点) */}
+      {wmToast && (
+        <div
+          role="status"
+          style={{ position: 'fixed', left: '50%', bottom: '72px', transform: 'translateX(-50%)',
+            background: 'rgba(30,30,30,0.92)', color: '#fff', padding: '8px 14px', borderRadius: 8,
+            fontSize: 13, zIndex: 1000, pointerEvents: 'none' }}
+        >
+          {t('license.toastCorner')}
+        </div>
       )}
     </div>
   )

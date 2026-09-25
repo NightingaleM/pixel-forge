@@ -580,5 +580,8 @@
     "notFound": {
       "title": "Page Not Found - PixelForge"
     }
+  },
+  "license": {
+    "toastCorner": "Watermark-free quota used up today; exports now carry a watermark"
   }
 }
