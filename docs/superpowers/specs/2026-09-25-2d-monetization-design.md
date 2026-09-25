@@ -54,8 +54,9 @@ day/week/month/year。
 
 - **验签**:前端硬编码公钥,用 @noble/curves 的 ed25519(纯 JS,~10KB,规避 WebCrypto
   的 Ed25519 浏览器兼容差异)。验签 <1ms,每次需要时现验,不缓存会员状态。
-- **存储**:localStorage 键 `pf.license.code` 存**码原文**(购买凭证,清存储后重输即恢复)。
-  过期码保留,面板显示"已过期,续费激活"。
+- **存储**:localStorage 键 `pixel-forge.license.v1` 存**码原文**(购买凭证,清存储后
+  重输即恢复;键名遵循项目 `pixel-forge.*.v1` 惯例,storage 经 StorageLike 注入,
+  同 presetStore 模式)。过期码保留,面板显示"已过期,续费激活"。
 - **错误分类**(激活输入框的三种提示):格式不对 / 验签失败(提示联系卖家) / 已过期。
 - **密钥管理**:生产密钥对由用户在后端环境生成(生成命令见后端需求文档),公钥填入
   前端常量 `PUBLIC_KEY`;轮换 = 换公钥 + 前端发版。测试密钥对仅用于开发自测,
@@ -83,9 +84,9 @@ day/week/month/year。
 
 ## 免费计数
 
-- 键 `pf.freeExports.<yyyy-mm-dd>`(日期编进键名,本地时区自然日,跨日自然重置,无需清理)。
-- 只存 localStorage:清存储的损害仅为"多得 5 次无水印",接受,不做服务端配额
-  (水印墙的红利:免费侧零后端)。
+- 键 `pixel-forge.freeExports.v1` 存 JSON `{date:'YYYY-MM-DD', count:N}`(单键自清洁:
+  读取时 date 非今日即归零重计;本地时区自然日)。只存 localStorage:清存储的损害
+  仅为"多得 5 次无水印",接受,不做服务端配额(水印墙的红利:免费侧零后端)。
 
 ## UI 与文案
 
