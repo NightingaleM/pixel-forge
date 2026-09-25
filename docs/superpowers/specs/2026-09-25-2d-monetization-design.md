@@ -77,8 +77,9 @@ localStorage 可清。设计目标不是防破解,而是把白嫖的麻烦程度
 - **密钥管理**:生产密钥对由用户在后端环境生成(生成命令见后端需求文档),公钥填入
   前端常量 `PUBLIC_KEY`;轮换 = 换公钥 + 前端发版。测试密钥对仅用于开发自测,
   `scripts/genLicense.mjs` 持有测试私钥(可进 git,`--unredeemed` 造未兑换码),
-  **生产私钥绝不进 git 与构建产物**。`VITE_API_BASE` 开发指向本地 mock
-  (scripts/mock-redeem.mjs),生产留空走同源,上线前注入正式后端地址。
+  **生产私钥绝不进 git 与构建产物**。dev 下 `/api` 由 vite proxy 同源转发到后端网关
+  (默认 7002,`API_PROXY_TARGET` 可覆盖,mock 回归指向 3999)——浏览器视为同源,
+  免后端 CORS 白名单;生产 `VITE_API_BASE` 留空走同源(部署反代),除非后端在异域。
 
 ## 生成归属(定稿:后端生成)
 
