@@ -6,8 +6,13 @@ import type { LicenseTier, StorageLike } from './types'
 
 const STORAGE_KEY = 'pixel-forge.license.v1'
 
-// ── 当前为测试公钥(与 testKey.ts 同步);上线前替换为后端交付的生产公钥 hex ──
-let publicKeyHex = '711858903ef7f1a8b6751ae99f9f333df56b77c6b9eb772c8d0c964a4b58796c'
+// ── 生产公钥(后端 2026-09-25 交付)。构建产物硬编码此值,无运行时后门;
+//    仅 dev 模式可经 VITE_LICENSE_PUBKEY 覆盖为测试公钥,供浏览器回归脚本
+//    (scripts/verify-license.mjs)用测试私钥造码走通激活流 ──
+let publicKeyHex = '2e9e43fd307c835c05dbc39a46806ff605bba7b3f91c35362ebf1ed12cc6f529'
+if (import.meta.env.DEV && import.meta.env.VITE_LICENSE_PUBKEY) {
+  publicKeyHex = import.meta.env.VITE_LICENSE_PUBKEY as string
+}
 export function setLicensePublicKey(hex: string): void { publicKeyHex = hex }
 
 // 同 presetStore:localStorage getter 在禁 cookie 环境会抛,模块加载期必须吞掉
