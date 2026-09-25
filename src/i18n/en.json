@@ -583,6 +583,21 @@
   },
   "license": {
     "toastCorner": "Watermark-free quota used up today; exports now carry a watermark",
-    "batchBanner": "Free batch exports are watermarked"
+    "batchBanner": "Free batch exports are watermarked",
+    "panelTitle": "Membership",
+    "freeTitle": "Free",
+    "memberTitle": "Member",
+    "freeRemaining": "{{count}} watermark-free exports left today",
+    "memberUntil": "Active until {{date}}",
+    "expiredTag": "Expired — renew to activate",
+    "activate": "Activate",
+    "placeholder": "Paste license code…",
+    "activated": "Activated",
+    "errFormat": "Invalid code format",
+    "errSignature": "Invalid code, please contact the seller",
+    "errExpired": "Code has expired",
+    "backup": "Copy code as backup",
+    "purchase": "Buy a code",
+    "badge": "Member"
   }
 }

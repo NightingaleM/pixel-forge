@@ -8,10 +8,13 @@ interface ActionBarProps {
   onReset: () => void
   onRandom: () => void
   onBatchApply: () => void
+  /** 会员入口(付费墙):免费=primary 引导转化,会员=secondary 状态展示 */
+  onOpenLicense?: () => void
+  licenseActive?: boolean
   imageInfo: { width: number; height: number; size: string } | null
 }
 
-function ActionBar({ onDownloadPng, onDownloadJpg, onDownloadSvg, renderMode, onReset, onRandom, onBatchApply, imageInfo }: ActionBarProps) {
+function ActionBar({ onDownloadPng, onDownloadJpg, onDownloadSvg, renderMode, onReset, onRandom, onBatchApply, onOpenLicense, licenseActive, imageInfo }: ActionBarProps) {
   const { t } = useTranslation()
   const isCanvas2d = renderMode === 'canvas2d'
 
@@ -39,6 +42,18 @@ function ActionBar({ onDownloadPng, onDownloadJpg, onDownloadSvg, renderMode, on
         </svg>
         {t('batch.apply')}
       </button>
+      {onOpenLicense && (
+        <button
+          className={`action-btn ${licenseActive ? 'action-btn--secondary' : 'action-btn--primary'}`}
+          onClick={onOpenLicense}
+        >
+          {/* 皇冠线稿:会员语义(手绘 SVG,禁 emoji) */}
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: '-2px', marginRight: 4 }} aria-hidden="true">
+            <path d="M3 8l4 4 5-6 5 6 4-4v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+          </svg>
+          {t('license.badge')}
+        </button>
+      )}
       {imageInfo && (
         <div className="image-info">
           {imageInfo.width} x {imageInfo.height} | {imageInfo.size}

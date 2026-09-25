@@ -39,6 +39,7 @@ import ActionBar from './ActionBar'
 import { CompareSlider } from './CompareSlider'
 import ConfirmDialog from './ConfirmDialog'
 import BatchPanel, { type BatchSeedMode } from './BatchPanel'
+import LicensePanel from './LicensePanel'
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return bytes + ' B'
@@ -116,6 +117,8 @@ function App2D() {
   const [closeDialog, setCloseDialog] = useState<'single' | 'batch' | null>(null)
   // 水印降级一次性提示:首次从"无水印"跌到"带水印"时弹一次,3s 自清,不反复骚扰
   const [wmToast, setWmToast] = useState(false)
+  // 会员浮窗(付费墙):激活成功经 onChanged 触发重渲,横幅/会员钮即时刷新
+  const [showLicensePanel, setShowLicensePanel] = useState(false)
   useEffect(() => {
     if (!wmToast) return
     const timer = setTimeout(() => setWmToast(false), 3000)
@@ -1123,6 +1126,8 @@ function App2D() {
         onReset={handleReset}
         onRandom={handleRandom}
         onBatchApply={handleBatchOpen}
+        onOpenLicense={() => setShowLicensePanel((v) => !v)}
+        licenseActive={getLicenseStatus().active}
         imageInfo={imageInfo}
       />
       {image && currentStyle && (
@@ -1217,6 +1222,13 @@ function App2D() {
           confirmLabel={closeDialog === 'batch' ? t('batch.confirmCloseSessionBtn') : undefined}
           onConfirm={handleClose}
           onCancel={() => setCloseDialog(null)}
+        />
+      )}
+      {/* 会员浮窗:激活/状态/备份/购买入口(付费墙) */}
+      {showLicensePanel && (
+        <LicensePanel
+          onClose={() => setShowLicensePanel(false)}
+          onChanged={() => setImages((v) => [...v])}
         />
       )}
       {/* 水印降级一次性提示(无障碍:纯通知,pointerEvents 关闭不抢焦点) */}

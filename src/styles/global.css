@@ -357,6 +357,18 @@ body {
   display: flex;
   flex-direction: column;
 }
+/* --- License Panel (付费墙会员浮窗,复用 preset-panel 底盘) --- */
+.license-panel { width: 300px; max-width: calc(100vw - 24px); }
+.license-body { display: flex; flex-direction: column; gap: 10px; padding: 12px; }
+.license-card { border: 1px solid rgba(128,128,128,0.25); border-radius: 10px; padding: 10px 12px; font-size: 13px; }
+.license-card--member { border-color: rgba(230,167,0,0.5); background: rgba(230,167,0,0.08); }
+.license-card-title { font-weight: 600; margin-bottom: 4px; }
+.license-activate { display: flex; gap: 8px; }
+.license-activate input { flex: 1; min-width: 0; }
+.license-msg { font-size: 12px; }
+.license-msg--ok { color: #4caf50; }
+.license-msg--err { color: #ef5350; }
+.license-link-btn { background: none; border: none; color: #8ab4ff; cursor: pointer; font-size: 12px; padding: 0; text-align: left; text-decoration: none; }
 .preset-panel-body {
   padding: 8px;
   overflow-y: auto;

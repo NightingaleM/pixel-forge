@@ -583,6 +583,21 @@
   },
   "license": {
     "toastCorner": "今日无水印额度已用完,本次导出带水印",
-    "batchBanner": "免费版批量导出带水印"
+    "batchBanner": "免费版批量导出带水印",
+    "panelTitle": "会员",
+    "freeTitle": "免费版",
+    "memberTitle": "会员",
+    "freeRemaining": "今日剩余无水印导出 {{count}} 次",
+    "memberUntil": "有效期至 {{date}}",
+    "expiredTag": "已过期,续费激活",
+    "activate": "激活",
+    "placeholder": "粘贴激活码…",
+    "activated": "激活成功",
+    "errFormat": "激活码格式不正确",
+    "errSignature": "激活码无效,请联系卖家",
+    "errExpired": "激活码已过期",
+    "backup": "复制激活码备份",
+    "purchase": "购买激活码",
+    "badge": "会员"
   }
 }
