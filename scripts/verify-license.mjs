@@ -1,8 +1,13 @@
 // scripts/verify-license.mjs
-// 付费墙浏览器实测(plan Task 7):水印绘制像素验证 + gating 全链路 + 激活 + 3D 无碍。
-// 用法: 先起 vite dev,然后 node scripts/verify-license.mjs <port>
+// 付费墙浏览器实测:水印绘制像素验证 + gating 全链路 + 兑换码激活全链路 + 3D 无碍。
+// 场景 C(兑换码方案):C0 断网贴未兑换码→网络提示;C1 起 mock 后 redeem 激活;
+//   C2 会员超额无 toast;C3 清存储重贴已兑换码离线恢复。
+// 用法: 先起 vite dev(.env.local 需有 VITE_API_BASE=http://localhost:3999 与测试公钥),
+//   然后 node scripts/verify-license.mjs <port>
 // 产物: artifacts/license-verify/ 截图 + result.json
 import puppeteer from 'puppeteer-core'
+import { spawn } from 'node:child_process'
+import { ed25519 } from '@noble/curves/ed25519'
 import fs from 'node:fs'
 import path from 'node:path'
 
@@ -11,8 +16,17 @@ const BASE = `http://localhost:${PORT}`
 const OUT = path.resolve('artifacts/license-verify')
 fs.mkdirSync(OUT, { recursive: true })
 
-const CODE = process.env.LICENSE_CODE
-if (!CODE) { console.error('缺少 LICENSE_CODE 环境变量(用 scripts/genLicense.mjs 生成)'); process.exit(1) }
+// 测试私钥自签两码(与 .env.local VITE_LICENSE_PUBKEY 测试公钥配对;换钥两处同步 testKey.ts)
+const TEST_PRIVATE_KEY_HEX = '585a87b0a5f2c4304597fcd18bd78368851de086b1ab126830bb961fc7fc2ff3'
+const sign = (payload) => {
+  const msg = Buffer.from(JSON.stringify(payload), 'utf8')
+  return `PF1.${msg.toString('base64url')}.${Buffer.from(ed25519.sign(msg, TEST_PRIVATE_KEY_HEX)).toString('base64url')}`
+}
+const NOW_S = Math.floor(Date.now() / 1000)
+const unredeemedCode = sign({ v: 1, tier: 'day', iat: NOW_S })            // 未兑换码(兑换码方案)
+const DAY_EXP = NOW_S + 86400
+const redeemedCode = sign({ v: 1, tier: 'day', exp: DAY_EXP })            // 已兑换码(离线路径)
+const b64urlJson = (code) => JSON.parse(Buffer.from(code.split('.')[1], 'base64url').toString('utf8'))
 
 const EDGE = ['C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
   'C:/Program Files/Microsoft/Edge/Application/msedge.exe'].find(fs.existsSync)
@@ -102,20 +116,61 @@ ok('B1 第 6 次导出触发降级 toast', toastSeen)
 ok('B2 localStorage 计数=5(额度耗尽)', quota === JSON.stringify({ date: new Date().toLocaleDateString('sv'), count: 5 }), `stored=${quota}`)
 await page.screenshot({ path: path.join(OUT, 'b2-toast.png') })
 
-// ---------- 场景 C:激活会员→按钮态/横幅/面板 ----------
-await page.evaluate((code) => localStorage.setItem('pixel-forge.license.v1', code), CODE)
-await page.reload({ waitUntil: 'networkidle0' })
-await page.click('img[src*="local_test_pic"]')
-await page.waitForFunction(() => document.querySelectorAll('canvas').length >= 2, { timeout: 10000 })
-await new Promise(r => setTimeout(r, 800))
-const memberBtn = await page.evaluate(() => {
-  const btns = [...document.querySelectorAll('.action-bar .action-btn')]
-  const b = btns.find(x => x.textContent?.includes('会员') || x.textContent?.includes('Member'))
+// ---------- 场景 C:兑换码激活全链路 ----------
+// UI 激活走真实交互:点 ActionBar 会员钮开面板 → 输入码 → 点激活(比直接 setItem 更真实)
+const openPanel = async () => {
+  const el = (await page.evaluateHandle(() => [...document.querySelectorAll('.action-bar .action-btn')]
+    .find(x => x.textContent?.includes('会员') || x.textContent?.includes('Member')))).asElement()
+  if (!el) throw new Error('未找到会员按钮')
+  await el.click()
+  await new Promise(r => setTimeout(r, 400))
+}
+const closePanel = async () => {
+  const b = await page.$('.license-panel .param-panel-close')
+  if (b) { await b.click(); await new Promise(r => setTimeout(r, 250)) }
+}
+const activateViaUi = async (code) => {
+  await openPanel()
+  await (await page.$('.license-panel input')).type(code)
+  await (await page.$('.license-panel .action-btn--primary')).click()
+}
+
+// C0:mock 未起(3999 不可达)→ 贴未兑换码 → 网络错误提示
+await page.evaluate(() => localStorage.removeItem('pixel-forge.license.v1'))
+await activateViaUi(unredeemedCode)
+await page.waitForFunction(() => document.querySelector('.license-msg--err') !== null, { timeout: 8000 })
+const c0msg = await page.evaluate(() => document.querySelector('.license-msg--err')?.textContent ?? '')
+ok('C0 断网贴未兑换码 → 网络不可达提示', /联网|[Ii]nternet/.test(c0msg), c0msg)
+await page.screenshot({ path: path.join(OUT, 'c0-offline.png') })
+await closePanel()
+
+// C1:起 mock redeem → 同一未兑换码激活成功
+const mock = spawn(process.execPath, ['scripts/mock-redeem.mjs', '3999'], { stdio: 'pipe' })
+let mockUp = false
+for (let i = 0; i < 30; i++) {
+  try { if ((await fetch('http://localhost:3999/')).ok) { mockUp = true; break } } catch { /* 未就绪,继续轮询 */ }
+  await new Promise(r => setTimeout(r, 200))
+}
+ok('C1a mock redeem 服务就绪(3999)', mockUp)
+await activateViaUi(unredeemedCode)
+await page.waitForFunction(() => document.querySelector('.license-msg--ok') !== null, { timeout: 8000 })
+const storedCode = await page.evaluate(() => localStorage.getItem('pixel-forge.license.v1'))
+const storedPayload = storedCode ? b64urlJson(storedCode) : null
+ok('C1b redeem 激活成功,存储区为已兑换码(有 exp 无 iat)',
+  storedPayload !== null && typeof storedPayload.exp === 'number' && storedPayload.iat === undefined,
+  storedCode ? JSON.stringify(storedPayload) : 'storage 空')
+const panelText = await page.evaluate(() => document.querySelector('.license-panel')?.textContent ?? '')
+ok('C1c 会员面板显示会员与到期日', /有效期|Active until/.test(panelText), panelText.slice(0, 80))
+const memberBtnCls = await page.evaluate(() => {
+  const b = [...document.querySelectorAll('.action-bar .action-btn')]
+    .find(x => x.textContent?.includes('会员') || x.textContent?.includes('Member'))
   return b ? b.className : null
 })
-ok('C1 ActionBar 会员钮呈会员态(secondary)', memberBtn !== null && memberBtn.includes('action-btn--secondary'), `class=${memberBtn}`)
+ok('C1d ActionBar 会员钮呈会员态(secondary)', memberBtnCls !== null && memberBtnCls.includes('action-btn--secondary'), `class=${memberBtnCls}`)
+await page.screenshot({ path: path.join(OUT, 'c1-member-panel.png') })
+await closePanel()
 
-// 免费下载 7 次(超额度):会员应全程无 toast
+// C2:会员超额下载 7 次应全程无降级 toast(B 场景已耗尽免费额度)
 let memberToastLeak = false
 const dl2 = await page.$$('.action-bar .action-btn')
 for (let i = 0; i < 7; i++) {
@@ -125,28 +180,21 @@ for (let i = 0; i < 7; i++) {
 }
 ok('C2 会员超额下载无降级 toast', !memberToastLeak)
 
-// 会员面板
-const memberBtnEl = await page.evaluateHandle(() => [...document.querySelectorAll('.action-bar .action-btn')]
-  .find(x => x.textContent?.includes('会员') || x.textContent?.includes('Member')))
-const el = memberBtnEl.asElement()
-if (!el) { ok('C3 会员面板显示到期信息', false, '未找到会员按钮') }
-else {
-  await el.click()
-  await new Promise(r => setTimeout(r, 400))
-  const panelText = await page.evaluate(() => document.querySelector('.license-panel')?.textContent ?? '')
-  ok('C3 会员面板显示到期信息', /会员|Member/.test(panelText) && /有效期|Active until/.test(panelText), panelText.slice(0, 80))
-  await page.screenshot({ path: path.join(OUT, 'c1-member-panel.png') })
-}
-
-// 清存储→回落免费→重输码恢复
+// C3:清存储回落免费 → 重贴已兑换码(离线路径,mock 在场但不发网络)→ 直接恢复
 await page.evaluate(() => localStorage.clear())
 await page.reload({ waitUntil: 'networkidle0' })
+await page.click('img[src*="local_test_pic"]')
+await page.waitForFunction(() => document.querySelectorAll('canvas').length >= 2, { timeout: 10000 })
 const fellBack = await page.evaluate(() => localStorage.getItem('pixel-forge.license.v1') === null)
-ok('C4 清存储后回落免费态', fellBack)
-await page.evaluate((code) => localStorage.setItem('pixel-forge.license.v1', code), CODE)
-await page.reload({ waitUntil: 'networkidle0' })
-const restored = await page.evaluate(() => localStorage.getItem('pixel-forge.license.v1') !== null)
-ok('C5 重输码恢复会员', restored)
+ok('C3a 清存储后回落免费态', fellBack)
+await activateViaUi(redeemedCode)
+await page.waitForFunction(() => document.querySelector('.license-msg--ok') !== null, { timeout: 8000 })
+const restoredCode = await page.evaluate(() => localStorage.getItem('pixel-forge.license.v1'))
+const restoredPayload = restoredCode ? b64urlJson(restoredCode) : null
+ok('C3b 重贴已兑换码离线直接恢复(exp 原样保留)',
+  restoredPayload !== null && restoredPayload.exp === DAY_EXP,
+  restoredCode ? JSON.stringify(restoredPayload) : 'storage 空')
+await closePanel()
 
 // ---------- 场景 D:3D 页无碍 ----------
 const errs3d = []
@@ -159,6 +207,7 @@ page.off('pageerror', onErr)
 
 fs.writeFileSync(path.join(OUT, 'result.json'), JSON.stringify({ results, pageErrors: errors }, null, 2))
 await browser.close()
+mock.kill()
 const failed = results.filter(r => !r.pass)
 console.log(`\n${results.length - failed.length}/${results.length} passed`)
 process.exit(failed.length ? 1 : 0)

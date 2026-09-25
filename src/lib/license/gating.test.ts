@@ -30,25 +30,25 @@ describe('decideSingleExport', () => {
     expect(decideSingleExport(NOW).mode).toBe('corner')
   })
 
-  it('会员:始终 none 且不消耗额度', () => {
-    activateCode(signLicense({ v: 1, tier: 'month', exp: Math.floor(NOW / 1000) + 1 }, TEST_PRIVATE_KEY_HEX), NOW)
+  it('会员:始终 none 且不消耗额度', async () => {
+    await activateCode(signLicense({ v: 1, tier: 'month', exp: Math.floor(NOW / 1000) + 1 }, TEST_PRIVATE_KEY_HEX), NOW)
     for (let i = 0; i < FREE_DAILY_NO_WATERMARK + 3; i++) {
       expect(decideSingleExport(NOW).mode).toBe('none')
     }
   })
 
-  it('过期会员回落免费逻辑', () => {
-    activateCode(signLicense({ v: 1, tier: 'day', exp: Math.floor(NOW / 1000) - 1 }, TEST_PRIVATE_KEY_HEX), NOW)
+  it('过期会员回落免费逻辑', async () => {
+    await activateCode(signLicense({ v: 1, tier: 'day', exp: Math.floor(NOW / 1000) - 1 }, TEST_PRIVATE_KEY_HEX), NOW)
     expect(decideSingleExport(NOW).mode).toBe('none')   // 免费第 1 次
     expect(decideSingleExport(NOW).mode).toBe('none')
   })
 })
 
 describe('decideBatchExport', () => {
-  it('免费=tiled 且不消耗单图额度;会员=none', () => {
+  it('免费=tiled 且不消耗单图额度;会员=none', async () => {
     expect(decideBatchExport(NOW).mode).toBe('tiled')
     expect(decideSingleExport(NOW).mode).toBe('none')   // 额度未被批量动过
-    activateCode(signLicense({ v: 1, tier: 'day', exp: Math.floor(NOW / 1000) + 100 }, TEST_PRIVATE_KEY_HEX), NOW)
+    await activateCode(signLicense({ v: 1, tier: 'day', exp: Math.floor(NOW / 1000) + 100 }, TEST_PRIVATE_KEY_HEX), NOW)
     expect(decideBatchExport(NOW).mode).toBe('none')
   })
 })

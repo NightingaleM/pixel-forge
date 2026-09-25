@@ -5,7 +5,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useDraggable } from '../lib/useDraggable'
-import { activateCode, getLicenseStatus, loadStoredCode, type LicenseParseResult } from '../lib/license/verify'
+import { activateCode, getLicenseStatus, loadStoredCode, type ActivateResult } from '../lib/license/verify'
 import { remainingToday, FREE_DAILY_NO_WATERMARK } from '../lib/license/quota'
 
 // v1 冷启动:面包多商品页;上线前替换为实际链接(收款三阶段见 spec 第 7 节)
@@ -20,6 +20,7 @@ interface LicensePanelProps {
 function LicensePanel({ onClose, onChanged }: LicensePanelProps) {
   const { t } = useTranslation()
   const [input, setInput] = useState('')
+  const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
   const { ref, pos, onHeaderMouseDown } = useDraggable(
     { x: Math.max(20, window.innerWidth - 340), y: 120 },
@@ -30,15 +31,25 @@ function LicensePanel({ onClose, onChanged }: LicensePanelProps) {
   const expired = !status.active && loadStoredCode() !== null
   const storedCode = loadStoredCode()
 
-  const handleActivate = () => {
-    const r: LicenseParseResult = activateCode(input)
-    if (r.ok) {
-      setMsg({ kind: 'ok', text: t('license.activated') })
-      setInput('')
-      onChanged()
-    } else {
-      const key = r.reason === 'format' ? 'errFormat' : r.reason === 'signature' ? 'errSignature' : 'errExpired'
-      setMsg({ kind: 'err', text: t(`license.${key}`) })
+  const handleActivate = async () => {
+    if (busy) return
+    setBusy(true)
+    try {
+      // 未兑换码会走 redeem(联网);已兑换码离线直达——激活中禁点防重复兑换
+      const r: ActivateResult = await activateCode(input)
+      if (r.ok) {
+        setMsg({ kind: 'ok', text: t('license.activated') })
+        setInput('')
+        onChanged()
+      } else {
+        const key = {
+          format: 'errFormat', signature: 'errSignature', expired: 'errExpired',
+          network: 'errNetwork', device_limit: 'errDeviceLimit', rate_limited: 'errRateLimit',
+        }[r.reason]
+        setMsg({ kind: 'err', text: t(`license.${key}`) })
+      }
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -73,8 +84,13 @@ function LicensePanel({ onClose, onChanged }: LicensePanelProps) {
             onChange={(e) => setInput(e.target.value)}
             placeholder={t('license.placeholder')}
             spellCheck={false}
+            disabled={busy}
           />
-          <button className="action-btn action-btn--primary" onClick={handleActivate}>{t('license.activate')}</button>
+          <button
+            className="action-btn action-btn--primary"
+            onClick={handleActivate}
+            disabled={busy || !input.trim()}
+          >{busy ? t('license.activating') : t('license.activate')}</button>
         </div>
         {msg && <div className={`license-msg license-msg--${msg.kind}`}>{msg.text}</div>}
         {storedCode && (

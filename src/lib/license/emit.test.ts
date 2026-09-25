@@ -1,8 +1,12 @@
 // src/lib/license/emit.test.ts
-// 签发/验签 roundtrip 与三类失败(格式/签名/过期)、激活存储策略、storage 健壮性。
+// 签发/验签 roundtrip 与三类失败(格式/签名/过期)、未兑换码契约(兑换码方案)、
+// 激活存储策略、storage 健壮性。
 import { describe, it, expect, beforeEach } from 'vitest'
-import { signLicense, type LicensePayload } from './emit'
-import { parseLicenseCode, activateCode, loadStoredCode, setLicenseStorage, setLicensePublicKey } from './verify'
+import { signLicense, signUnredeemed, type LicensePayload, type UnredeemedPayload } from './emit'
+import {
+  parseLicenseCode, parseUnredeemedCode, activateCode, loadStoredCode,
+  setLicenseStorage, setLicensePublicKey,
+} from './verify'
 import { TEST_PRIVATE_KEY_HEX, TEST_PUBLIC_KEY_HEX } from './testKey'
 
 // 内存 storage(node 无 window),同 presetStore 测试模式
@@ -65,38 +69,70 @@ describe('signLicense / parseLicenseCode', () => {
   })
 })
 
+describe('signUnredeemed / parseUnredeemedCode', () => {
+  const unredeemed: UnredeemedPayload = { v: 1, tier: 'week', iat: 1_759_300_000 }
+
+  it('roundtrip:未兑换码解析回同 tier/iat(永不过期,无 expired 分支)', () => {
+    const code = signUnredeemed(unredeemed, priv)
+    expect(code.startsWith('PF1.')).toBe(true)
+    expect(parseUnredeemedCode(code)).toEqual({ ok: true, tier: 'week', iat: 1_759_300_000 })
+  })
+
+  it('payload 键序 v/tier/iat 紧凑 JSON(与后端契约逐字节一致)', () => {
+    const code = signUnredeemed({ v: 1, tier: 'day', iat: 1_759_300_000 }, priv)
+    const b64 = code.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
+    expect(Buffer.from(b64, 'base64').toString('utf8')).toBe('{"v":1,"tier":"day","iat":1759300000}')
+  })
+
+  it('篡改 payload → signature 失败', () => {
+    const code = signUnredeemed(unredeemed, priv)
+    const parts = code.split('.')
+    const mid = 5
+    parts[1] = parts[1].slice(0, mid) + (parts[1][mid] === 'A' ? 'B' : 'A') + parts[1].slice(mid + 1)
+    expect(parseUnredeemedCode(parts.join('.'))).toEqual({ ok: false, reason: 'signature' })
+  })
+
+  it('未兑换码交给 parseLicenseCode → format(存储区只认已兑换码,未兑换码永不判为活跃会员)', () => {
+    expect(parseLicenseCode(signUnredeemed(unredeemed, priv), NOW)).toEqual({ ok: false, reason: 'format' })
+  })
+
+  it('已兑换码(有 exp 无 iat)交给 parseUnredeemedCode → format(两类码互斥)', () => {
+    expect(parseUnredeemedCode(signLicense(day, priv))).toEqual({ ok: false, reason: 'format' })
+  })
+})
+
 describe('activateCode', () => {
-  it('首次激活存储码原文;重输同码幂等', () => {
+  it('首次激活存储码原文;重输同码幂等', async () => {
     const code = signLicense(day, priv)
-    expect(activateCode(code, NOW).ok).toBe(true)
+    expect((await activateCode(code, NOW)).ok).toBe(true)
     expect(loadStoredCode()).toBe(code)
-    expect(activateCode(code, NOW).ok).toBe(true)
+    expect((await activateCode(code, NOW)).ok).toBe(true)
     expect(loadStoredCode()).toBe(code)
   })
 
-  it('新码 exp 更早 → 不覆盖现存;更晚 → 覆盖', () => {
+  it('新码 exp 更早 → 不覆盖现存;更晚 → 覆盖', async () => {
     const late = signLicense({ v: 1, tier: 'year', exp: Math.floor(NOW / 1000) + 3e7 }, priv)
     const early = day
-    activateCode(late, NOW)
-    activateCode(signLicense(early, priv), NOW)   // 更早,不覆盖
+    await activateCode(late, NOW)
+    await activateCode(signLicense(early, priv), NOW)   // 更早,不覆盖
     expect(loadStoredCode()).toBe(late)
     const later = signLicense({ v: 1, tier: 'lifetime', exp: 4102444800 }, priv)
-    activateCode(later, NOW)
+    await activateCode(later, NOW)
     expect(loadStoredCode()).toBe(later)
   })
 
-  it('坏码不触碰已存码', () => {
+  it('坏码不触碰已存码', async () => {
     const code = signLicense(day, priv)
-    activateCode(code, NOW)
-    activateCode('garbage', NOW)
+    await activateCode(code, NOW)
+    await activateCode('garbage', NOW)
     expect(loadStoredCode()).toBe(code)
   })
 })
 
 describe('storage 健壮性', () => {
-  it('storage 为 null 时一切安全回落', () => {
+  it('storage 为 null 时一切安全回落', async () => {
     setLicenseStorage(null)
     expect(loadStoredCode()).toBe(null)
-    expect(activateCode(signLicense(day, priv), NOW).ok).toBe(true)  // 验签仍通过,只是不持久化
+    expect((await activateCode(signLicense(day, priv), NOW)).ok).toBe(true)  // 验签仍通过,只是不持久化
   })
 })

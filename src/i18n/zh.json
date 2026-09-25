@@ -596,6 +596,10 @@
     "errFormat": "激活码格式不正确",
     "errSignature": "激活码无效,请联系卖家",
     "errExpired": "激活码已过期",
+    "activating": "激活中…",
+    "errNetwork": "激活需要联网,请检查网络后重试",
+    "errDeviceLimit": "设备数量已达上限,请联系卖家",
+    "errRateLimit": "操作过于频繁,请稍后再试",
     "backup": "复制激活码备份",
     "purchase": "购买激活码",
     "badge": "会员"

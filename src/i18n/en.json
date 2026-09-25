@@ -596,6 +596,10 @@
     "errFormat": "Invalid code format",
     "errSignature": "Invalid code, please contact the seller",
     "errExpired": "Code has expired",
+    "activating": "Activating…",
+    "errNetwork": "Activation requires internet. Check your connection and try again",
+    "errDeviceLimit": "Device limit reached. Please contact the seller",
+    "errRateLimit": "Too many attempts. Please try again later",
     "backup": "Copy code as backup",
     "purchase": "Buy a code",
     "badge": "Member"

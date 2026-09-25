@@ -30,42 +30,60 @@ localStorage 可清。设计目标不是防破解,而是把白嫖的麻烦程度
 心理路径:先尝到无水印导出的甜头 → 第 6 次起降级水印(损失厌恶) →
 批量需求撞上平铺水印(刚需付费)。
 
-**设计原则:后端是增强,不是依赖。** 后端未部署/不可用时,前端全部功能照常,
-仅丢失"防分享绑定"与"邮箱找回"两项增强(v2 后端能力)。
+**设计原则(2026-09-25 修订):兑换依赖后端,使用不依赖。** 激活未兑换码需
+联网调 redeem;换回已兑换码后一切离线,后端故障不影响已有会员。后端不可用时,
+免费功能与已兑换码的激活/恢复照常,仅"未兑换码激活"这一步受阻(提示需联网)。
 
 ## 模块设计
 
-新增 `src/lib/license/`,三个互不依赖的单元:
+新增 `src/lib/license/`,四个互不依赖的单元:
 
 | 单元 | 职责 | 依赖 |
 |---|---|---|
-| `verify.ts` | 激活码解析 + Ed25519 验签,输出 `{active, tier, expAt}` | @noble/curves |
+| `verify.ts` | 两类码解析 + Ed25519 验签(已兑换码输出 `{active, tier, expAt}`;未兑换码解析供激活流程分流),激活入口 `activateCode` | @noble/curves |
+| `redeem.ts` | 未兑换码 → 后端换已兑换码(POST /api/license/redeem,仅激活时调用) | fetch |
 | `quota.ts` | 当日免费无水印剩余次数(读写 localStorage) | 无 |
 | `watermark.ts` | 在导出 canvas / SVG 上合成水印 | 无 |
 
 调用方仅两处:App2D 单图导出、runBatch 批量导出。预览画布与底部栏缩略图永不加水印。
 
-## 激活码
+## 激活码(2026-09-25 修订:兑换码方案)
 
-**格式**:`PF1.<base64url(payload)>.<base64url(signature)>`,
-payload 为紧凑 JSON `{v:1,tier:"day"|"week"|"month"|"year"|"lifetime",exp:<unix秒>}`。
-码长约 90 字符,整段可复制粘贴。lifetime 档位字段预留(为将来买断制),首发 SKU 只发
-day/week/month/year。
+**两类码,同一外层格式** `PF1.<base64url(payload)>.<base64url(signature)>`:
+
+| 类型 | payload(紧凑 JSON,键序固定) | 来源 |
+|---|---|---|
+| 未兑换码 | `{v:1,tier:"day"\|"week"\|"month"\|"year"\|"lifetime",iat:<unix秒>}` | 后端 generate(囤库存零损耗,永不过期) |
+| 已兑换码 | `{v:1,tier,exp:<unix秒>}` | 后端 redeem(exp=兑换时刻+时长) |
+
+**两段式激活流程**(`activateCode`,async):
+
+1. 本地验签为合法**已兑换码** → 离线直接存(兼容客服手工签发,零网络);
+2. 本地验签为合法**未兑换码** → 调 `POST {VITE_API_BASE}/api/license/redeem`
+   (带 localStorage 持久随机 `deviceId`,键 `pixel-forge.deviceId.v1`)→
+   **本地验签返回码**(不信响应体)→ 通过才存;
+3. 多码保留 `exp` 更晚者的既有策略不变。
 
 - **验签**:前端硬编码公钥,用 @noble/curves 的 ed25519(纯 JS,~10KB,规避 WebCrypto
   的 Ed25519 浏览器兼容差异)。验签 <1ms,每次需要时现验,不缓存会员状态。
-- **存储**:localStorage 键 `pixel-forge.license.v1` 存**码原文**(购买凭证,清存储后
-  重输即恢复;键名遵循项目 `pixel-forge.*.v1` 惯例,storage 经 StorageLike 注入,
-  同 presetStore 模式)。过期码保留,面板显示"已过期,续费激活"。
-- **错误分类**(激活输入框的三种提示):格式不对 / 验签失败(提示联系卖家) / 已过期。
+  `parseLicenseCode` 与 `parseUnredeemedCode` 互斥(有 exp 无 iat ↔ 有 iat 无 exp),
+  未兑换码永不判为活跃会员,存储区永远只有已兑换码原文。
+- **存储**:localStorage 键 `pixel-forge.license.v1` 存**已兑换码原文**(购买凭证,
+  清存储后重输即恢复;键名遵循项目 `pixel-forge.*.v1` 惯例,storage 经 StorageLike
+  注入,同 presetStore 模式)。过期码保留,面板显示"已过期,续费激活"。
+- **错误分类**(激活输入框六种提示):格式不对 / 验签失败(提示联系卖家) / 已过期 /
+  网络不可达(提示激活需联网) / 设备超限(联系卖家) / 操作频繁(稍后再试)。
+  激活中按钮 loading 态防重复兑换。
 - **密钥管理**:生产密钥对由用户在后端环境生成(生成命令见后端需求文档),公钥填入
   前端常量 `PUBLIC_KEY`;轮换 = 换公钥 + 前端发版。测试密钥对仅用于开发自测,
-  `scripts/genLicense.mjs` 持有测试私钥(可进 git),**生产私钥绝不进 git 与构建产物**。
+  `scripts/genLicense.mjs` 持有测试私钥(可进 git,`--unredeemed` 造未兑换码),
+  **生产私钥绝不进 git 与构建产物**。`VITE_API_BASE` 开发指向本地 mock
+  (scripts/mock-redeem.mjs),生产留空走同源,上线前注入正式后端地址。
 
 ## 生成归属(定稿:后端生成)
 
-正式发码全部走后端 `POST /api/admin/license/generate`(后台管理系统操作,生成即入库,
-形成台账),前端仓库的 `scripts/genLicense.mjs` 仅作开发自测工具(测试密钥对)。
+正式发码全部走后端 `POST /api/admin/license/generate`(后台管理系统操作,生成**未兑换码**
+即入库,形成台账),前端仓库的 `scripts/genLicense.mjs` 仅作开发自测工具(测试密钥对)。
 决策依据:私钥单点受控(服务器环境变量)、生成即入库的完整台账、可接 webhook 自动化。
 
 ## 水印规格
@@ -100,10 +118,13 @@ day/week/month/year。
 
 ## 后端需求(摘要,全文见独立文档)
 
-**v1(上线必需)**:`POST /api/admin/license/generate`(后台鉴权)+ 表 `license_codes`。
-**v2(自动化阶段)**:`POST /api/license/activate`(设备绑定,上限 3 台)、
-`POST /api/license/recover`(邮箱找回,依赖 SMTP)+ 表 `license_binding`。
-原则:两 v2 接口失败/未部署时前端静默降级纯离线模式,不报错。
+**v1(上线必需)**:`POST /api/admin/license/generate`(后台鉴权,生成未兑换码)+
+表 `license_codes`。
+**v1.5(发卡模式组成部分)**:`POST /api/license/redeem`(未兑换码换已兑换码,设备
+绑定上限 3 台,幂等)——激活未兑换码的唯一途径,需可用。
+**v2(自动化阶段)**:`POST /api/license/recover`(邮箱找回,依赖 SMTP)+ 表
+`license_binding`。原则:redeem 失败时未兑换码激活受阻(提示需联网);已兑换码的
+激活/恢复与一切使用离线照常;recover 未部署时静默降级,不报错。
 
 ## 收款与发卡(三阶段,运营动作非代码)
 
@@ -134,5 +155,6 @@ day/week/month/year。
 | 水印墙而非纯次数墙 | 先甜后苦的转化漏斗;免费批量开放让价值可感知,平铺水印是批量用户刚需痛点 |
 | 离线验签而非联网验证 | 纯客户端架构下服务端强制是幻觉;离线验签零后端依赖、零延迟、后端故障不影响用户 |
 | 后端生成而非本地脚本 | 私钥单点受控、生成即入库台账、可接 webhook 自动化(用户后端有后台管理系统) |
+| 兑换码方案(2026-09-25):生成未兑换码,激活时 redeem 换已兑换码 | 旧模型 exp 生成时写死,预贴库存持续损耗时长,发卡平台预贴库存模式不可行;新模型时长从激活起算,囤码零损耗 |
 | 账户体系无限期推迟 | 其核心卖点(服务端强制限额)在本架构下不成立;持久性问题由"存码原文+重输恢复+v2 邮箱托底"以 1/10 成本解决 |
 | 不做服务端渲染 | 保住零边际成本性质;一旦渲染上服务器,商业模式从"卖许可"劣化为"卖算力" |
