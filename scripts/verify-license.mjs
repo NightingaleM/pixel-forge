@@ -2,8 +2,10 @@
 // 付费墙浏览器实测:水印绘制像素验证 + gating 全链路 + 兑换码激活全链路 + 3D 无碍。
 // 场景 C(兑换码方案):C0 断网贴未兑换码→网络提示;C1 起 mock 后 redeem 激活;
 //   C2 会员超额无 toast;C3 清存储重贴已兑换码离线恢复。
-// 用法: 先起 vite dev(.env.local 需有 VITE_API_BASE=http://localhost:3999 与测试公钥),
-//   然后 node scripts/verify-license.mjs <port>
+// 用法: 先起 mock 目标的 dev: API_PROXY_TARGET=http://localhost:3999 npx vite
+//   (端口 5177 由 vite.config.ts 指定),然后 node scripts/verify-license.mjs <port>
+//   测试公钥在本脚本内经 setLicensePublicKey 注入页面(此 vite 8 下 env 文件/命令行
+//   均无法把 VITE_ 变量可靠注入 dev 的 import.meta.env,故不依赖 .env.local)。
 // 产物: artifacts/license-verify/ 截图 + result.json
 import puppeteer from 'puppeteer-core'
 import { spawn } from 'node:child_process'
@@ -11,13 +13,14 @@ import { ed25519 } from '@noble/curves/ed25519'
 import fs from 'node:fs'
 import path from 'node:path'
 
-const PORT = process.argv[2] || '5173'
+const PORT = process.argv[2] || '5177'
 const BASE = `http://localhost:${PORT}`
 const OUT = path.resolve('artifacts/license-verify')
 fs.mkdirSync(OUT, { recursive: true })
 
-// 测试私钥自签两码(与 .env.local VITE_LICENSE_PUBKEY 测试公钥配对;换钥两处同步 testKey.ts)
+// 测试私钥自签两码,公钥派生注入页面(与 src/lib/license/testKey.ts 同一对,换钥两处同步)
 const TEST_PRIVATE_KEY_HEX = '585a87b0a5f2c4304597fcd18bd78368851de086b1ab126830bb961fc7fc2ff3'
+const TEST_PUBLIC_KEY_HEX = Buffer.from(ed25519.getPublicKey(TEST_PRIVATE_KEY_HEX)).toString('hex')
 const sign = (payload) => {
   const msg = Buffer.from(JSON.stringify(payload), 'utf8')
   return `PF1.${msg.toString('base64url')}.${Buffer.from(ed25519.sign(msg, TEST_PRIVATE_KEY_HEX)).toString('base64url')}`
@@ -117,6 +120,14 @@ ok('B2 localStorage 计数=5(额度耗尽)', quota === JSON.stringify({ date: ne
 await page.screenshot({ path: path.join(OUT, 'b2-toast.png') })
 
 // ---------- 场景 C:兑换码激活全链路 ----------
+// 测试公钥注入页面(dev 默认公钥是开发公钥,reload 后模块状态重置须重注入)
+const applyTestPubkey = async () => {
+  await page.evaluate(async (pub) => {
+    const m = await import('/src/lib/license/verify.ts')
+    m.setLicensePublicKey(pub)
+  }, TEST_PUBLIC_KEY_HEX)
+}
+
 // UI 激活走真实交互:点 ActionBar 会员钮开面板 → 输入码 → 点激活(比直接 setItem 更真实)
 const openPanel = async () => {
   const el = (await page.evaluateHandle(() => [...document.querySelectorAll('.action-bar .action-btn')]
@@ -136,6 +147,7 @@ const activateViaUi = async (code) => {
 }
 
 // C0:mock 未起(3999 不可达)→ 贴未兑换码 → 网络错误提示
+await applyTestPubkey()
 await page.evaluate(() => localStorage.removeItem('pixel-forge.license.v1'))
 await activateViaUi(unredeemedCode)
 await page.waitForFunction(() => document.querySelector('.license-msg--err') !== null, { timeout: 8000 })
@@ -183,6 +195,7 @@ ok('C2 会员超额下载无降级 toast', !memberToastLeak)
 // C3:清存储回落免费 → 重贴已兑换码(离线路径,mock 在场但不发网络)→ 直接恢复
 await page.evaluate(() => localStorage.clear())
 await page.reload({ waitUntil: 'networkidle0' })
+await applyTestPubkey()   // reload 重置了模块内公钥
 await page.click('img[src*="local_test_pic"]')
 await page.waitForFunction(() => document.querySelectorAll('canvas').length >= 2, { timeout: 10000 })
 const fellBack = await page.evaluate(() => localStorage.getItem('pixel-forge.license.v1') === null)
