@@ -582,6 +582,7 @@
     }
   },
   "license": {
-    "toastCorner": "Watermark-free quota used up today; exports now carry a watermark"
+    "toastCorner": "Watermark-free quota used up today; exports now carry a watermark",
+    "batchBanner": "Free batch exports are watermarked"
   }
 }

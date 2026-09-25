@@ -9,6 +9,7 @@ import { findBrightestPoint } from '../lib/brightPoint'
 import { randomizeParams } from '../lib/randomSeed'
 import { renderImage, exportCanvasBlob, compositeOnBlack } from '../lib/renderImage'
 import { decideSingleExport } from '../lib/license/gating'
+import { getLicenseStatus } from '../lib/license/verify'
 import { exportWatermarked, injectSvgWatermark } from '../lib/license/watermark'
 import { loadPresets, savePreset, removePreset, mergeWithDefaults, type PresetEntry } from '../lib/presetStore'
 import { randomId } from '../lib/randomId'
@@ -1192,6 +1193,7 @@ function App2D() {
           onFormatChange={setFormat}
           onRandomizeAll={handleRandomizeAll}
           onStart={startProcessing}
+          licenseActive={getLicenseStatus().active}
           onRetryRow={handleRetryRow}
           onRerollRow={handleRerollRow}
           onDownloadRow={handleDownloadRow}

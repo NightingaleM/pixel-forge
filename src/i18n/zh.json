@@ -582,6 +582,7 @@
     }
   },
   "license": {
-    "toastCorner": "今日无水印额度已用完,本次导出带水印"
+    "toastCorner": "今日无水印额度已用完,本次导出带水印",
+    "batchBanner": "免费版批量导出带水印"
   }
 }

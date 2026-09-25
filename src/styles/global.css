@@ -1788,6 +1788,9 @@ body {
 
 /* ----- Batch panel (复用 .param-panel 骨架,色值取自 .seed-bar/.action-btn/.param-select 体系) ----- */
 .batch-panel { width: 380px; max-width: calc(100vw - 24px); }
+/* 免费版批量水印常驻提示(付费墙):暖色轻横幅,不遮挡操作 */
+.batch-wm-banner { margin: 8px 0; padding: 6px 10px; border-radius: 8px;
+  background: rgba(255, 193, 7, 0.12); color: #e6a700; font-size: 12px; text-align: center; }
 .batch-tabs { display: flex; gap: 6px; margin-bottom: 10px; }
 .batch-tab {
   flex: 1;

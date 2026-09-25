@@ -34,6 +34,8 @@ export interface BatchPanelProps {
   onFormatChange: (f: BatchFormat) => void
   onRandomizeAll: () => void
   onStart: () => void
+  /** 会员态(App2D 现查):免费时配置 tab 顶部显示水印横幅 */
+  licenseActive: boolean
   /** 行列表点击行=切换选中(App2D handleSelect,含独立模式懒同步) */
   onRowSelect: (i: number) => void
   /** 已保存配置(种子列表数据源,App2D presets) */
@@ -70,6 +72,7 @@ function BatchPanel({
   onFormatChange,
   onRandomizeAll,
   onStart,
+  licenseActive,
   onRowSelect,
   presets,
   onApplyPreset,
@@ -141,6 +144,8 @@ function BatchPanel({
         </div>
         {tab === 'config' ? (
           <div className="batch-config">
+            {/* 免费版常驻水印提示:批量导出全图平铺水印(付费墙 spec) */}
+            {!licenseActive && <div className="batch-wm-banner">{t('license.batchBanner')}</div>}
             {/* 单图开面板(spec 字面:打开并提示可继续追加)——底部栏 [+] 可加图进批量 */}
             {images.length === 1 && <div className="batch-hint">{t('batch.addMoreHint')}</div>}
             <label className="batch-format">

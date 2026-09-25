@@ -6,9 +6,11 @@ import type { StyleId } from '../../types'
 import { ShaderRenderer } from '../ShaderRenderer'
 import { AsciiCanvasRenderer } from '../AsciiCanvasRenderer'
 import { findBrightestPoint } from '../brightPoint'
-import { renderImage, exportCanvasBlob, exportJpgWithBlackBg } from '../renderImage'
+import { renderImage, exportCanvasBlob, compositeOnBlack } from '../renderImage'
 import { getStyle } from '../StyleRegistry'
-import { decodeSeed } from '../seedCodec'
+import { decodeSeed, encodeSeed } from '../seedCodec'
+import { decideBatchExport } from '../license/gating'
+import { exportWatermarked, injectSvgWatermark } from '../license/watermark'
 import { mergeWithDefaults } from '../presetStore'
 import { effectiveFormat, type BatchFormat } from './batchJob'
 import type { BatchImage } from './imageList'
@@ -159,20 +161,29 @@ export function createCanvasRenderTask(baseline: ProcessingBaseline): RenderTask
         brightest,
       })
       const out = isCanvas2d ? asciiCanvas! : canvas!
+      // 批量水印决策:每张导出瞬间现查(会员 none/免费 tiled;批量不消耗单图额度)。
+      // 种子码由渲染状态现编码(与行 seed roundtrip 等价,RenderTask 无需携带 seed)
+      const wm = decideBatchExport().mode
+      const seedText = encodeSeed(t.styleId, t.params, def, t.textParams)
       if (t.format === 'svg') {
         const family = baseline.fontParams['uFont']?.family ?? 'monospace'
-        return new Blob([asciiRenderer.exportSvg(family)], { type: 'image/svg+xml' })
+        const svg = asciiRenderer.exportSvg(family)
+        return new Blob([wm === 'tiled' ? injectSvgWatermark(svg, 'tiled', seedText) : svg], { type: 'image/svg+xml' })
       }
       if (t.format === 'jpg') {
         const showBg = t.params['uShowBg'] ?? 1
-        // toBlob 可能返回 null(画布受污染/过大),显式抛错让该行进 failed 而非产出空 blob
-        const jpg = isCanvas2d && showBg !== 1
-          ? await exportJpgWithBlackBg(out)
-          : await exportCanvasBlob(out, 'image/jpeg')
+        // toBlob 可能返回 null(画布受污染/过大),显式抛错让该行进 failed 而非产出空 blob。
+        // JPG 水印顺序契约:渲染→黑底→水印→toBlob(与单图同规则)
+        const base = isCanvas2d && showBg !== 1 ? compositeOnBlack(out) : out
+        const jpg = wm === 'tiled'
+          ? await exportWatermarked(base, 'tiled', seedText, 'image/jpeg')
+          : await exportCanvasBlob(base, 'image/jpeg')
         if (!jpg) throw new Error('jpg export failed')
         return jpg
       }
-      const png = await exportCanvasBlob(out, 'image/png')
+      const png = wm === 'tiled'
+        ? await exportWatermarked(out, 'tiled', seedText, 'image/png')
+        : await exportCanvasBlob(out, 'image/png')
       if (!png) throw new Error('png export failed')
       return png
     } catch (e) {
