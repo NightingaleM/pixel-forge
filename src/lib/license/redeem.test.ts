@@ -138,4 +138,17 @@ describe('activateCode(兑换码方案)', () => {
     expect(await activateCode(expired, NOW)).toEqual({ ok: false, reason: 'expired' })
     expect(fetchMock).not.toHaveBeenCalled()
   })
+
+  it('非安全上下文(http://局域网IP,无 crypto.randomUUID)下 deviceId 仍可生成并兑换', async () => {
+    // 复现:浏览器仅在 secure context(https/localhost)提供 randomUUID
+    const real = globalThis.crypto
+    vi.stubGlobal('crypto', { getRandomValues: real.getRandomValues.bind(real) })
+    const fetchMock = vi.fn().mockResolvedValue(res(200, { code: redeemedDay, tier: 'day', expAt: 1 }))
+    vi.stubGlobal('fetch', fetchMock)
+    const r = await activateCode(unredeemed, NOW)
+    expect(r.ok).toBe(true)
+    const id = JSON.parse(fetchMock.mock.calls[0][1].body).deviceId
+    expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
+    expect(loadStoredCode()).toBe(redeemedDay)
+  })
 })

@@ -92,18 +92,29 @@ export function loadStoredCode(): string | null {
   try { return storage.getItem(STORAGE_KEY) } catch { return null }
 }
 
+/** randomUUID 仅 secure context(https/localhost)提供;局域网 IP 明文访问时用
+ *  getRandomValues(不受该限制)手工组 UUID v4,格式与 randomUUID 一致。 */
+function uuidV4(): string {
+  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID()
+  const b = crypto.getRandomValues(new Uint8Array(16))
+  b[6] = (b[6] & 0x0f) | 0x40   // version 4
+  b[8] = (b[8] & 0x3f) | 0x80   // variant 10xx
+  const h = Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('')
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`
+}
+
 /** 本机身份(redeem 防分享绑定用):首次生成持久化,禁存储环境回落一次性随机 id。 */
 export function getOrCreateDeviceId(): string {
   if (storage) {
     try {
       const existing = storage.getItem(DEVICE_ID_KEY)
       if (existing) return existing
-      const id = crypto.randomUUID()
+      const id = uuidV4()
       storage.setItem(DEVICE_ID_KEY, id)
       return id
     } catch { /* 禁 cookie/配额满:每次激活都是新 id,兑换不受阻 */ }
   }
-  return crypto.randomUUID()
+  return uuidV4()
 }
 
 export type ActivateResult =
