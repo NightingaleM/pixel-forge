@@ -111,8 +111,10 @@ describe('signLicense / parseLicenseCode', () => {
   it('篡改 payload 任一字符 → signature 失败', () => {
     const code = signLicense(day, priv)
     const parts = code.split('.')
-    // 篡改 payload 段最后一个 b64url 字符
-    parts[1] = parts[1].slice(0, -1) + (parts[1].endsWith('A') ? 'B' : 'A')
+    // 篡改 payload 段中间字符:尾字符仅高 2 位有效且 atob 宽容丢弃越界位,
+    // 替换尾字符字节可能不变;中间字符每一位都映射到字节,必然改变
+    const mid = 5
+    parts[1] = parts[1].slice(0, mid) + (parts[1][mid] === 'A' ? 'B' : 'A') + parts[1].slice(mid + 1)
     const r = parseLicenseCode(parts.join('.'), NOW)
     expect(r).toEqual({ ok: false, reason: 'signature' })
   })
@@ -120,7 +122,8 @@ describe('signLicense / parseLicenseCode', () => {
   it('篡改 signature → signature 失败', () => {
     const code = signLicense(day, priv)
     const parts = code.split('.')
-    parts[2] = parts[2].slice(0, -1) + (parts[2].endsWith('A') ? 'B' : 'A')
+    const mid = 5
+    parts[2] = parts[2].slice(0, mid) + (parts[2][mid] === 'A' ? 'B' : 'A') + parts[2].slice(mid + 1)
     expect(parseLicenseCode(parts.join('.'), NOW)).toEqual({ ok: false, reason: 'signature' })
   })
 
@@ -260,18 +263,22 @@ function fromB64Url(s: string): Uint8Array | null {
 }
 
 export function parseLicenseCode(code: string, now: number = Date.now()): LicenseParseResult {
+  // 检查顺序即语义契约:结构→b64url→验签→JSON 解析→过期。
+  // 先验签后解析:签名覆盖 payload 全部字节,payload 任何篡改一律 signature
+  // (不依赖 JSON 是否恰好损坏),且不解析未验签内容。
   const parts = code.trim().split('.')
   if (parts.length !== 3 || parts[0] !== 'PF1') return { ok: false, reason: 'format' }
   const msg = fromB64Url(parts[1])
   const sig = fromB64Url(parts[2])
   if (!msg || !sig) return { ok: false, reason: 'format' }
+  try {
+    // @noble/curves@1.9 实测参数序:verify(signature, message, publicKey)
+    if (!ed25519.verify(sig, msg, publicKeyHex)) return { ok: false, reason: 'signature' }
+  } catch { return { ok: false, reason: 'signature' } }   // 公钥未注入/长度错等
   let parsed: { v?: unknown; tier?: unknown; exp?: unknown }
   try { parsed = JSON.parse(new TextDecoder().decode(msg)) } catch { return { ok: false, reason: 'format' } }
   if (parsed.v !== 1 || typeof parsed.tier !== 'string' || !TIERS.includes(parsed.tier as LicenseTier)
     || typeof parsed.exp !== 'number' || !Number.isFinite(parsed.exp)) return { ok: false, reason: 'format' }
-  try {
-    if (!ed25519.verify(msg, sig, publicKeyHex)) return { ok: false, reason: 'signature' }
-  } catch { return { ok: false, reason: 'signature' } }   // 公钥未注入/长度错等
   if (parsed.exp * 1000 <= now) return { ok: false, reason: 'expired' }
   return { ok: true, tier: parsed.tier as LicenseTier, expAt: parsed.exp }
 }
