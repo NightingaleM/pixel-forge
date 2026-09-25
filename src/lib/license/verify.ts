@@ -6,8 +6,9 @@ import type { LicenseTier, StorageLike } from './types'
 
 const STORAGE_KEY = 'pixel-forge.license.v1'
 
-// ── 生产公钥(后端 2026-09-25 交付)。构建产物硬编码此值,无运行时后门;
-//    仅 dev 模式可经 VITE_LICENSE_PUBKEY 覆盖为测试公钥,供浏览器回归脚本
+// ── 开发公钥(后端 2026-09-25 交付)。⚠️ 上线前用户会另给真生产公钥,替换本值
+//    并重新构建。构建产物硬编码此值,无运行时后门;仅 dev 模式可经
+//    VITE_LICENSE_PUBKEY 覆盖为测试公钥,供浏览器回归脚本
 //    (scripts/verify-license.mjs)用测试私钥造码走通激活流 ──
 let publicKeyHex = '2e9e43fd307c835c05dbc39a46806ff605bba7b3f91c35362ebf1ed12cc6f529'
 if (import.meta.env.DEV && import.meta.env.VITE_LICENSE_PUBKEY) {
