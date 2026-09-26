@@ -172,7 +172,8 @@ ok('C1b redeem 激活成功,存储区为已兑换码(有 exp 无 iat)',
   storedPayload !== null && typeof storedPayload.exp === 'number' && storedPayload.iat === undefined,
   storedCode ? JSON.stringify(storedPayload) : 'storage 空')
 const panelText = await page.evaluate(() => document.querySelector('.license-panel')?.textContent ?? '')
-ok('C1c 会员面板显示会员与到期日', /有效期|Active until/.test(panelText), panelText.slice(0, 80))
+ok('C1c 会员面板显示会员与到期日(含时:分)',
+  /有效期|Active until/.test(panelText) && /\d{1,2}:\d{2}/.test(panelText), panelText.slice(0, 90))
 const memberBtnCls = await page.evaluate(() => {
   const b = [...document.querySelectorAll('.action-bar .action-btn')]
     .find(x => x.textContent?.includes('会员') || x.textContent?.includes('Member'))
@@ -180,6 +181,13 @@ const memberBtnCls = await page.evaluate(() => {
 })
 ok('C1d ActionBar 会员钮呈会员态(secondary)', memberBtnCls !== null && memberBtnCls.includes('action-btn--secondary'), `class=${memberBtnCls}`)
 await page.screenshot({ path: path.join(OUT, 'c1-member-panel.png') })
+
+// 复制备份反馈:点按钮出现"已复制"提示(剪贴板 API 在 localhost 走标准路径;
+// 条件锚定复制文案,避免命中激活成功残留提示)
+await (await page.$('.license-panel .license-link-btn')).click()
+await page.waitForFunction(() => /已复制|[Cc]opied/.test(document.querySelector('.license-msg--ok')?.textContent ?? ''), { timeout: 5000 })
+const copyMsg = await page.evaluate(() => document.querySelector('.license-msg--ok')?.textContent ?? '')
+ok('C1e 复制激活码备份有"已复制"反馈', /已复制|copied/i.test(copyMsg), copyMsg)
 await closePanel()
 
 // C2:会员超额下载 7 次应全程无降级 toast(B 场景已耗尽免费额度)

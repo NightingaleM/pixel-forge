@@ -601,6 +601,9 @@
     "errDeviceLimit": "Device limit reached. Please contact the seller",
     "errRateLimit": "Too many attempts. Please try again later",
     "backup": "Copy code as backup",
+    "backup": "Copy code as backup",
+    "copied": "Code copied",
+    "copyFailed": "Copy failed — select the code text manually",
     "purchase": "Buy a code",
     "badge": "Member"
   }

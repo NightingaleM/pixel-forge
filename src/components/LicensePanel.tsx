@@ -53,6 +53,33 @@ function LicensePanel({ onClose, onChanged }: LicensePanelProps) {
     }
   }
 
+  const handleCopy = async () => {
+    const code = storedCode
+    if (!code) return
+    // clipboard API 仅 secure context(https/localhost)存在:局域网 IP 明文访问下
+    // navigator.clipboard 为 undefined,静默跳过=既没复制也无反馈。降级 execCommand。
+    let ok = false
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(code)
+        ok = true
+      }
+    } catch { /* 权限拒绝/焦点丢失:走降级 */ }
+    if (!ok) {
+      try {
+        const ta = document.createElement('textarea')
+        ta.value = code
+        ta.style.position = 'fixed'
+        ta.style.opacity = '0'
+        document.body.appendChild(ta)
+        ta.select()
+        ok = document.execCommand('copy')
+        ta.remove()
+      } catch { ok = false }
+    }
+    setMsg({ kind: ok ? 'ok' : 'err', text: t(ok ? 'license.copied' : 'license.copyFailed') })
+  }
+
   return (
     <div className="preset-panel license-panel" ref={ref} style={{ left: pos.x, top: pos.y }}>
       <div className="param-panel-header" onMouseDown={onHeaderMouseDown}>
@@ -67,7 +94,11 @@ function LicensePanel({ onClose, onChanged }: LicensePanelProps) {
         {status.active ? (
           <div className="license-card license-card--member">
             <div className="license-card-title">{t('license.memberTitle')}</div>
-            <div>{t('license.memberUntil', { date: new Date((status.expAt ?? 0) * 1000).toLocaleDateString() })}</div>
+            <div>{t('license.memberUntil', {
+              date: new Date((status.expAt ?? 0) * 1000).toLocaleString(undefined, {
+                year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit',
+              }),
+            })}</div>
           </div>
         ) : (
           <div className="license-card">
@@ -94,7 +125,7 @@ function LicensePanel({ onClose, onChanged }: LicensePanelProps) {
         </div>
         {msg && <div className={`license-msg license-msg--${msg.kind}`}>{msg.text}</div>}
         {storedCode && (
-          <button className="license-link-btn" onClick={() => navigator.clipboard?.writeText(storedCode)}>
+          <button className="license-link-btn" onClick={handleCopy}>
             {t('license.backup')}
           </button>
         )}
