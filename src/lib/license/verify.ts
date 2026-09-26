@@ -11,11 +11,11 @@ const CREDENTIAL_KEY = 'pixel-forge.license.v2'
 const META_KEY = 'pixel-forge.licenseMeta.v2'
 const DEVICE_ID_KEY = 'pixel-forge.deviceId.v1'
 
-// ── 开发公钥(后端 2026-09-25 交付)。⚠️ 上线前用户会另给真生产公钥,替换本值
-//    并重新构建。构建产物硬编码此值,无运行时后门;仅 dev 模式可经
+// ── 后端公钥(2026-09-26 链式方案重做时新生成交付)。⚠️ 若后端再换密钥对,
+//    替换本值并重新构建。构建产物硬编码此值,无运行时后门;仅 dev 模式可经
 //    VITE_LICENSE_PUBKEY 覆盖为测试公钥,供浏览器回归脚本
 //    (scripts/verify-license.mjs)用测试私钥造码走通激活流 ──
-let publicKeyHex = '2e9e43fd307c835c05dbc39a46806ff605bba7b3f91c35362ebf1ed12cc6f529'
+let publicKeyHex = '6bc88195c75c5b4c05a539e340ef29254decdebd8b5772d949fb26ab201dba6f'
 if (import.meta.env.DEV && import.meta.env.VITE_LICENSE_PUBKEY) {
   publicKeyHex = import.meta.env.VITE_LICENSE_PUBKEY as string
 }
