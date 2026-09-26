@@ -1,11 +1,14 @@
 // src/lib/license/verify.ts
-// 会员判定核心:localStorage 存码原文(购买凭证),每次现验——不缓存状态,篡改无意义。
+// 会员判定核心(链式方案,spec 2026-09-26):localStorage 存隐藏凭证 {v:2,cid,exp,did} 原文,
+// 每次现验——验签 + did 绑定本机,凭证复制到未绑定设备自动失效。篡改无意义,不缓存状态。
+// 用户全程只接触兑换码原文(身份码/补充包);凭证由本模块自动存取,不可见无需备份。
 // 生产公钥上线前替换(来源:后端生成密钥对,见 docs/2026-09-25-backend-license-api.md 第 0 节)。
 import { ed25519 } from '@noble/curves/ed25519'
 import type { LicenseTier, StorageLike } from './types'
-import { redeemCode } from './redeem'
+import { redeemActivate, redeemRenew, redeemRefresh, type RedeemResult } from './redeem'
 
-const STORAGE_KEY = 'pixel-forge.license.v1'
+const CREDENTIAL_KEY = 'pixel-forge.license.v2'
+const META_KEY = 'pixel-forge.licenseMeta.v2'
 const DEVICE_ID_KEY = 'pixel-forge.deviceId.v1'
 
 // ── 开发公钥(后端 2026-09-25 交付)。⚠️ 上线前用户会另给真生产公钥,替换本值
@@ -25,8 +28,8 @@ try {
 } catch { storage = null }
 export function setLicenseStorage(s: StorageLike | null): void { storage = s }
 
-export type LicenseParseResult =
-  | { ok: true; tier: LicenseTier; expAt: number }
+export type CredentialParseResult =
+  | { ok: true; cid: string; expAt: number; did: string }
   | { ok: false; reason: 'format' | 'signature' | 'expired' }
 
 export type UnredeemedParseResult =
@@ -62,34 +65,57 @@ function verifyAndDecode(code: string): { msg: Uint8Array } | { err: 'format' | 
   return { msg }
 }
 
-export function parseLicenseCode(code: string, now: number = Date.now()): LicenseParseResult {
+/** 隐藏凭证解析:payload {v:2,cid,exp,did},did 由调用方与本地 deviceId 比对。 */
+export function parseCredential(code: string, now: number = Date.now()): CredentialParseResult {
   const head = verifyAndDecode(code)
   if ('err' in head) return { ok: false, reason: head.err }
-  let parsed: { v?: unknown; tier?: unknown; exp?: unknown }
+  let parsed: { v?: unknown; cid?: unknown; exp?: unknown; did?: unknown; iat?: unknown }
   try { parsed = JSON.parse(new TextDecoder().decode(head.msg)) } catch { return { ok: false, reason: 'format' } }
-  if (parsed.v !== 1 || typeof parsed.tier !== 'string' || !TIERS.includes(parsed.tier as LicenseTier)
-    || typeof parsed.exp !== 'number' || !Number.isFinite(parsed.exp)) return { ok: false, reason: 'format' }
+  if (parsed.v !== 2
+    || typeof parsed.cid !== 'string' || !/^[0-9a-f]{16}$/.test(parsed.cid)
+    || typeof parsed.exp !== 'number' || !Number.isFinite(parsed.exp)
+    || typeof parsed.did !== 'string' || !parsed.did
+    // 未兑换码混进来也拒绝:两类码互斥
+    || parsed.iat !== undefined) return { ok: false, reason: 'format' }
   if (parsed.exp * 1000 <= now) return { ok: false, reason: 'expired' }
-  return { ok: true, tier: parsed.tier as LicenseTier, expAt: parsed.exp }
+  return { ok: true, cid: parsed.cid, expAt: parsed.exp, did: parsed.did }
 }
 
-/** 未兑换码解析(兑换码方案):payload {v:1,tier,iat},永不过期故无 expired 分支。
- *  与 parseLicenseCode 互斥:有 exp 无 iat → format,反之亦然。 */
+/** 未兑换码解析:payload {v:1,tier,iat},永不过期故无 expired 分支。身份码/补充包同形态。 */
 export function parseUnredeemedCode(code: string): UnredeemedParseResult {
   const head = verifyAndDecode(code)
   if ('err' in head) return { ok: false, reason: head.err }
-  let parsed: { v?: unknown; tier?: unknown; iat?: unknown; exp?: unknown }
+  let parsed: { v?: unknown; tier?: unknown; iat?: unknown; exp?: unknown; cid?: unknown }
   try { parsed = JSON.parse(new TextDecoder().decode(head.msg)) } catch { return { ok: false, reason: 'format' } }
   if (parsed.v !== 1 || typeof parsed.tier !== 'string' || !TIERS.includes(parsed.tier as LicenseTier)
     || typeof parsed.iat !== 'number' || !Number.isFinite(parsed.iat)
-    // 有 exp 的已兑换码混进来也拒绝:两类码必须互斥,兑换流程才不失控
-    || parsed.exp !== undefined) return { ok: false, reason: 'format' }
+    // 有 exp/cid 的凭证混进来也拒绝:两类码必须互斥
+    || parsed.exp !== undefined || parsed.cid !== undefined) return { ok: false, reason: 'format' }
   return { ok: true, tier: parsed.tier as LicenseTier, iat: parsed.iat }
 }
 
-export function loadStoredCode(): string | null {
+export function loadStoredCredential(): string | null {
   if (!storage) return null
-  try { return storage.getItem(STORAGE_KEY) } catch { return null }
+  try { return storage.getItem(CREDENTIAL_KEY) } catch { return null }
+}
+
+/** 面板显示"可绑定设备余 N 次":最近一次 redeem/refresh 应答的 count 快照。 */
+export function loadLicenseCount(): number | null {
+  if (!storage) return null
+  try {
+    const raw = storage.getItem(META_KEY)
+    if (!raw) return null
+    const count = (JSON.parse(raw) as { count?: unknown })?.count
+    return typeof count === 'number' && Number.isFinite(count) ? count : null
+  } catch { return null }
+}
+
+function storeCredential(credential: string, count: number): void {
+  if (!storage) return
+  try {
+    storage.setItem(CREDENTIAL_KEY, credential.trim())
+    storage.setItem(META_KEY, JSON.stringify({ count }))
+  } catch { /* 配额满:本次会话内存态也已无,忽略 */ }
 }
 
 /** randomUUID 仅 secure context(https/localhost)提供;局域网 IP 明文访问时用
@@ -103,7 +129,13 @@ function uuidV4(): string {
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`
 }
 
-/** 本机身份(redeem 防分享绑定用):首次生成持久化,禁存储环境回落一次性随机 id。 */
+/** 只读本机 deviceId(会员判定路径不写存储)。 */
+function peekDeviceId(): string | null {
+  if (!storage) return null
+  try { return storage.getItem(DEVICE_ID_KEY) } catch { return null }
+}
+
+/** 本机身份(链设备绑定用):首次生成持久化,禁存储环境回落一次性随机 id。 */
 export function getOrCreateDeviceId(): string {
   if (storage) {
     try {
@@ -117,54 +149,62 @@ export function getOrCreateDeviceId(): string {
   return uuidV4()
 }
 
-export type ActivateResult =
-  | { ok: true; tier: LicenseTier; expAt: number }
-  | { ok: false; reason: 'format' | 'signature' | 'expired' | 'network' | 'device_limit' | 'rate_limited' }
+export type LicenseFailReason =
+  'format' | 'signature' | 'expired' | 'used' | 'identity_conflict' | 'device_exhausted' | 'network' | 'rate_limited'
 
-/** 存储策略:exp 晚于现存码才落库(多码保留更晚者,续费=新码覆盖)。已兑换码专用。 */
-function storeIfBetter(code: string, parsed: { expAt: number }, now: number): void {
-  if (!storage) return
-  const existing = loadStoredCode()
-  if (existing) {
-    const er = parseLicenseCode(existing, now)
-    // 现存码已过期/损坏也直接覆盖
-    if (er.ok && er.expAt >= parsed.expAt) return
+export type LicenseResult =
+  | { ok: true; expAt: number; count: number }
+  | { ok: false; reason: LicenseFailReason }
+
+/** 应答统一处理:验返回凭证签名 + did 必须为本机(不信响应体),过才落库。 */
+async function settle(rr: RedeemResult, deviceId: string, now: number): Promise<LicenseResult> {
+  if (!rr.ok) {
+    // 本地验签已过的码被后端 400 拒 = 已消耗(补充包/他链),提示"已被使用"
+    if (rr.reason === 'invalid_code') return { ok: false, reason: 'used' }
+    return { ok: false, reason: rr.reason }
   }
-  try { storage.setItem(STORAGE_KEY, code.trim()) } catch { /* 配额满:本次会话内存态也已无,忽略 */ }
+  const verified = parseCredential(rr.code, now)
+  if (!verified.ok) return { ok: false, reason: 'signature' }
+  if (verified.did !== deviceId) return { ok: false, reason: 'signature' }
+  storeCredential(rr.code, rr.count)
+  return { ok: true, expAt: verified.expAt, count: rr.count }
 }
 
-/**
- * 激活入口(兑换码方案):
- * - 已兑换码合法 → 离线直接存(客服手工签发兼容路径,零网络);
- * - 未兑换码合法 → redeem 换已兑换码 → 验返回码签名 → 存(兑换依赖后端);
- * - 其余 → 原错误分类,不发网络请求。
- */
-export async function activateCode(code: string, now: number = Date.now()): Promise<ActivateResult> {
-  const r = parseLicenseCode(code, now)
-  if (r.ok) {
-    storeIfBetter(code, r, now)
-    return r
-  }
-  if (r.reason === 'format') {
-    const u = parseUnredeemedCode(code)
-    if (!u.ok) return r   // 未兑换码也不合法:保持原 format 判定
-    const rr = await redeemCode(code.trim(), getOrCreateDeviceId())
-    if (!rr.ok) {
-      // 后端不认码与本地验签失败同义(联系卖家);其余错误已在 ActivateResult 枚举内
-      if (rr.reason === 'invalid_code') return { ok: false, reason: 'signature' }
-      return { ok: false, reason: rr.reason }
-    }
-    const verified = parseLicenseCode(rr.code, now)
-    if (!verified.ok) return { ok: false, reason: 'signature' }   // 不信响应体:返回码必须过本端验签
-    storeIfBetter(rr.code, verified, now)
-    return verified
-  }
-  return r   // signature(已兑换码验签失败/未兑换码被篡改)与 expired 都不走网络
+/** 激活入口(非会员设备):输入未兑换码——新码建链成身份码,或身份码迁移/刷新本机。 */
+export async function activateCode(code: string, now: number = Date.now()): Promise<LicenseResult> {
+  const u = parseUnredeemedCode(code)
+  if (!u.ok) return { ok: false, reason: u.reason }   // 凭证文本/旧 v1 码/垃圾输入一律 format|signature
+  const deviceId = getOrCreateDeviceId()
+  return settle(await redeemActivate(code.trim(), deviceId), deviceId, now)
 }
 
-export function getLicenseStatus(now: number = Date.now()): { active: boolean; tier?: LicenseTier; expAt?: number } {
-  const code = loadStoredCode()
+/** 续费入口(会员设备):输入未使用码 → 消耗为补充包,链 exp 延长、次数 +1。 */
+export async function renewCode(code: string, now: number = Date.now()): Promise<LicenseResult> {
+  const stored = loadStoredCredential()
+  if (!stored) return { ok: false, reason: 'format' }
+  const c = parseCredential(stored, now)
+  if (!c.ok) return { ok: false, reason: c.reason }
+  if (c.did !== peekDeviceId()) return { ok: false, reason: 'format' }
+  const u = parseUnredeemedCode(code)
+  if (!u.ok) return { ok: false, reason: u.reason }
+  const deviceId = getOrCreateDeviceId()
+  return settle(await redeemRenew(code.trim(), deviceId, stored), deviceId, now)
+}
+
+/** 刷新(会员设备,免输码):同步链当前 exp(其他设备续费后的同步通道,0 次数)。 */
+export async function refreshCredential(now: number = Date.now()): Promise<LicenseResult> {
+  const stored = loadStoredCredential()
+  if (!stored) return { ok: false, reason: 'format' }
+  const c = parseCredential(stored, now)
+  if (!c.ok) return { ok: false, reason: c.reason }
+  const deviceId = getOrCreateDeviceId()
+  return settle(await redeemRefresh(stored, deviceId), deviceId, now)
+}
+
+export function getLicenseStatus(now: number = Date.now()): { active: boolean; expAt?: number } {
+  const code = loadStoredCredential()
   if (!code) return { active: false }
-  const r = parseLicenseCode(code, now)
-  return r.ok ? { active: true, tier: r.tier, expAt: r.expAt } : { active: false }
+  const r = parseCredential(code, now)
+  if (!r.ok || r.did !== peekDeviceId()) return { active: false }
+  return { active: true, expAt: r.expAt }
 }

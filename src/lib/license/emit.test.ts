@@ -1,11 +1,11 @@
 // src/lib/license/emit.test.ts
-// 签发/验签 roundtrip 与三类失败(格式/签名/过期)、未兑换码契约(兑换码方案)、
-// 激活存储策略、storage 健壮性。
+// 签发/解析契约(链式方案):未兑换码 {v:1,tier,iat} 与隐藏凭证 {v:2,cid,exp,did}
+// 的 roundtrip、键序逐字节一致、篡改/过期失败、两类码互斥、旧格式 v:1 凭证拒收。
 import { describe, it, expect, beforeEach } from 'vitest'
-import { signLicense, signUnredeemed, type LicensePayload, type UnredeemedPayload } from './emit'
+import { ed25519 } from '@noble/curves/ed25519'
+import { signUnredeemed, signCredential, type UnredeemedPayload, type CredentialPayload } from './emit'
 import {
-  parseLicenseCode, parseUnredeemedCode, activateCode, loadStoredCode,
-  setLicenseStorage, setLicensePublicKey,
+  parseUnredeemedCode, parseCredential, setLicenseStorage, setLicensePublicKey,
 } from './verify'
 import { TEST_PRIVATE_KEY_HEX, TEST_PUBLIC_KEY_HEX } from './testKey'
 
@@ -25,51 +25,60 @@ beforeEach(() => {
   setLicensePublicKey(TEST_PUBLIC_KEY_HEX)
 })
 
-const day: LicensePayload = { v: 1, tier: 'day', exp: Math.floor(NOW / 1000) + 86400 }
+describe('signCredential / parseCredential(隐藏凭证 v2)', () => {
+  const cred: CredentialPayload = { v: 2, cid: 'abcdef0123456789', exp: Math.floor(NOW / 1000) + 86400, did: 'dev-1' }
 
-describe('signLicense / parseLicenseCode', () => {
-  it('roundtrip:签发→解析回同 tier/exp', () => {
-    const code = signLicense(day, priv)
+  it('roundtrip:签发→解析回同 cid/exp/did', () => {
+    const code = signCredential(cred, priv)
     expect(code.startsWith('PF1.')).toBe(true)
-    const r = parseLicenseCode(code, NOW)
-    expect(r).toEqual({ ok: true, tier: 'day', expAt: day.exp })
+    expect(parseCredential(code, NOW)).toEqual({ ok: true, cid: cred.cid, expAt: cred.exp, did: 'dev-1' })
   })
 
-  it('篡改 payload 任一字符 → signature 失败', () => {
-    const code = signLicense(day, priv)
-    const parts = code.split('.')
-    // 篡改 payload 段中间字符:尾字符仅高 2 位有效且 atob 宽容丢弃越界位,
-    // 替换尾字符字节可能不变;中间字符每一位都映射到字节,必然改变
+  it('payload 键序 v/cid/exp/did 紧凑 JSON(与后端契约逐字节一致)', () => {
+    const code = signCredential(cred, priv)
+    const b64 = code.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
+    expect(Buffer.from(b64, 'base64').toString('utf8'))
+      .toBe('{"v":2,"cid":"abcdef0123456789","exp":1750086400,"did":"dev-1"}')
+  })
+
+  it('篡改 payload → signature 失败', () => {
+    const parts = signCredential(cred, priv).split('.')
     const mid = 5
     parts[1] = parts[1].slice(0, mid) + (parts[1][mid] === 'A' ? 'B' : 'A') + parts[1].slice(mid + 1)
-    const r = parseLicenseCode(parts.join('.'), NOW)
-    expect(r).toEqual({ ok: false, reason: 'signature' })
+    expect(parseCredential(parts.join('.'), NOW)).toEqual({ ok: false, reason: 'signature' })
   })
 
   it('篡改 signature → signature 失败', () => {
-    const code = signLicense(day, priv)
-    const parts = code.split('.')
+    const parts = signCredential(cred, priv).split('.')
     const mid = 5
     parts[2] = parts[2].slice(0, mid) + (parts[2][mid] === 'A' ? 'B' : 'A') + parts[2].slice(mid + 1)
-    expect(parseLicenseCode(parts.join('.'), NOW)).toEqual({ ok: false, reason: 'signature' })
+    expect(parseCredential(parts.join('.'), NOW)).toEqual({ ok: false, reason: 'signature' })
   })
 
   it('exp 已过 → expired', () => {
-    const expired = signLicense({ v: 1, tier: 'day', exp: Math.floor(NOW / 1000) - 1 }, priv)
-    expect(parseLicenseCode(expired, NOW)).toEqual({ ok: false, reason: 'expired' })
+    const expired = signCredential({ ...cred, exp: Math.floor(NOW / 1000) - 1 }, priv)
+    expect(parseCredential(expired, NOW)).toEqual({ ok: false, reason: 'expired' })
   })
 
-  it('格式错:非 PF1 前缀 / 段数不对 / 非法 b64url / 非法 JSON', () => {
-    expect(parseLicenseCode('XX1.a.b', NOW)).toEqual({ ok: false, reason: 'format' })
-    expect(parseLicenseCode('PF1.only-two', NOW)).toEqual({ ok: false, reason: 'format' })
-    expect(parseLicenseCode('PF1.!!??.zzzz', NOW)).toEqual({ ok: false, reason: 'format' })
-    // 合法 b64url 但内容不是 JSON
-    const notJson = Buffer.from('not json').toString('base64url')
-    expect(parseLicenseCode(`PF1.${notJson}.x`, NOW)).toEqual({ ok: false, reason: 'format' })
+  it('格式错:v≠2 / cid 非 16 hex / did 缺失 / exp 非数', () => {
+    const mk = (payload: Record<string, unknown>) => {
+      const msg = Buffer.from(JSON.stringify(payload), 'utf8')
+      return `PF1.${msg.toString('base64url')}.${Buffer.from(ed25519.sign(msg, priv)).toString('base64url')}`
+    }
+    expect(parseCredential(mk({ v: 2, cid: 'XYZ', exp: cred.exp, did: 'dev-1' }), NOW)).toEqual({ ok: false, reason: 'format' })
+    expect(parseCredential(mk({ v: 2, cid: cred.cid, exp: cred.exp }), NOW)).toEqual({ ok: false, reason: 'format' })
+    expect(parseCredential(mk({ v: 2, cid: cred.cid, exp: 'soon', did: 'dev-1' }), NOW)).toEqual({ ok: false, reason: 'format' })
+    expect(parseCredential(mk({ v: 1, tier: 'day', iat: 1 }), NOW)).toEqual({ ok: false, reason: 'format' })
+  })
+
+  it('旧格式 v1 已兑换码(有 tier 无 cid)→ format(链式方案清洁切换,旧码全部作废)', () => {
+    const msg = Buffer.from(JSON.stringify({ v: 1, tier: 'day', exp: Math.floor(NOW / 1000) + 86400 }), 'utf8')
+    const legacy = `PF1.${msg.toString('base64url')}.${Buffer.from(ed25519.sign(msg, priv)).toString('base64url')}`
+    expect(parseCredential(legacy, NOW)).toEqual({ ok: false, reason: 'format' })
   })
 })
 
-describe('signUnredeemed / parseUnredeemedCode', () => {
+describe('signUnredeemed / parseUnredeemedCode(未兑换码,契约不变)', () => {
   const unredeemed: UnredeemedPayload = { v: 1, tier: 'week', iat: 1_759_300_000 }
 
   it('roundtrip:未兑换码解析回同 tier/iat(永不过期,无 expired 分支)', () => {
@@ -85,54 +94,14 @@ describe('signUnredeemed / parseUnredeemedCode', () => {
   })
 
   it('篡改 payload → signature 失败', () => {
-    const code = signUnredeemed(unredeemed, priv)
-    const parts = code.split('.')
+    const parts = signUnredeemed(unredeemed, priv).split('.')
     const mid = 5
     parts[1] = parts[1].slice(0, mid) + (parts[1][mid] === 'A' ? 'B' : 'A') + parts[1].slice(mid + 1)
     expect(parseUnredeemedCode(parts.join('.'))).toEqual({ ok: false, reason: 'signature' })
   })
 
-  it('未兑换码交给 parseLicenseCode → format(存储区只认已兑换码,未兑换码永不判为活跃会员)', () => {
-    expect(parseLicenseCode(signUnredeemed(unredeemed, priv), NOW)).toEqual({ ok: false, reason: 'format' })
-  })
-
-  it('已兑换码(有 exp 无 iat)交给 parseUnredeemedCode → format(两类码互斥)', () => {
-    expect(parseUnredeemedCode(signLicense(day, priv))).toEqual({ ok: false, reason: 'format' })
-  })
-})
-
-describe('activateCode', () => {
-  it('首次激活存储码原文;重输同码幂等', async () => {
-    const code = signLicense(day, priv)
-    expect((await activateCode(code, NOW)).ok).toBe(true)
-    expect(loadStoredCode()).toBe(code)
-    expect((await activateCode(code, NOW)).ok).toBe(true)
-    expect(loadStoredCode()).toBe(code)
-  })
-
-  it('新码 exp 更早 → 不覆盖现存;更晚 → 覆盖', async () => {
-    const late = signLicense({ v: 1, tier: 'year', exp: Math.floor(NOW / 1000) + 3e7 }, priv)
-    const early = day
-    await activateCode(late, NOW)
-    await activateCode(signLicense(early, priv), NOW)   // 更早,不覆盖
-    expect(loadStoredCode()).toBe(late)
-    const later = signLicense({ v: 1, tier: 'lifetime', exp: 4102444800 }, priv)
-    await activateCode(later, NOW)
-    expect(loadStoredCode()).toBe(later)
-  })
-
-  it('坏码不触碰已存码', async () => {
-    const code = signLicense(day, priv)
-    await activateCode(code, NOW)
-    await activateCode('garbage', NOW)
-    expect(loadStoredCode()).toBe(code)
-  })
-})
-
-describe('storage 健壮性', () => {
-  it('storage 为 null 时一切安全回落', async () => {
-    setLicenseStorage(null)
-    expect(loadStoredCode()).toBe(null)
-    expect((await activateCode(signLicense(day, priv), NOW)).ok).toBe(true)  // 验签仍通过,只是不持久化
+  it('隐藏凭证(v2)交给 parseUnredeemedCode → format(两类码互斥)', () => {
+    const cred: CredentialPayload = { v: 2, cid: 'abcdef0123456789', exp: 1, did: 'dev-1' }
+    expect(parseUnredeemedCode(signCredential(cred, priv))).toEqual({ ok: false, reason: 'format' })
   })
 })

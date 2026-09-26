@@ -1,19 +1,34 @@
 // src/components/LicensePanel.tsx
-// 会员浮窗:状态卡(免费剩余/会员到期)+激活+备份+购买链接。纯视图+本地激活,
-// 状态变化经 onChanged 上交 App2D(触发重渲,批量横幅/会员钮即时刷新)。
+// 会员浮窗(链式方案,spec 2026-09-26):双入口按状态切换——非会员=激活(未兑换码),
+// 会员=续费(补充包)+到期/次数展示+刷新链接。纯视图+本地判定,状态变化经 onChanged
+// 上交 App2D(触发重渲,批量横幅/会员钮即时刷新)。
+// 用户只持有兑换码原文;隐藏凭证由 verify.ts 自动存取,无备份功能(设备绑定,备份无意义)。
 // v1 无邮箱托底(后端 v2 recover 就绪后再加,见后端需求文档)。
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useDraggable } from '../lib/useDraggable'
-import { activateCode, getLicenseStatus, loadStoredCode, type ActivateResult } from '../lib/license/verify'
+import {
+  activateCode, renewCode, refreshCredential, getLicenseStatus,
+  loadStoredCredential, loadLicenseCount, type LicenseFailReason,
+} from '../lib/license/verify'
 import { remainingToday, FREE_DAILY_NO_WATERMARK } from '../lib/license/quota'
 
-// v1 冷启动:面包多商品页;上线前替换为实际链接(收款三阶段见 spec 第 7 节)
+// v1 冷启动:面包多商品页;上线前替换为实际链接(收款三阶段见 spec)
 const PURCHASE_URL = 'https://mianbaoduo.com/'
+
+const ERR_KEY: Record<LicenseFailReason, string> = {
+  format: 'errFormat', signature: 'errSignature', expired: 'errExpired',
+  used: 'errUsed', identity_conflict: 'errIdentityConflict',
+  device_exhausted: 'errDeviceExhausted', network: 'errNetwork', rate_limited: 'errRateLimit',
+}
+
+const fmtDate = (expAt: number) => new Date(expAt * 1000).toLocaleString(undefined, {
+  year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit',
+})
 
 interface LicensePanelProps {
   onClose: () => void
-  /** 激活/状态变化通知(App2D 触发重渲) */
+  /** 激活/续费/状态变化通知(App2D 触发重渲) */
   onChanged: () => void
 }
 
@@ -21,63 +36,53 @@ function LicensePanel({ onClose, onChanged }: LicensePanelProps) {
   const { t } = useTranslation()
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
-  const [msg, setMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
+  const [msg, setMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>( null)
   const { ref, pos, onHeaderMouseDown } = useDraggable(
     { x: Math.max(20, window.innerWidth - 340), y: 120 },
     'pixel-forge.panelPos.license',
   )
   const status = getLicenseStatus()
-  // 过期判定:无活跃会员但存过码 = 曾经激活过(过期/损坏),提示续费而非全新激活
-  const expired = !status.active && loadStoredCode() !== null
-  const storedCode = loadStoredCode()
+  // 过期判定:无活跃会员但存过凭证 = 曾激活过(过期/换设备),提示重新激活
+  const expired = !status.active && loadStoredCredential() !== null
+  const count = loadLicenseCount()
 
-  const handleActivate = async () => {
-    if (busy) return
+  const run = async (fn: () => Promise<{ ok: true; expAt: number } | { ok: false; reason: LicenseFailReason }>,
+    okText: (expAt: number) => string) => {
+    if (busy) return   // 禁用态由按钮控制;此处兜底防重入
     setBusy(true)
+    setMsg(null)
     try {
-      // 未兑换码会走 redeem(联网);已兑换码离线直达——激活中禁点防重复兑换
-      const r: ActivateResult = await activateCode(input)
+      const r = await fn()
       if (r.ok) {
-        setMsg({ kind: 'ok', text: t('license.activated') })
+        setMsg({ kind: 'ok', text: okText(r.expAt) })
         setInput('')
         onChanged()
       } else {
-        const key = {
-          format: 'errFormat', signature: 'errSignature', expired: 'errExpired',
-          network: 'errNetwork', device_limit: 'errDeviceLimit', rate_limited: 'errRateLimit',
-        }[r.reason]
-        setMsg({ kind: 'err', text: t(`license.${key}`) })
+        setMsg({ kind: 'err', text: t(`license.${ERR_KEY[r.reason]}`) })
       }
     } finally {
       setBusy(false)
     }
   }
 
-  const handleCopy = async () => {
-    const code = storedCode
-    if (!code) return
-    // clipboard API 仅 secure context(https/localhost)存在:局域网 IP 明文访问下
-    // navigator.clipboard 为 undefined,静默跳过=既没复制也无反馈。降级 execCommand。
-    let ok = false
+  // 激活入口(非会员):未兑换码——新码建链成身份码,或身份码迁移/刷新本机
+  const handleActivate = () => run(() => activateCode(input), () => t('license.activated'))
+  // 续费入口(会员):未使用码消耗为补充包,链 exp 延长、次数 +1
+  const handleRenew = () => run(() => renewCode(input), (expAt) => t('license.renewed', { date: fmtDate(expAt) }))
+  // 刷新(免输码):同步其他设备续费后的链当前 exp
+  const handleRefresh = async () => {
+    if (busy) return
+    setBusy(true)
+    setMsg(null)
     try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(code)
-        ok = true
-      }
-    } catch { /* 权限拒绝/焦点丢失:走降级 */ }
-    if (!ok) {
-      try {
-        const ta = document.createElement('textarea')
-        ta.value = code
-        ta.style.position = 'fixed'
-        ta.style.opacity = '0'
-        document.body.appendChild(ta)
-        ta.select()
-        ok = document.execCommand('copy')
-        ta.remove()
-      } catch { ok = false }
+      const r = await refreshCredential()
+      setMsg(r.ok
+        ? { kind: 'ok', text: t('license.refreshed') }
+        : { kind: 'err', text: t(`license.${ERR_KEY[r.reason]}`) })
+      if (r.ok) onChanged()
+    } finally {
+      setBusy(false)
     }
-    setMsg({ kind: ok ? 'ok' : 'err', text: t(ok ? 'license.copied' : 'license.copyFailed') })
   }
 
   return (
@@ -94,11 +99,8 @@ function LicensePanel({ onClose, onChanged }: LicensePanelProps) {
         {status.active ? (
           <div className="license-card license-card--member">
             <div className="license-card-title">{t('license.memberTitle')}</div>
-            <div>{t('license.memberUntil', {
-              date: new Date((status.expAt ?? 0) * 1000).toLocaleString(undefined, {
-                year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit',
-              }),
-            })}</div>
+            <div>{t('license.memberUntil', { date: fmtDate(status.expAt ?? 0) })}</div>
+            {count !== null && <div className="license-count">{t('license.devicesLeft', { count })}</div>}
           </div>
         ) : (
           <div className="license-card">
@@ -113,22 +115,26 @@ function LicensePanel({ onClose, onChanged }: LicensePanelProps) {
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder={t('license.placeholder')}
+            placeholder={status.active ? t('license.renewPlaceholder') : t('license.placeholder')}
             spellCheck={false}
             disabled={busy}
           />
           <button
             className="action-btn action-btn--primary"
-            onClick={handleActivate}
+            onClick={status.active ? handleRenew : handleActivate}
             disabled={busy || !input.trim()}
-          >{busy ? t('license.activating') : t('license.activate')}</button>
+          >
+            {busy
+              ? (status.active ? t('license.renewing') : t('license.activating'))
+              : (status.active ? t('license.renew') : t('license.activate'))}
+          </button>
         </div>
-        {msg && <div className={`license-msg license-msg--${msg.kind}`}>{msg.text}</div>}
-        {storedCode && (
-          <button className="license-link-btn" onClick={handleCopy}>
-            {t('license.backup')}
+        {status.active && (
+          <button className="license-link-btn" onClick={handleRefresh} disabled={busy}>
+            {t('license.refresh')}
           </button>
         )}
+        {msg && <div className={`license-msg license-msg--${msg.kind}`}>{msg.text}</div>}
         <a className="license-link-btn" href={PURCHASE_URL} target="_blank" rel="noreferrer">{t('license.purchase')} ↗</a>
       </div>
     </div>
