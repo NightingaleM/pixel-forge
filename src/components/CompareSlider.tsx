@@ -129,8 +129,21 @@ function CompareSlider({
             transformOrigin: '0 0',
           }}
         >
-          <canvas ref={canvasRef} style={{ display: renderMode === 'canvas2d' ? 'none' : 'block' }} />
-          <canvas ref={asciiCanvasRef} style={{ display: renderMode === 'canvas2d' ? 'block' : 'none' }} />
+          {/* 拦截右键/拖拽:预览画布永不落水印(水印只在导出副本),右键「图片另存为」
+              「复制图片」或拖拽到桌面都会存出无水印 PNG,绕过导出 gating 的额度与
+              水印。无差别拦截(不分会员态),避免会员态切换的漏网窗口 */}
+          <canvas
+            ref={canvasRef}
+            style={{ display: renderMode === 'canvas2d' ? 'none' : 'block' }}
+            onContextMenu={(e) => e.preventDefault()}
+            onDragStart={(e) => e.preventDefault()}
+          />
+          <canvas
+            ref={asciiCanvasRef}
+            style={{ display: renderMode === 'canvas2d' ? 'block' : 'none' }}
+            onContextMenu={(e) => e.preventDefault()}
+            onDragStart={(e) => e.preventDefault()}
+          />
 
           {compareMode && originalImage && (
             <img
