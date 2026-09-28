@@ -13,9 +13,6 @@ import {
 } from '../lib/license/verify'
 import { remainingToday, FREE_DAILY_NO_WATERMARK } from '../lib/license/quota'
 
-// v1 冷启动:面包多商品页;上线前替换为实际链接(收款三阶段见 spec)
-const PURCHASE_URL = 'https://mianbaoduo.com/'
-
 const ERR_KEY: Record<LicenseFailReason, string> = {
   format: 'errFormat', signature: 'errSignature', expired: 'errExpired',
   used: 'errUsed', identity_conflict: 'errIdentityConflict',
@@ -135,7 +132,6 @@ function LicensePanel({ onClose, onChanged }: LicensePanelProps) {
           </button>
         )}
         {msg && <div className={`license-msg license-msg--${msg.kind}`}>{msg.text}</div>}
-        <a className="license-link-btn" href={PURCHASE_URL} target="_blank" rel="noreferrer">{t('license.purchase')} ↗</a>
       </div>
     </div>
   )

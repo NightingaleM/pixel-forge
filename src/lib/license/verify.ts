@@ -2,7 +2,6 @@
 // 会员判定核心(链式方案,spec 2026-09-26):localStorage 存隐藏凭证 {v:2,cid,exp,did} 原文,
 // 每次现验——验签 + did 绑定本机,凭证复制到未绑定设备自动失效。篡改无意义,不缓存状态。
 // 用户全程只接触兑换码原文(身份码/补充包);凭证由本模块自动存取,不可见无需备份。
-// 生产公钥上线前替换(来源:后端生成密钥对,见 docs/2026-09-25-backend-license-api.md 第 0 节)。
 import { ed25519 } from '@noble/curves/ed25519'
 import type { LicenseTier, StorageLike } from './types'
 import { redeemActivate, redeemRenew, redeemRefresh, type RedeemResult } from './redeem'

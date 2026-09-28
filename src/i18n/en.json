@@ -609,7 +609,6 @@
     "errDeviceExhausted": "This code can no longer be activated",
     "errNetwork": "This action requires internet. Check your connection and try again",
     "errRateLimit": "Too many attempts. Please try again later",
-    "purchase": "Buy a code",
     "badge": "Member"
   }
 }

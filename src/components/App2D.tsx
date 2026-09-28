@@ -1224,7 +1224,7 @@ function App2D() {
           onCancel={() => setCloseDialog(null)}
         />
       )}
-      {/* 会员浮窗:激活/状态/备份/购买入口(付费墙) */}
+      {/* 会员浮窗:激活/状态/续费入口(付费墙);购买渠道未定,入口暂缓 */}
       {showLicensePanel && (
         <LicensePanel
           onClose={() => setShowLicensePanel(false)}

@@ -609,7 +609,6 @@
     "errDeviceExhausted": "该兑换码无法再次激活",
     "errNetwork": "此操作需要联网,请检查网络后重试",
     "errRateLimit": "操作过于频繁,请稍后再试",
-    "purchase": "购买兑换码",
     "badge": "会员"
   }
 }
