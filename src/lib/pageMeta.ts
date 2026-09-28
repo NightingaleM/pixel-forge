@@ -25,6 +25,7 @@ export const PAGE_METAS: readonly PageMeta[] = [
   { path: '/privacy', titleKey: 'meta.privacy.title', descKey: 'meta.privacy.desc', noindex: false },
   { path: '/terms', titleKey: 'meta.terms.title', descKey: 'meta.terms.desc', noindex: false },
   { path: '/help', titleKey: 'meta.help.title', descKey: 'meta.help.desc', noindex: false },
+  { path: '/license', titleKey: 'meta.license.title', descKey: 'meta.license.desc', noindex: false },
 ]
 
 /** 尾斜杠归一化后精确匹配；未知路径回退 notFound（预渲染脚本的路由清单须与 PAGE_METAS 保持一致） */

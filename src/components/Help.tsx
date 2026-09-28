@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import InfoPage from './InfoPage'
 
@@ -23,6 +24,12 @@ export default function Help() {
           <li>{t('help.tipsFormats')}</li>
           <li>{t('help.tipsPerformance')}</li>
         </ul>
+      </section>
+
+      <section>
+        <h2>{t('help.memberTitle')}</h2>
+        <p>{t('help.memberBody')}</p>
+        <p><Link to="/license" className="info-back-link">{t('help.memberLink')}</Link></p>
       </section>
     </InfoPage>
   )

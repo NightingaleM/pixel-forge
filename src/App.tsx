@@ -11,6 +11,7 @@ const About = lazy(() => import('./components/About'))
 const Privacy = lazy(() => import('./components/Privacy'))
 const Terms = lazy(() => import('./components/Terms'))
 const Help = lazy(() => import('./components/Help'))
+const LicenseHelp = lazy(() => import('./components/LicenseHelp'))
 const NotFound = lazy(() => import('./components/NotFound'))
 
 /** Router 上下文内的 meta 管理器：按路由应用 title/og/canonical，语言切换时重应用 */
@@ -58,6 +59,7 @@ export default function App() {
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/terms" element={<Terms />} />
           <Route path="/help" element={<Help />} />
+          <Route path="/license" element={<LicenseHelp />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>

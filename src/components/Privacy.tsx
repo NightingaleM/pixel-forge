@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import InfoPage from './InfoPage'
 
-const sections = ['collect', 'usage', 'cookies', 'thirdParty', 'security', 'rights', 'changes', 'contact'] as const
+const sections = ['collect', 'license', 'usage', 'cookies', 'thirdParty', 'security', 'rights', 'changes', 'contact'] as const
 
 export default function Privacy() {
   const { t } = useTranslation()

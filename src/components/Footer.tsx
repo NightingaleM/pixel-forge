@@ -8,9 +8,10 @@ export default function Footer() {
     <footer className="footer">
       <div className="footer-links">
         <Link to="/about" className="footer-link">{t('footer.about')}</Link>
-        {/* <Link to="/privacy" className="footer-link">{t('footer.privacy')}</Link> */}
-        {/* <Link to="/terms" className="footer-link">{t('footer.terms')}</Link> */}
+        <Link to="/privacy" className="footer-link">{t('footer.privacy')}</Link>
+        <Link to="/terms" className="footer-link">{t('footer.terms')}</Link>
         <Link to="/help" className="footer-link">{t('footer.help')}</Link>
+        <Link to="/license" className="footer-link">{t('footer.license')}</Link>
       </div>
       <p className="footer-copyright">{t('footer.copyright')}</p>
     </footer>

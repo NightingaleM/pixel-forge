@@ -5,6 +5,7 @@
 // 用户只持有兑换码原文;隐藏凭证由 verify.ts 自动存取,无备份功能(设备绑定,备份无意义)。
 // v1 无邮箱托底(后端 v2 recover 就绪后再加,见后端需求文档)。
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useDraggable } from '../lib/useDraggable'
 import {
@@ -131,6 +132,7 @@ function LicensePanel({ onClose, onChanged }: LicensePanelProps) {
             {t('license.refresh')}
           </button>
         )}
+        <Link to="/license" className="license-link-btn">{t('license.helpLink')}</Link>
         {msg && <div className={`license-msg license-msg--${msg.kind}`}>{msg.text}</div>}
       </div>
     </div>

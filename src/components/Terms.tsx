@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import InfoPage from './InfoPage'
 
-const sections = ['acceptance', 'license', 'userContent', 'limitations', 'disclaimer', 'governingLaw', 'changes', 'contact'] as const
+const sections = ['acceptance', 'license', 'membership', 'device', 'userContent', 'limitations', 'disclaimer', 'governingLaw', 'changes', 'contact'] as const
 
 export default function Terms() {
   const { t } = useTranslation()

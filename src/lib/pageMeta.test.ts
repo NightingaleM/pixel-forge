@@ -14,7 +14,7 @@ function getNested(obj: unknown, keyPath: string): string | undefined {
 }
 
 describe('resolvePageMeta', () => {
-  it('精确匹配 7 个常规路由', () => {
+  it('精确匹配 8 个常规路由', () => {
     expect(resolvePageMeta('/').titleKey).toBe('meta.home.title')
     expect(resolvePageMeta('/2d').titleKey).toBe('meta.p2d.title')
     expect(resolvePageMeta('/3d').titleKey).toBe('meta.p3d.title')
@@ -22,6 +22,7 @@ describe('resolvePageMeta', () => {
     expect(resolvePageMeta('/privacy').titleKey).toBe('meta.privacy.title')
     expect(resolvePageMeta('/terms').titleKey).toBe('meta.terms.title')
     expect(resolvePageMeta('/help').titleKey).toBe('meta.help.title')
+    expect(resolvePageMeta('/license').titleKey).toBe('meta.license.title')
   })
 
   it('尾斜杠归一化到同一路由', () => {
@@ -35,14 +36,14 @@ describe('resolvePageMeta', () => {
     expect(NOT_FOUND_META.titleKey).toBe('meta.notFound.title')
   })
 
-  it('7 个常规路由均不带 noindex', () => {
+  it('8 个常规路由均不带 noindex', () => {
     for (const meta of PAGE_METAS) {
       expect(meta.noindex).toBe(false)
     }
   })
 
-  it('PAGE_METAS 覆盖且仅覆盖 7 个常规路由', () => {
-    expect(PAGE_METAS.map((m) => m.path)).toEqual(['/', '/2d', '/3d', '/about', '/privacy', '/terms', '/help'])
+  it('PAGE_METAS 覆盖且仅覆盖 8 个常规路由', () => {
+    expect(PAGE_METAS.map((m) => m.path)).toEqual(['/', '/2d', '/3d', '/about', '/privacy', '/terms', '/help', '/license'])
   })
 
   it('notFound 无 descKey(保留默认 description)', () => {

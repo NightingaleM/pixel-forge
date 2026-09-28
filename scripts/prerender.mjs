@@ -17,7 +17,7 @@ import process from 'node:process'
 import puppeteer from 'puppeteer-core'
 
 const PORT = 4317
-const ROUTES = ['/', '/2d', '/3d', '/about', '/privacy', '/terms', '/help']
+const ROUTES = ['/', '/2d', '/3d', '/about', '/privacy', '/terms', '/help', '/license']
 const DIST = path.resolve(process.cwd(), 'dist')
 
 function findChrome() {
