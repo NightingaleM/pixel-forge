@@ -89,14 +89,13 @@ describe('loadWorking', () => {
     expect(w.params.uCellSize).toBe(33)
     expect(w.params.uAngle).toBe(45)
   })
-  it('与 handleApplySeed 同 merge 语义:种子不携带项(toggle/select)回风格默认而非基线', () => {
-    // 种子按基线值编码,但 uColorMode/uShape 不参与编码 → 解析后回风格默认 1/0,
-    // 与单图模式粘贴种子的行为一致(不是 runBatch.resolveRowRenderState 的基线
-    // 打底——那条路供批量渲染延续调参现场)
-    const seed = encodeSeed('halftone', base.params, def, {})
+  it('与 handleApplySeed 同 merge 语义:select/toggle 随种子码携带(v1)', () => {
+    // v1 布局种子=完整配方:select 档随码走(取非默认值 2 以示区分);
+    // 旧 v0 码不携带离散档 → 解码缺失,由 merge 回风格默认——双版本语义见 seedCodec
+    const seed = encodeSeed('halftone', { ...base.params, uColorMode: 2, uShape: 2 }, def, {})
     const w = loadWorking(makeRow({ seed }), base, def)
-    expect(w.params.uColorMode).toBe(1)
-    expect(w.params.uShape).toBe(0)
+    expect(w.params.uColorMode).toBe(2)
+    expect(w.params.uShape).toBe(2)
   })
   it('异风格种子容错解析:不抛错,参数集按传入 def 补齐', () => {
     // 上游(SeedBar 粘贴校验)会拒绝异风格;此处只保证拿到种子不崩:
@@ -120,9 +119,10 @@ describe('loadWorking', () => {
       params: { uEdgeWidth: 2.5, uSensitivity: 0.5, uDetail: 0.8, uHatchDensity: 6 },
       textParams: { uBgColor: '#102030', uLineColor: '#ff8800' },
     })
-    // toggle(uHatching)/select(uEdgeMethod)不在种子内 → 回风格默认
+    // toggle(uHatching) 不参与随机但参与编码:working 缺省 → 风格默认 0 随码往返;
+    // select(uEdgeMethod) v1 起随码携带:working 值 0 往返保留(不再回风格默认 1)
     expect(w.params.uHatching).toBe(0)
-    expect(w.params.uEdgeMethod).toBe(1)
+    expect(w.params.uEdgeMethod).toBe(0)
   })
 })
 

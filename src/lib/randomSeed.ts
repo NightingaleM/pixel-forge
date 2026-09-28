@@ -5,7 +5,8 @@ import { snapToStep } from './paramValue'
 // 这些 uniform 随机会产生不可用结果（居中/旋转类），随机时保持不动
 export const SKIP_RANDOM_UNIFORMS = ['uCenterX', 'uCenterY', 'uRotation', 'uAngle']
 
-/** 以 base 为底随机 seedable 参数（toggle/select/text/font 保留现值，color 均匀随机）。 */
+/** 以 base 为底随机 seedable 参数（select 均匀随机一档，color 均匀随机；
+ *  toggle/text/font 保留现值——开关类不随机，棱镜默认关等定稿不受骰子干扰）。 */
 export function randomizeParams(
   def: StyleDefinition,
   baseParams: Record<string, number>,
@@ -15,7 +16,12 @@ export function randomizeParams(
   const params = { ...baseParams }
   const textParams = { ...baseTextParams }
   for (const p of def.params) {
-    if (p.type === 'text' || p.type === 'toggle' || p.type === 'select' || p.type === 'font') continue
+    if (p.type === 'text' || p.type === 'toggle' || p.type === 'font') continue
+    if (p.type === 'select') {
+      // select 参与随机（v1 种子布局同步）：rand()*n ∈ [0,n) 天然不越界
+      params[p.uniform] = p.options[Math.floor(rand() * p.options.length)].value
+      continue
+    }
     if (p.type === 'color') {
       // 均匀随机 RGB（与 3D 随机一致），rand()*2^24 覆盖含 #FFFFFF 的全值域
       textParams[p.uniform] = '#' + Math.floor(rand() * 16777216).toString(16).padStart(6, '0')

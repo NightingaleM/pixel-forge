@@ -56,10 +56,10 @@ const nextFrame = () =>
   )
 
 /** 种子→渲染状态(base 打底)。与 imageList.loadWorking 的「风格默认打底」刻意
- *  不同(T1 concern):批量渲染的非 seedable 项(toggle/select/text)必须延续整批
- *  基线快照——处理结果要的是调参现场,不是风格默认;而 UI 载入工作副本要与单图
- *  粘贴种子行为一致才回默认。种子携带其他风格时跟随种子(种子是完整状态)。
- *  非法返回 null。 */
+ *  不同(T1 concern):批量渲染的非 seedable 项(text/font)必须延续整批基线快照
+ *  ——处理结果要的是调参现场,不是风格默认;而 UI 载入工作副本要与单图粘贴种子
+ *  行为一致才回默认。select/toggle 自 v1 布局起随种子码携带(种子=完整配方),
+ *  v0 旧码缺离散项时同样由基线打底。种子携带其他风格时跟随种子。非法返回 null。 */
 export function resolveRowRenderState(
   baseline: ProcessingBaseline,
   seedCode: string,

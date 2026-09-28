@@ -1,4 +1,4 @@
-import type { NumberParamDef, StyleDefinition, StyleId } from '../types'
+import type { NumberParamDef, SelectParamDef, StyleDefinition, StyleId, ToggleParamDef } from '../types'
 import { styles } from './StyleRegistry'
 import { isValidHexColor } from './paramValue'
 
@@ -59,15 +59,46 @@ export function valueOfIndex(p: NumberParamDef, idx: number): number {
   return Math.round(raw * f) / f
 }
 
-export const SEED_VERSION = 0   // 对应字符 '0'（ALPHABET[0]）
+/** v1(2026-09-28)：布局纳入 select/toggle 档——种子=完整配方（万花筒镜像模式等
+ *  核心视觉项随码复现）。'0' 旧码仅 numeric+color，decodeSeed 兼容双版本解码；
+ *  encodeSeed 恒产 v1。text/font 仍不参与（携带自由文本会撑爆码长）。 */
+export const SEED_VERSION = 1
 
 function isNumeric(p: StyleDefinition['params'][number]): p is NumberParamDef {
   return p.type === undefined || p.type === 'number'
 }
 
-/** 参与种子编码的参数：数值档 + color 档（toggle/select/text/font 仍不参与）. */
-function seedableListOf(def: StyleDefinition): StyleDefinition['params'][number][] {
-  return def.params.filter((p) => isNumeric(p) || p.type === 'color')
+type DiscreteParamDef = SelectParamDef | ToggleParamDef
+
+function isDiscrete(p: StyleDefinition['params'][number]): p is DiscreteParamDef {
+  return p.type === 'select' || p.type === 'toggle'
+}
+
+/** 参与种子编码的参数：数值档 + color 档 + select/toggle 档（text/font 仍不参与）.
+ *  v0 布局不含离散档，解码旧码时传 false 还原旧序列. */
+function seedableListOf(def: StyleDefinition, includeDiscrete: boolean): StyleDefinition['params'][number][] {
+  return def.params.filter((p) => isNumeric(p) || p.type === 'color' || (includeDiscrete && isDiscrete(p)))
+}
+
+/** select 档数 = options.length；toggle 恒 2 档（0/1）. */
+function discreteCount(p: DiscreteParamDef): number {
+  return p.type === 'select' ? p.options.length : 2
+}
+
+/** value → 档位索引（编码侧）。select 找不到匹配项（手改 localStorage 预设等
+ *  脏值）回 default 档，default 也不在 options（registry 写错）回 0——与 color
+ *  脏值回退同一防御等级，encodeSeed 在 seed useMemo 渲染期被调，不容抛错. */
+function discreteIndex(p: DiscreteParamDef, value: number | undefined): number {
+  if (p.type === 'toggle') return (value ?? p.default) >= 0.5 ? 1 : 0
+  const target = value ?? p.default
+  let idx = p.options.findIndex((o) => o.value === target)
+  if (idx < 0) idx = p.options.findIndex((o) => o.value === p.default)
+  return idx < 0 ? 0 : idx
+}
+
+/** 档位索引 → value（解码侧用；idx 由 % count 得出，必在界内）. */
+function discreteValue(p: DiscreteParamDef, idx: number): number {
+  return p.type === 'select' ? p.options[idx].value : idx
 }
 
 /** 编码：{ styleId, params, textParams(color 部分) } → 种子码字符串.
@@ -78,18 +109,20 @@ export function encodeSeed(
   def: StyleDefinition,
   textParams: Record<string, string> = {},
 ): string {
-  const seedable = seedableListOf(def)
+  const seedable = seedableListOf(def, true)
   let big = 0n
   for (const p of seedable) {
     if (p.type === 'color') {
       // color 档：hex → 24-bit index，radix 2^24 覆盖 #000000..#FFFFFF 全值域。
-      // 用显式 type 判断而非 else：seedable 联合含 text/font（无 default 属性），else 分支过不了 tsc
       // 非法 hex（如手改 localStorage 预设的脏值）回退 default——parseInt 得 NaN 会让
       // BigInt 抛 RangeError，encodeSeed 在 seed useMemo 渲染期被调，无 ErrorBoundary 会白屏。
       // 合法性判定与 presetStore/paramValue 共用 isValidHexColor（同一把尺子）
       const v = textParams[p.uniform] ?? ''
       const idx = isValidHexColor(v) ? parseInt(v.replace(/^#/, ''), 16) : parseInt(p.default.slice(1), 16)
       big = big * 16777216n + BigInt(idx)
+    } else if (isDiscrete(p)) {
+      // select/toggle 档（v1 布局）
+      big = big * BigInt(discreteCount(p)) + BigInt(discreteIndex(p, params[p.uniform]))
     } else if (isNumeric(p)) {
       const count = BigInt(paramCount(p))
       const idx = BigInt(paramIndex(p, params[p.uniform] ?? p.default))
@@ -102,14 +135,17 @@ export function encodeSeed(
   return version + ALPHABET[styleIdx] + encodeB62(big)
 }
 
-/** 解码：种子码 → { styleId, params, colorParams }；任何非法情况返回 null. */
+/** 解码：种子码 → { styleId, params, colorParams }；任何非法情况返回 null.
+ *  v1 码（当前布局）params 含 select/toggle；v0 旧码按旧布局解出，
+ *  select/toggle 不在结果中（调用方 mergeWithDefaults/基线兜底）. */
 export function decodeSeed(
   code: string,
   registry: StyleDefinition[] = styles,
 ): { styleId: StyleId; params: Record<string, number>; colorParams: Record<string, string> } | null {
   if (code.length < 2) return null
   const versionVal = CHAR_TO_VAL[code[0]]
-  if (versionVal !== SEED_VERSION) return null
+  // v0（numeric+color）/ v1（+select/toggle）双布局兼容；更高版本拒绝
+  if (versionVal !== 0 && versionVal !== SEED_VERSION) return null
   const styleVal = CHAR_TO_VAL[code[1]]
   if (styleVal === undefined || styleVal >= registry.length) return null
   const def = registry[styleVal]
@@ -118,7 +154,7 @@ export function decodeSeed(
   const big = decodeB62(code.slice(2))
   if (big === null) return null
 
-  const seedable = seedableListOf(def)
+  const seedable = seedableListOf(def, versionVal === 1)
   const out: Record<string, number> = {}
   const colorOut: Record<string, string> = {}
   let rem = big
@@ -129,6 +165,11 @@ export function decodeSeed(
       const n = rem % 16777216n
       rem = rem / 16777216n
       colorOut[p.uniform] = '#' + n.toString(16).padStart(6, '0')
+    } else if (isDiscrete(p)) {
+      const count = BigInt(discreteCount(p))
+      const idx = Number(rem % count)
+      rem = rem / count
+      out[p.uniform] = discreteValue(p, idx)
     } else if (isNumeric(p)) {
       const count = BigInt(paramCount(p))
       const idx = Number(rem % count)

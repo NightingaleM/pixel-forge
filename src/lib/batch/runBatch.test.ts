@@ -87,14 +87,18 @@ describe('createBatchRunner', () => {
 
 describe('resolveRowRenderState', () => {
   const baseline = mkBaseline({ params: { uCellSize: 9, uColorMode: 0 } })
-  it('合法种子:seedable 项被种子覆盖,非 seedable 项走基线打底', () => {
-    // 用 encodeSeed 造一个 uCellSize=max 的种子(uColorMode 是 select,不参与编码)
+  it('合法种子:seedable 项(含 v1 select/toggle)被种子覆盖', () => {
+    // v1 布局种子=完整配方:uColorMode 编码缺省取 default 1 随码携带,优先于基线 0
     const p = halftone.params.find((x) => x.uniform === 'uCellSize') as { min: number; max: number }
     const seed = encodeSeed('halftone', { uCellSize: p.max }, halftone, {})
     const st = resolveRowRenderState(baseline, seed)!
     expect(st.styleId).toBe('halftone')
     expect(st.params.uCellSize).toBe(p.max)
-    // T1 concern:toggle/select 必须取基线而非风格默认(uColorMode 默认 1)
+    expect(st.params.uColorMode).toBe(1)
+  })
+  it('v0 旧码(无离散档):select/toggle 延续基线(T1 兼容)', () => {
+    // v0 布局不带 uColorMode → decoded 缺项由基线打底保留 0,不回风格默认 1
+    const st = resolveRowRenderState(baseline, '00njY7e')!   // halftone v0 硬编码码
     expect(st.params.uColorMode).toBe(0)
   })
   it('非法种子返回 null', () => {

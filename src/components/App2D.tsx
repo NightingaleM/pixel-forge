@@ -990,8 +990,8 @@ function App2D() {
     if (!decoded) return false
     const def = getStyle(decoded.styleId)
     if (!def) return false
-    // decodeSeed 产出 numeric + color 参数(toggle/select 仍不参与编码),以风格默认值
-    // 为底合并补齐;colorParams 覆盖默认色,text 类型(charset 等)仍回默认
+    // decodeSeed 产出 numeric+color+select+toggle(v1 全配方;v0 旧码缺离散项以风格
+    // 默认为底合并补齐);text 类型(charset 等)不参与编码,仍回默认
     const merged = mergeWithDefaults(def, decoded.params, {
       ...defaultTextParams(decoded.styleId),
       ...decoded.colorParams,
