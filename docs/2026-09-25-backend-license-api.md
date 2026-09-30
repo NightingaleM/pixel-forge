@@ -137,6 +137,23 @@ signature = ed25519.sign(payloadUtf8, privateKey)
 - 用途:多设备场景下,其他设备续费后本设备免输码同步最新到期(已绑定设备,不消耗次数)。
 - 返回/限流:同 redeem。
 
+### 410 终态错误(2026-10-01 增补:voided)
+
+来源:2026-10-01 后端契约通知(通知称后端已上线;micro_server_nest_ai 侧实现本库
+无法核实。前端已按本节契约适配——后端不返回 voided 时新分支不触发,向后安全)。
+redeem 与 refresh 均可能返回:
+
+| error | 含义 | 附加字段 | 前端行为 |
+|---|---|---|---|
+| expired | 已到期 / 风控封禁 | 无 | 提示「已过期」(既有行为) |
+| voided | 退款作废(不可恢复终态) | `voidedAt`(ISO 8601)、`reason`(纯文本) | 停止对该凭证/激活码一切重试;本地凭证与会员状态标记失效;提示作废时间与原因,与到期区分 |
+
+- 两态同为 410,靠 body.error 区分;`voidedAt`/`reason` 仅 `error === 'voided'` 时返回,
+  其余错误码(400 invalid_code / invalid_credential、409 冲突类、429)契约不变。
+- 已激活链被退款作废后服务端**不主动推送**,客户端下次 refresh(或 redeem)才收到
+  410——失效感知依赖 refresh 的错误路径。
+- `reason` 是纯文本,前端按文本渲染,不解析 HTML/Markdown。
+
 ### POST /api/license/recover —— 公开接口(v2 不变)
 
 - body: `{ email: string }`
@@ -169,6 +186,7 @@ signature = ed25519.sign(payloadUtf8, privateKey)
 
 - 激活入口(非会员):`activateCode` → redeem(无 credential);续费入口(会员):`renewCode`
   → redeem(自动携 credential);刷新:`refreshCredential` → refresh。三者错误分类一致
-  (format/signature/expired/used/identity_conflict/device_exhausted/network/rate_limited)。
+  (format/signature/expired/used/identity_conflict/device_exhausted/network/rate_limited/
+  voided——携 voidedAt/reason,本地写失效标记,已标记凭证 refresh/renew 短路不发网)。
 - 会员判定:`getLicenseStatus` 纯离线——验签 + `did == 本机 deviceId`,凭证复制失效。
 - 上线前前端注入生产公钥与同源 `/api` 反代(生产 `VITE_API_BASE` 留空,nginx 转发到后端)。

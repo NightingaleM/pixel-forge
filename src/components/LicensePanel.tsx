@@ -9,8 +9,8 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useDraggable } from '../lib/useDraggable'
 import {
-  activateCode, renewCode, refreshCredential, getLicenseStatus,
-  loadStoredCredential, loadLicenseCount, type LicenseFailReason,
+  activateCode, renewCode, refreshCredential, getLicenseStatus, getVoidedInfo,
+  loadStoredCredential, loadLicenseCount, type LicenseFailReason, type LicenseResult,
 } from '../lib/license/verify'
 import { remainingToday, FREE_DAILY_NO_WATERMARK } from '../lib/license/quota'
 
@@ -18,11 +18,18 @@ const ERR_KEY: Record<LicenseFailReason, string> = {
   format: 'errFormat', signature: 'errSignature', expired: 'errExpired',
   used: 'errUsed', identity_conflict: 'errIdentityConflict',
   device_exhausted: 'errDeviceExhausted', network: 'errNetwork', rate_limited: 'errRateLimit',
+  voided: 'errVoided',
 }
 
 const fmtDate = (expAt: number) => new Date(expAt * 1000).toLocaleString(undefined, {
   year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit',
 })
+
+// voidedAt 是 ISO 8601 字符串;非法日期原样展示(不抛错)
+const fmtIsoDate = (iso: string) => {
+  const ms = new Date(iso).getTime()
+  return Number.isNaN(ms) ? iso : fmtDate(ms / 1000)
+}
 
 interface LicensePanelProps {
   onClose: () => void
@@ -40,11 +47,18 @@ function LicensePanel({ onClose, onChanged }: LicensePanelProps) {
     'pixel-forge.panelPos.license',
   )
   const status = getLicenseStatus()
+  // 作废判定(410 voided 终态)优先于过期:退款作废的链凭证本身仍有效,靠本地标记识别
+  const voided = !status.active && getVoidedInfo() !== null
   // 过期判定:无活跃会员但存过凭证 = 曾激活过(过期/换设备),提示重新激活
-  const expired = !status.active && loadStoredCredential() !== null
+  const expired = !status.active && !voided && loadStoredCredential() !== null
   const count = loadLicenseCount()
 
-  const run = async (fn: () => Promise<{ ok: true; expAt: number } | { ok: false; reason: LicenseFailReason }>,
+  // 错误文案:voided 带作废时间与原因(与到期提示区分);reason 纯文本插值渲染,不解析
+  const failText = (r: Extract<LicenseResult, { ok: false }>) => (r.reason === 'voided'
+    ? t('license.errVoided', { date: fmtIsoDate(r.voidedAt), reason: r.voidReason })
+    : t(`license.${ERR_KEY[r.reason]}`))
+
+  const run = async (fn: () => Promise<LicenseResult>,
     okText: (expAt: number) => string) => {
     if (busy) return   // 禁用态由按钮控制;此处兜底防重入
     setBusy(true)
@@ -56,7 +70,8 @@ function LicensePanel({ onClose, onChanged }: LicensePanelProps) {
         setInput('')
         onChanged()
       } else {
-        setMsg({ kind: 'err', text: t(`license.${ERR_KEY[r.reason]}`) })
+        setMsg({ kind: 'err', text: failText(r) })
+        if (r.reason === 'voided') onChanged()   // 作废=会员态落地,触发外层重渲
       }
     } finally {
       setBusy(false)
@@ -76,7 +91,8 @@ function LicensePanel({ onClose, onChanged }: LicensePanelProps) {
       const r = await refreshCredential()
       setMsg(r.ok
         ? { kind: 'ok', text: t('license.refreshed') }
-        : { kind: 'err', text: t(`license.${ERR_KEY[r.reason]}`) })
+        : { kind: 'err', text: failText(r) })
+      if (!r.ok && r.reason === 'voided') onChanged()   // 作废=会员态落地,触发外层重渲
       if (r.ok) onChanged()
     } finally {
       setBusy(false)
@@ -104,7 +120,7 @@ function LicensePanel({ onClose, onChanged }: LicensePanelProps) {
           <div className="license-card">
             <div className="license-card-title">
               {t('license.freeTitle')}
-              {expired ? ` · ${t('license.expiredTag')}` : ''}
+              {voided ? ` · ${t('license.voidedTag')}` : expired ? ` · ${t('license.expiredTag')}` : ''}
             </div>
             <div>{t('license.freeRemaining', { count: remainingToday() })} / {FREE_DAILY_NO_WATERMARK}</div>
           </div>

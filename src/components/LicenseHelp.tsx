@@ -5,7 +5,7 @@ import InfoPage from './InfoPage'
 // 错误对照表:提示文案直接复用浮窗 license.errX(单一事实源,不另抄一份),
 // 解释文案在本页 hintX——两处键名后缀一致,漂移即缺键可见
 const ERRS = [
-  'Format', 'Signature', 'Expired', 'Used',
+  'Format', 'Signature', 'Expired', 'Voided', 'Used',
   'IdentityConflict', 'DeviceExhausted', 'Network', 'RateLimit',
 ] as const
 

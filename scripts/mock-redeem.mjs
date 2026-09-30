@@ -2,8 +2,10 @@
 // 本地 mock 后端链式兑换接口,供浏览器回归(scripts/verify-license.mjs)与手动联调。
 // 契约:docs/2026-09-25-backend-license-api.md 第 3 节(链式方案 2026-09-26 修订):
 //   POST /api/license/redeem  {code, deviceId, credential?} → 200 {code:<凭证>, expAt, count}
-//   POST /api/license/refresh {credential, deviceId}        → 200 同上 / 410 expired
+//   POST /api/license/refresh {credential, deviceId}        → 200 同上 / 410 expired|voided
 //   400 invalid_code / 409 device_exhausted|identity_conflict(body.error)
+// 410 voided(2026-10-01 契约):退款作废终态,附 voidedAt/reason;mock 专用控制端点
+//   POST /api/license/void {code?|cid?, reason?, at?} 标记链或未用码为已作废(回归用)。
 // 状态机:未使用码 × 无凭证 → 建链成身份码(绑设备,次数-1);未使用码 × 带凭证 →
 //   消耗为补充包(链 exp+=时长,次数+1);身份码重输 → 幂等重签(已知设备 0 次)。
 // 不验签(mock 简化):信任请求里的码,按其 payload 处理——真后端必须验签。
@@ -30,6 +32,8 @@ const codes = new Map()
 const chains = new Map()
 const nowS = () => Math.floor(Date.now() / 1000)
 const cidOf = (code) => crypto.createHash('sha256').update(code).digest('hex').slice(0, 16)
+// 退款作废:链/未用码记录上挂 {at, reason},命中即 410 voided(voidedAt=at)
+const voidedThrow = (v) => ({ status: 410, error: 'voided', voidedAt: v.at, reason: v.reason })
 
 const json = (res, status, body) => res.writeHead(status, { 'Content-Type': 'application/json' }).end(JSON.stringify(body))
 
@@ -54,10 +58,12 @@ function redeem({ code, deviceId, credential }) {
     if (cred.v !== 2 || !cred.cid || cred.did !== deviceId) throw { status: 400, error: 'invalid_code' }
     const chain = chains.get(cred.cid)
     if (!chain) throw { status: 400, error: 'invalid_code' }
+    if (chain.voided) throw voidedThrow(chain.voided)
     if (chain.exp <= nowS()) throw { status: 410, error: 'expired' }
     if (!chain.devices.has(deviceId)) throw { status: 400, error: 'invalid_code' }   // 未绑定设备不得续费(堵凭证复制洗牌)
     if (code === undefined) return { cid: cred.cid, exp: chain.exp, count: chain.count }   // refresh:幂等重签
     const { payload, rec } = parseCode()
+    if (rec.voided) throw voidedThrow(rec.voided)   // 补充码本身已被退款作废
     if (rec.status === 'unused') {
       // 消耗为补充包:链 exp 延长、次数 +1
       if (payload.tier === 'lifetime') chain.exp = DURATIONS.lifetime
@@ -75,6 +81,7 @@ function redeem({ code, deviceId, credential }) {
 
   // 激活入口(无凭证):新码建链成身份码,或身份码迁移/幂等
   const { payload, rec } = parseCode()
+  if (rec.voided) throw voidedThrow(rec.voided)   // 未用码已被退款作废
   if (rec.status === 'supplement') throw { status: 400, error: 'invalid_code' }
   if (rec.status === 'unused') {
     const cid = cidOf(code)
@@ -85,6 +92,7 @@ function redeem({ code, deviceId, credential }) {
   }
   // status=identity:幂等或绑新设备
   const chain = chains.get(rec.cid)
+  if (chain.voided) throw voidedThrow(chain.voided)
   if (chain.exp <= nowS()) throw { status: 410, error: 'expired' }
   if (!chain.devices.has(deviceId)) {
     if (chain.count <= 0) throw { status: 409, error: 'device_exhausted' }
@@ -94,13 +102,29 @@ function redeem({ code, deviceId, credential }) {
   return { cid: rec.cid, exp: chain.exp, count: chain.count }
 }
 
+/** mock 专用控制端点:标记链(按 code 或 cid)或未用码为已作废(回归场景 C5 用)。 */
+function voidTarget({ code, cid, reason, at }) {
+  const v = { at: at ?? new Date().toISOString(), reason: reason ?? '退款' }
+  if (typeof code === 'string') {
+    const rec = codes.get(code)
+    if (!rec) throw { status: 404, error: 'not_found' }
+    if (rec.status === 'unused') { rec.voided = v; return { cid: null } }
+    cid = rec.cid   // identity/supplement 码 → 作废其所属链
+  }
+  if (typeof cid !== 'string') throw { status: 400, error: 'invalid_code' }
+  const chain = chains.get(cid)
+  if (!chain) throw { status: 404, error: 'not_found' }
+  chain.voided = v
+  return { cid }
+}
+
 const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
   if (req.method === 'OPTIONS') { res.writeHead(204).end(); return }
   if (req.method === 'GET') { res.writeHead(200).end('mock-redeem ok'); return }   // 存活探测
-  const route = req.method === 'POST' && (req.url.startsWith('/api/license/redeem') || req.url.startsWith('/api/license/refresh'))
+  const route = req.method === 'POST' && (req.url.startsWith('/api/license/redeem') || req.url.startsWith('/api/license/refresh') || req.url.startsWith('/api/license/void'))
     ? req.url.split('?')[0] : null
   if (!route) {
     res.writeHead(404, { 'Content-Type': 'application/json' }).end(JSON.stringify({ error: 'not_found' }))
@@ -111,11 +135,14 @@ const server = http.createServer((req, res) => {
   req.on('end', () => {
     try {
       const parsed = JSON.parse(body || '{}')
+      if (route.endsWith('/void')) { json(res, 200, { ok: true, ...voidTarget(parsed) }); return }
       if (route.endsWith('/refresh')) parsed.code = undefined   // refresh 只凭 credential
       const r = redeem(parsed)
       json(res, 200, { code: signCredential(r.cid, r.exp, parsed.deviceId), expAt: r.exp, count: r.count })
     } catch (e) {
-      json(res, e?.status ?? 400, { error: e?.error ?? 'invalid_code' })
+      json(res, e?.status ?? 400, e?.error === 'voided'
+        ? { error: 'voided', voidedAt: e.voidedAt, reason: e.reason }
+        : { error: e?.error ?? 'invalid_code' })
     }
   })
 })

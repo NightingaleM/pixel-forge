@@ -1,12 +1,13 @@
 // src/lib/license/redeem.test.ts
 // 链式方案网络流程:redeemActivate/redeemRenew/redeemRefresh(mock fetch 各分支)、
 // activateCode/renewCode/refreshCredential 全链路(错误分类、凭证存储、did 绑定)、
-// getLicenseStatus 设备绑定判定、deviceId 持久化与非安全上下文降级。
+// getLicenseStatus 设备绑定判定、deviceId 持久化与非安全上下文降级;
+// voided 退款作废终态(2026-10-01 契约:410 body.error 区分,标记失效与短路)。
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { ed25519 } from '@noble/curves/ed25519'
 import { signUnredeemed, signCredential } from './emit'
 import {
-  activateCode, renewCode, refreshCredential, getLicenseStatus,
+  activateCode, renewCode, refreshCredential, getLicenseStatus, getVoidedInfo,
   loadStoredCredential, getOrCreateDeviceId, setLicenseStorage, setLicensePublicKey,
 } from './verify'
 import { redeemActivate, redeemRefresh } from './redeem'
@@ -206,6 +207,97 @@ describe('renewCode / refreshCredential(续费与刷新,会员态)', () => {
       .mockResolvedValueOnce(res(200, { code: credentialFor(did, NOW_S + 172800), expAt: NOW_S + 172800, count: 4 })))
     expect(await refreshCredential(NOW)).toEqual({ ok: false, reason: 'expired' })
     expect(await refreshCredential(NOW)).toEqual({ ok: true, expAt: NOW_S + 172800, count: 4 })
+  })
+})
+
+describe('voided 终态(退款作废,410 增补契约)', () => {
+  const VOIDED_AT = '2026-09-28T10:00:00.000Z'
+  const VOID_REASON = '退款 #1024'
+  const voidedRes = () => res(410, { error: 'voided', voidedAt: VOIDED_AT, reason: VOID_REASON })
+
+  it('410 按 body.error 区分:voided 携 voidedAt/voidReason;体不可读 → expired(向后兼容)', async () => {
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(voidedRes())
+      .mockResolvedValueOnce({ ok: false, status: 410, json: () => Promise.reject(new Error('bad body')) }))
+    expect(await redeemRefresh('PF1.x.y', 'dev-1')).toEqual({
+      ok: false, reason: 'voided', voidedAt: VOIDED_AT, voidReason: VOID_REASON,
+    })
+    expect(await redeemRefresh('PF1.x.y', 'dev-1')).toEqual({ ok: false, reason: 'expired' })
+  })
+
+  it('刷新遇 voided:返回作废信息,凭证与会员态标记失效;再次刷新不发网(终态停止重试)', async () => {
+    const did = getOrCreateDeviceId()
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(res(200, { code: credentialFor(did, NOW_S + 86400), expAt: NOW_S + 86400, count: 4 })))
+    await activateCode(unredeemedA, NOW)
+    expect(getLicenseStatus(NOW)).toEqual({ active: true, expAt: NOW_S + 86400 })
+
+    const fetchMock = vi.fn().mockResolvedValue(voidedRes())
+    vi.stubGlobal('fetch', fetchMock)
+    expect(await refreshCredential(NOW)).toEqual({
+      ok: false, reason: 'voided', voidedAt: VOIDED_AT, voidReason: VOID_REASON,
+    })
+    expect(getLicenseStatus(NOW)).toEqual({ active: false })
+    expect(getVoidedInfo()).toEqual({ voidedAt: VOIDED_AT, reason: VOID_REASON })
+
+    fetchMock.mockClear()
+    expect(await refreshCredential(NOW)).toEqual({
+      ok: false, reason: 'voided', voidedAt: VOIDED_AT, voidReason: VOID_REASON,
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('续费遇 voided:同样标记本机凭证失效', async () => {
+    const did = getOrCreateDeviceId()
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(res(200, { code: credentialFor(did, NOW_S + 86400), expAt: NOW_S + 86400, count: 4 }))
+      .mockResolvedValueOnce(voidedRes()))
+    await activateCode(unredeemedA, NOW)
+    expect(await renewCode(unredeemedB, NOW)).toEqual({
+      ok: false, reason: 'voided', voidedAt: VOIDED_AT, voidReason: VOID_REASON,
+    })
+    expect(getLicenseStatus(NOW)).toEqual({ active: false })
+    expect(getVoidedInfo()).toEqual({ voidedAt: VOIDED_AT, reason: VOID_REASON })
+  })
+
+  it('激活遇 voided:返回作废信息但不标记本机凭证(作废的是贴入的码,可能异链)', async () => {
+    const did = getOrCreateDeviceId()
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(res(200, { code: credentialFor(did, NOW_S + 86400), expAt: NOW_S + 86400, count: 4 }))
+      .mockResolvedValueOnce(voidedRes()))
+    await activateCode(unredeemedA, NOW)
+    expect(await activateCode(unredeemedB, NOW)).toEqual({
+      ok: false, reason: 'voided', voidedAt: VOIDED_AT, voidReason: VOID_REASON,
+    })
+    expect(getVoidedInfo()).toBe(null)
+    expect(getLicenseStatus(NOW)).toEqual({ active: true, expAt: NOW_S + 86400 })
+  })
+
+  it('作废后成功激活新码:标记清除,会员态恢复', async () => {
+    const did = getOrCreateDeviceId()
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(res(200, { code: credentialFor(did, NOW_S + 86400), expAt: NOW_S + 86400, count: 4 })))
+    await activateCode(unredeemedA, NOW)
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(voidedRes()))
+    await refreshCredential(NOW)
+    expect(getLicenseStatus(NOW)).toEqual({ active: false })
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      res(200, { code: credentialFor(did, NOW_S + 172800), expAt: NOW_S + 172800, count: 4 })))
+    expect(await activateCode(unredeemedB, NOW)).toEqual({ ok: true, expAt: NOW_S + 172800, count: 4 })
+    expect(getVoidedInfo()).toBe(null)
+    expect(getLicenseStatus(NOW)).toEqual({ active: true, expAt: NOW_S + 172800 })
+  })
+
+  it('标记与当前凭证异链(cid 不匹配)不生效:防手改存储残留误伤', async () => {
+    const did = getOrCreateDeviceId()
+    const s = new MemStorage()
+    s.setItem('pixel-forge.deviceId.v1', did)
+    s.setItem('pixel-forge.license.v2', credentialFor(did, NOW_S + 86400))
+    s.setItem('pixel-forge.licenseVoided.v1', JSON.stringify({ cid: '0000000000000000', at: VOIDED_AT, reason: VOID_REASON }))
+    setLicenseStorage(s)
+    expect(getLicenseStatus(NOW)).toEqual({ active: true, expAt: NOW_S + 86400 })
+    expect(getVoidedInfo()).toBe(null)
   })
 })
 

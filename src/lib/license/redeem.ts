@@ -3,17 +3,20 @@
 // 第 3 节(链式方案,2026-09-26 修订):
 //   POST /api/license/redeem   {code, deviceId, credential?} → 200 {code:<凭证>, expAt, count}
 //     400 invalid_code / 409 device_exhausted|identity_conflict(body.error 区分) / 429 限流
-//   POST /api/license/refresh  {credential, deviceId} → 200 同上 / 410 expired
+//   POST /api/license/refresh  {credential, deviceId} → 200 同上 / 410 expired|voided
+// 410 两终态靠 body.error 区分(2026-10-01 增补 voided:退款作废,附 voidedAt/reason)。
 // 兑换依赖后端,使用不依赖:本模块只在激活/续费/刷新时被调用,会员判定(verify.ts)永不上网。
 // VITE_API_BASE:开发 .env.local 指向 mock/本地后端,生产留空走同源(上线前注入正式值)。
 const API_BASE = (import.meta.env.VITE_API_BASE ?? '').replace(/\/+$/, '')
 
 export type RedeemFailReason
-  = 'network' | 'invalid_code' | 'device_exhausted' | 'identity_conflict' | 'rate_limited' | 'expired'
+  = 'network' | 'invalid_code' | 'device_exhausted' | 'identity_conflict' | 'rate_limited' | 'expired' | 'voided'
 
 export type RedeemResult =
   | { ok: true; code: string; expAt: number; count: number }   // 凭证原文;签名由调用方验(不信响应体)
-  | { ok: false; reason: RedeemFailReason }
+  | { ok: false; reason: Exclude<RedeemFailReason, 'voided'> }
+  // voided 不可恢复终态(退款作废):voidedAt=ISO 时间、voidReason=作废原因(纯文本展示)
+  | { ok: false; reason: 'voided'; voidedAt: string; voidReason: string }
 
 /** 409 两种语义靠 body.error 区分(device_exhausted / identity_conflict),读体失败归 network。 */
 async function post(path: string, body: Record<string, unknown>): Promise<RedeemResult> {
@@ -27,7 +30,20 @@ async function post(path: string, body: Record<string, unknown>): Promise<Redeem
   } catch { return { ok: false, reason: 'network' } }
   if (res.status === 400) return { ok: false, reason: 'invalid_code' }
   if (res.status === 429) return { ok: false, reason: 'rate_limited' }
-  if (res.status === 410) return { ok: false, reason: 'expired' }
+  if (res.status === 410) {
+    // expired/voided 同为 410,靠 body.error 区分;读体失败或旧后端裸 410 → expired(向后兼容)
+    try {
+      const b = (await res.json()) as { error?: unknown; voidedAt?: unknown; reason?: unknown }
+      if (b?.error === 'voided') {
+        return {
+          ok: false, reason: 'voided',
+          voidedAt: typeof b.voidedAt === 'string' ? b.voidedAt : '',
+          voidReason: typeof b.reason === 'string' ? b.reason : '',
+        }
+      }
+    } catch { /* body 不可读按 expired 处理 */ }
+    return { ok: false, reason: 'expired' }
+  }
   if (res.status === 409) {
     try {
       const err = ((await res.json()) as { error?: unknown })?.error

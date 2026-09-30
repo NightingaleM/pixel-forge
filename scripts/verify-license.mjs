@@ -3,7 +3,8 @@
 // 场景 C(链式方案,spec 2026-09-26):C0 断网贴未兑换码→网络提示;C1 起 mock 后激活
 //   成身份码(存储区为 v2 凭证,did 绑定);C1b 会员态续费(补充包,exp 延长+次数+1);
 //   C1c 刷新同步;C2 会员超额无 toast;C3 清存储重输身份码恢复(绑新设备);
-//   C4 篡改 deviceId → 凭证失效(设备绑定)。
+//   C4 篡改 deviceId → 凭证失效(设备绑定);C5 退款作废——mock /void 标记链 →
+//   刷新收到 410 voided → 作废提示(时间+原因)+ 本地标记 + 会员态落地失效。
 // 用法: 先起 mock 目标的 dev: API_PROXY_TARGET=http://localhost:3999 npx vite
 //   (端口 5177 由 vite.config.ts 指定),然后 node scripts/verify-license.mjs <port>
 //   测试公钥在本脚本内经 setLicensePublicKey 注入页面(此 vite 8 下 env 文件/命令行
@@ -252,6 +253,41 @@ const hijacked = await page.evaluate(async (pub) => {
 }, TEST_PUBLIC_KEY_HEX)
 ok('C4 deviceId 被换 → 凭证判定非会员(复制到未绑定设备无效)', hijacked.active === false,
   JSON.stringify(hijacked))
+
+// C5:退款作废(410 voided,2026-10-01 契约)——干净态重激活 → mock 作废链 →
+// 刷新感知 → 提示含时间与原因(区别于"已过期"),本地标记落库,会员态失效
+await page.evaluate(() => localStorage.clear())
+await page.reload({ waitUntil: 'networkidle0' })
+await sniffVerifyUrls()
+await applyTestPubkey()
+await page.click('img[src*="local_test_pic"]')
+await page.waitForFunction(() => document.querySelectorAll('canvas').length >= 2, { timeout: 10000 })
+await inputCodeViaUi(codeA)
+await page.waitForFunction(() => document.querySelector('.license-msg--ok') !== null, { timeout: 8000 })
+const voidResp = await fetch('http://localhost:3999/api/license/void', {
+  method: 'POST', headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ code: codeA, reason: '退款 #1024', at: '2026-09-28T10:00:00.000Z' }),
+}).then(r => r.json())
+ok('C5a mock 作废链成功(控制端点)', voidResp.ok === true, JSON.stringify(voidResp))
+await (await page.$('.license-panel .license-link-btn')).click()   // 会员态刷新链接
+await page.waitForFunction(() => document.querySelector('.license-msg--err') !== null, { timeout: 8000 })
+const c5msg = await page.evaluate(() => document.querySelector('.license-msg--err')?.textContent ?? '')
+ok('C5b 刷新遇 410 voided → 提示含作废/时间/原因(与过期区分)',
+  /作废|[Vv]oided/.test(c5msg) && c5msg.includes('退款 #1024') && c5msg.includes('2026'), c5msg)
+const c5marker = await page.evaluate(() => localStorage.getItem('pixel-forge.licenseVoided.v1'))
+const voidedStatus = await page.evaluate(async (pub) => {
+  const m = await import('/src/lib/license/verify.ts')
+  m.setLicensePublicKey(pub)
+  return m.getLicenseStatus()
+}, TEST_PUBLIC_KEY_HEX)
+ok('C5c 本地凭证与会员态标记失效(voided 标记落库,getLicenseStatus 非 active)',
+  c5marker !== null && voidedStatus.active === false,
+  `marker=${c5marker} status=${JSON.stringify(voidedStatus)}`)
+await new Promise(r => setTimeout(r, 400))   // 等 onChanged 重渲
+const c5panel = await page.evaluate(() => document.querySelector('.license-panel')?.textContent ?? '')
+ok('C5d 面板切免费态并显示"已作废"tag', /已作废|[Vv]oided/.test(c5panel), c5panel.slice(0, 120))
+await page.screenshot({ path: path.join(OUT, 'c5-voided.png') })
+await closePanel()
 
 // ---------- 场景 D:3D 页无碍 ----------
 const errs3d = []

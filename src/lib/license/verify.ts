@@ -2,6 +2,8 @@
 // 会员判定核心(链式方案,spec 2026-09-26):localStorage 存隐藏凭证 {v:2,cid,exp,did} 原文,
 // 每次现验——验签 + did 绑定本机,凭证复制到未绑定设备自动失效。篡改无意义,不缓存状态。
 // 用户全程只接触兑换码原文(身份码/补充包);凭证由本模块自动存取,不可见无需备份。
+// 退款作废(2026-10-01 契约):refresh/renew 收 410 voided 时写 voided 标记(挂钩凭证 cid),
+// 凭证本身仍验签有效,故 getLicenseStatus 额外查标记;成功兑换新凭证即清除标记。
 import { ed25519 } from '@noble/curves/ed25519'
 import type { LicenseTier, StorageLike } from './types'
 import { redeemActivate, redeemRenew, redeemRefresh, type RedeemResult } from './redeem'
@@ -9,6 +11,7 @@ import { redeemActivate, redeemRenew, redeemRefresh, type RedeemResult } from '.
 const CREDENTIAL_KEY = 'pixel-forge.license.v2'
 const META_KEY = 'pixel-forge.licenseMeta.v2'
 const DEVICE_ID_KEY = 'pixel-forge.deviceId.v1'
+const VOIDED_KEY = 'pixel-forge.licenseVoided.v1'
 
 // ── 后端公钥(2026-09-26 链式方案重做时新生成交付)。⚠️ 若后端再换密钥对,
 //    替换本值并重新构建。构建产物硬编码此值,无运行时后门;仅 dev 模式可经
@@ -114,7 +117,57 @@ function storeCredential(credential: string, count: number): void {
   try {
     storage.setItem(CREDENTIAL_KEY, credential.trim())
     storage.setItem(META_KEY, JSON.stringify({ count }))
+    // 新凭证生效 = 旧作废标记作废(激活新链即自救;renew 误标记可经 refresh/重激活仲裁)
+    storage.removeItem(VOIDED_KEY)
   } catch { /* 配额满:本次会话内存态也已无,忽略 */ }
+}
+
+// ── 退款作废标记(410 voided 终态,不可恢复)──
+
+type VoidedMarker = { cid: string; at: string; reason: string }
+
+function loadVoidedMarker(): VoidedMarker | null {
+  if (!storage) return null
+  try {
+    const raw = storage.getItem(VOIDED_KEY)
+    if (!raw) return null
+    const m = JSON.parse(raw) as { cid?: unknown; at?: unknown; reason?: unknown }
+    if (typeof m.cid !== 'string' || !m.cid
+      || typeof m.at !== 'string' || typeof m.reason !== 'string') return null
+    return { cid: m.cid, at: m.at, reason: m.reason }
+  } catch { return null }
+}
+
+function markVoided(cid: string, at: string, reason: string): void {
+  if (!storage) return
+  try { storage.setItem(VOIDED_KEY, JSON.stringify({ cid, at, reason })) } catch { /* 忽略 */ }
+}
+
+/** 取凭证 payload 的 cid(不校验 exp/did):作废标记与当前凭证挂钩用的轻量读取。 */
+function peekCredentialCid(code: string): string | null {
+  const head = verifyAndDecode(code)
+  if ('err' in head) return null
+  try {
+    const p = JSON.parse(new TextDecoder().decode(head.msg)) as { cid?: unknown }
+    return typeof p.cid === 'string' ? p.cid : null
+  } catch { return null }
+}
+
+/** 已作废凭证的短路应答(终态:refresh/renew 不再发网重试)。 */
+function voidedShortCircuit(cid: string): LicenseResult | null {
+  const m = loadVoidedMarker()
+  return m && m.cid === cid
+    ? { ok: false, reason: 'voided', voidedAt: m.at, voidReason: m.reason }
+    : null
+}
+
+/** 退款作废信息(仅当标记挂钩当前存储凭证时返回;面板展示作废 tag 用)。 */
+export function getVoidedInfo(): { voidedAt: string; reason: string } | null {
+  const code = loadStoredCredential()
+  if (!code) return null
+  const m = loadVoidedMarker()
+  if (!m || peekCredentialCid(code) !== m.cid) return null
+  return { voidedAt: m.at, reason: m.reason }
 }
 
 /** randomUUID 仅 secure context(https/localhost)提供;局域网 IP 明文访问时用
@@ -149,18 +202,21 @@ export function getOrCreateDeviceId(): string {
 }
 
 export type LicenseFailReason =
-  'format' | 'signature' | 'expired' | 'used' | 'identity_conflict' | 'device_exhausted' | 'network' | 'rate_limited'
+  'format' | 'signature' | 'expired' | 'used' | 'identity_conflict' | 'device_exhausted' | 'network' | 'rate_limited' | 'voided'
 
 export type LicenseResult =
   | { ok: true; expAt: number; count: number }
-  | { ok: false; reason: LicenseFailReason }
+  | { ok: false; reason: Exclude<LicenseFailReason, 'voided'> }
+  | { ok: false; reason: 'voided'; voidedAt: string; voidReason: string }
 
 /** 应答统一处理:验返回凭证签名 + did 必须为本机(不信响应体),过才落库。 */
 async function settle(rr: RedeemResult, deviceId: string, now: number): Promise<LicenseResult> {
   if (!rr.ok) {
     // 本地验签已过的码被后端 400 拒 = 已消耗(补充包/他链),提示"已被使用"
     if (rr.reason === 'invalid_code') return { ok: false, reason: 'used' }
-    return { ok: false, reason: rr.reason }
+    return rr.reason === 'voided'
+      ? { ok: false, reason: 'voided', voidedAt: rr.voidedAt, voidReason: rr.voidReason }
+      : { ok: false, reason: rr.reason }
   }
   const verified = parseCredential(rr.code, now)
   if (!verified.ok) return { ok: false, reason: 'signature' }
@@ -184,26 +240,36 @@ export async function renewCode(code: string, now: number = Date.now()): Promise
   const c = parseCredential(stored, now)
   if (!c.ok) return { ok: false, reason: c.reason }
   if (c.did !== peekDeviceId()) return { ok: false, reason: 'format' }
+  const short = voidedShortCircuit(c.cid)   // 终态:本机凭证已作废,续费无意义不发网
+  if (short) return short
   const u = parseUnredeemedCode(code)
   if (!u.ok) return { ok: false, reason: u.reason }
   const deviceId = getOrCreateDeviceId()
-  return settle(await redeemRenew(code.trim(), deviceId, stored), deviceId, now)
+  const rr = await redeemRenew(code.trim(), deviceId, stored)
+  if (!rr.ok && rr.reason === 'voided') markVoided(c.cid, rr.voidedAt, rr.voidReason)
+  return settle(rr, deviceId, now)
 }
 
-/** 刷新(会员设备,免输码):同步链当前 exp(其他设备续费后的同步通道,0 次数)。 */
+/** 刷新(会员设备,免输码):同步链当前 exp(其他设备续费后的同步通道,0 次数)。
+ *  也是作废失效的感知通道:链被退款作废后服务端不推送,下次刷新收到 410 voided。 */
 export async function refreshCredential(now: number = Date.now()): Promise<LicenseResult> {
   const stored = loadStoredCredential()
   if (!stored) return { ok: false, reason: 'format' }
   const c = parseCredential(stored, now)
   if (!c.ok) return { ok: false, reason: c.reason }
+  const short = voidedShortCircuit(c.cid)   // 终态:已作废凭证不再发网重试
+  if (short) return short
   const deviceId = getOrCreateDeviceId()
-  return settle(await redeemRefresh(stored, deviceId), deviceId, now)
+  const rr = await redeemRefresh(stored, deviceId)
+  if (!rr.ok && rr.reason === 'voided') markVoided(c.cid, rr.voidedAt, rr.voidReason)
+  return settle(rr, deviceId, now)
 }
 
 export function getLicenseStatus(now: number = Date.now()): { active: boolean; expAt?: number } {
   const code = loadStoredCredential()
   if (!code) return { active: false }
   const r = parseCredential(code, now)
-  if (!r.ok || r.did !== peekDeviceId()) return { active: false }
+  // voided 标记优先于自然到期判定:凭证签名与 exp 仍有效,但链已被退款作废
+  if (!r.ok || r.did !== peekDeviceId() || loadVoidedMarker()?.cid === r.cid) return { active: false }
   return { active: true, expAt: r.expAt }
 }
