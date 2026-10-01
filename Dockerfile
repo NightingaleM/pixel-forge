@@ -32,7 +32,9 @@ WORKDIR /app
 # 先复制依赖配置文件，利用 Docker 层缓存加速重复构建
 COPY package.json package-lock.json* ./
 
-RUN npm install --ignore-scripts
+# npm ci 严格按 lockfile 的 integrity 拉依赖：fflate 0.8.3 上游重发布过（同版本两种 .d.ts 内容），
+# npm install 的宽松解析曾让旧 tarball 混入构建环境，引发 tsc 类型报错
+RUN npm ci --ignore-scripts
 
 # 复制所有源码和配置文件
 COPY . .

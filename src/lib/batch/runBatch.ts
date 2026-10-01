@@ -199,5 +199,7 @@ export async function buildBatchZip(entries: { name: string; blob: Blob }[]): Pr
   for (const e of entries) {
     files[e.name] = new Uint8Array(await e.blob.arrayBuffer())
   }
-  return new Blob([zipSync(files)], { type: 'application/zip' })
+  // 显式收窄：fflate 0.8.3 曾重发布过 .d.ts（裸 Uint8Array ↔ Uint8Array<ArrayBuffer>），
+  // 部分构建环境仍会解析到旧声明，导致 BlobPart 赋值报 TS2322；运行时 zipSync 产物必为普通 ArrayBuffer 背书，收窄是安全的。
+  return new Blob([zipSync(files) as Uint8Array<ArrayBuffer>], { type: 'application/zip' })
 }
