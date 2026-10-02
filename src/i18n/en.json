@@ -665,6 +665,7 @@
     "params": "Params",
     "longPressSave": "Long-press the image to save",
     "openInBrowser": "To download the ZIP, open in a browser: tap \"···\" (top-right) → \"Open in browser\"",
+    "gotIt": "Got it",
     "pcOnly3d": "3D is desktop-only"
   }
 }

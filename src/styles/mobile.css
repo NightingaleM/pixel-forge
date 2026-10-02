@@ -39,4 +39,49 @@
   .m-style-row-desc { font-size: 11px; opacity: 0.7; }
   /* 导出灯箱长按提示(Task 7):移动端字号加大 */
   .batch-lightbox-hint { font-size: 14px; }
+  /* 灯箱舞台 dvh(前任务 review 附注):移动端动态工具栏下 global.css 的
+     88vh/80vh 按大视口计偏高会顶出屏,渐进回落到视觉视口单位(不支持 dvh
+     的老浏览器保有 vh 原值),并整体收一档给 hint/info 条留位 */
+  .batch-lightbox-stage { max-height: 80dvh; }
+  .batch-lightbox-stage img { max-height: 72dvh; }
+  /* 批量全屏卡片流(Task 8):BatchPanel variant=mobile 经 m-batch-layer 挂入。
+     覆盖 .param-panel/.batch-panel 的浮窗定位(本文件后载,同特异性即胜;行内
+     left/top 在 mobile variant 下不注入,无 !important 之争) */
+  .batch-panel--mobile {
+    inset: 0;
+    z-index: 800; /* sheet(900)/两壳弹窗与灯箱(1000)之下 */
+    width: auto;
+    max-width: none;
+    max-height: none;
+    border: none;
+    background: #F5F5F0;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  /* 标题条折叠/关闭键桌面 20px,触屏撑到 32px(黑底反色观感不变) */
+  .batch-panel--mobile .param-panel-collapse,
+  .batch-panel--mobile .param-panel-close { width: 32px; height: 32px; }
+  /* 触控目标:tab/图标键 44px,主按钮 48px */
+  .batch-panel--mobile .batch-tab { min-height: 44px; }
+  .batch-panel--mobile .batch-icon-btn { min-width: 44px; min-height: 44px; }
+  .batch-panel--mobile .batch-btn { min-height: 48px; }
+  .batch-panel--mobile .batch-format select { min-height: 44px; }
+  /* 行列表卡片化:外框/表头底色退役,每行独立白卡;滚动统一交给面板主滚动区
+     (.param-panel-body flex:1 overflow auto),解除 240px 内滚避免触屏嵌套双滚动 */
+  .batch-panel--mobile .batch-rowlist { border: none; margin-top: 4px; }
+  .batch-panel--mobile .batch-rowlist-head { background: transparent; border-bottom: none; }
+  .batch-panel--mobile .batch-rowlist-body { max-height: none; overflow: visible; }
+  .batch-panel--mobile .batch-rowlist-row {
+    flex-wrap: wrap;
+    border: 1px solid #000;
+    border-radius: 10px;
+    background: #FFF;
+    padding: 8px;
+    margin-bottom: 8px;
+  }
+  /* 卡片化后白底覆盖了桌面 --selected 灰底(同特异性本文件后载),显式恢复高亮 */
+  .batch-panel--mobile .batch-rowlist-row--selected { background: #F0F0F0; box-shadow: inset 2px 0 0 #000; }
+  /* 结果画廊:悬停浮层触屏无 hover,操作常显;画廊不再内滚(主滚动区统一) */
+  .batch-panel--mobile .batch-cell-actions { opacity: 1; }
+  .batch-panel--mobile .batch-gallery { max-height: none; }
 }

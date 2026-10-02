@@ -48,6 +48,10 @@ export interface BatchPanelProps {
   onDownloadZip: () => void
   /** 确定性关闭:运行中须先经确认弹窗再调;App2D 侧终止队列并收面板(不清图片) */
   onClose: () => void
+  /** 外壳形态(Task 8):desktop=可拖浮窗(默认,零回归);mobile=MobileShell 全屏
+   *  卡片流——仅根 class 追加 batch-panel--mobile 且不注入行内定位,内部 DOM 不动,
+   *  移动化全交 styles/mobile.css 覆盖 */
+  variant?: 'desktop' | 'mobile'
 }
 
 // 骰子图标(圆角方 + 对角三点),与 ParamPanel/SeedBar 的手绘 SVG 风格一致(禁 emoji)
@@ -81,10 +85,13 @@ function BatchPanel({
   onDownloadRow,
   onDownloadZip,
   onClose,
+  variant = 'desktop',
 }: BatchPanelProps) {
   const { t } = useTranslation()
+  // mobile 全屏形态禁用拖拽(hook 恒调以满足规则,enabled=false 不绑事件不定位;
+  // 与 ParamPanel embedded 同款),行内 left/top 也不注入——定位全权交 CSS
   const { ref: panelRef, pos, onHeaderMouseDown } = useDraggable(
-    { x: 90, y: 130 }, 'pixel-forge.panelPos.batch.v1',
+    { x: 90, y: 130 }, 'pixel-forge.panelPos.batch.v1', { enabled: variant !== 'mobile' },
   )
   const [tab, setTab] = useState<'config' | 'results'>('config')
   // 最小化:收成标题条只留头部,批量任务后台继续跑;与 ParamPanel/PresetPanel 的折叠 affordance 一致
@@ -114,9 +121,9 @@ function BatchPanel({
 
   return (
     <div
-      className="param-panel batch-panel"
+      className={`param-panel batch-panel${variant === 'mobile' ? ' batch-panel--mobile' : ''}`}
       ref={panelRef}
-      style={{ left: pos.x, top: pos.y }}
+      style={variant === 'mobile' ? undefined : { left: pos.x, top: pos.y }}
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => {
         // 面板全域拦掉默认行为:拖放脱靶时浏览器会直接打开图片、丢掉整个页面状态。

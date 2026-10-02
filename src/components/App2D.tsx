@@ -16,6 +16,7 @@ import { randomId } from '../lib/randomId'
 import { readImageFiles } from '../lib/readImageFiles'
 import { useMediaQuery } from '../lib/useMediaQuery'
 import { planDownload, anchorDownload } from '../lib/downloadFlow'
+import { isWeChatUA } from '../lib/clientEnv'
 import { svgToPngBlob } from '../lib/svgToPng'
 import { findMatchingBuiltInPreset, resolveBuiltInPreset } from '../lib/builtInPreset'
 import type { BuiltInPresetDefinition, StyleId } from '../types'
@@ -457,29 +458,8 @@ function App2D() {
     if (!batchRunningRef.current) void drain()
   }, [activeStyle, images, batchBase, seedMode, selectedIndex, drain])
 
-  // 单张下载:与 ZIP 内条目同命名({styleId}_{原名}_{种子}.{ext})。种子/风格读
-  // done 快照:换基线或重骰后,旧结果仍按生成时刻的值标注
-  const handleDownloadRow = useCallback((img: BatchImage) => {
-    if (!img.blob) return
-    const def = getStyle(activeStyle)
-    const seed = img.renderedSeed ?? (def ? rowEffectiveSeed(img, batchBase, def) : '')
-    anchorDownload(img.blob, zipEntryName(img.renderedStyleId ?? activeStyle, img.fileName, seed, blobExt(img.blob)))
-  }, [activeStyle, batchBase])
-
-  // 打包下载:done 行集齐后 fflate 打包;同图同种子跑两次会撞名,逐条 dedupe
-  const handleDownloadZip = useCallback(async () => {
-    const done = images.filter((r) => r.status === 'done' && r.blob)
-    if (done.length === 0) return
-    const def = getStyle(activeStyle)
-    const taken = new Set<string>()
-    const entries = done.map((r) => {
-      const seed = r.renderedSeed ?? (def ? rowEffectiveSeed(r, batchBase, def) : '')
-      const name = dedupeName(zipEntryName(r.renderedStyleId ?? activeStyle, r.fileName, seed, blobExt(r.blob!)), taken)
-      taken.add(name)
-      return { name, blob: r.blob! }
-    })
-    anchorDownload(await buildBatchZip(entries), 'pixel-forge-batch.zip')
-  }, [images, activeStyle, batchBase])
+  // 单张/ZIP 下载 handler 定义在 downloadBlob 之后(微信/移动分流引用它,且其
+  // deps 数组在渲染期求值不能前向引用);命名与种子快照语义见彼处注释
 
   // runningRef 变化不触发重绘,用行状态兜底:跑首行前的空窗期也能禁用格式切换
   // 等操作(v1 同策;drain 收尾后若无后续渲染,禁用态多停留一帧,可接受)
@@ -856,21 +836,67 @@ function App2D() {
   // 导出灯箱(Task 7):微信内/移动端 svg 的长按保存视图;objectUrl 在 onClose
   // 时回收,期间由本 state 持有引用
   const [saveLightbox, setSaveLightbox] = useState<LightboxItem | null>(null)
+  // 微信内 ZIP 下载引导(Task 8):WebView 拦 a[download] 且 ZIP 无法长按保存,
+  // 弹「在浏览器中打开」确认框(两壳共用 dialogsNode;桌面微信窄窗同样命中,
+  // 与 Task 7 导出分流行为一致)
+  const [wechatZipHint, setWechatZipHint] = useState(false)
 
   // 单图导出分流(Task 7):blob 生成后决策交付方式——微信内或移动端 svg 走
   // 长按保存灯箱(微信 WebView 拦截 a[download],svg 相册不认),其余保持
-  // a[download] 原路径(桌面零回归)。水印 gating 链路不受影响,只改最后交付
-  const downloadBlob = useCallback((blob: Blob | null, ext: string, opts?: { isSvg?: boolean }) => {
+  // a[download] 原路径(桌面零回归)。水印 gating 链路不受影响,只改最后交付。
+  // fileName 可选覆盖(Task 8):批量单行传 zip 条目名,缺省沿用 风格_时间戳
+  const downloadBlob = useCallback((blob: Blob | null, ext: string, opts?: { isSvg?: boolean; fileName?: string }) => {
     if (!blob) return
     const isSvg = !!opts?.isSvg
     const plan = planDownload({ isSvg, forceLightbox: isMobile && isSvg })
-    const fileName = `${activeStyle}_${Date.now()}.${ext}`
+    const fileName = opts?.fileName ?? `${activeStyle}_${Date.now()}.${ext}`
     if (plan === 'lightbox') {
       setSaveLightbox({ objectUrl: URL.createObjectURL(blob), fileName, seed, ext })
       return // 灯箱关闭时 revoke(saveLightboxNode 的 onClose)
     }
     anchorDownload(blob, fileName)
   }, [activeStyle, seed, isMobile])
+
+  // 批量单张下载(Task 8 起走 downloadBlob 分流):与 ZIP 内条目同命名
+  // ({styleId}_{原名}_{种子}.{ext});种子/风格读 done 快照——换基线或重骰后,
+  // 旧结果仍按生成时刻的值标注。微信内/移动端 svg 自动转长按保存灯箱,
+  // 桌面保持 a[download] 原路径(命名不变)。移动端 svg 先转 PNG(Task 7 单图
+  // 导出同策:相册不认 svg,长按存不出可用文件),转换失败退回原 svg 交付
+  const handleDownloadRow = useCallback(async (img: BatchImage) => {
+    if (!img.blob) return
+    const def = getStyle(activeStyle)
+    const seed = img.renderedSeed ?? (def ? rowEffectiveSeed(img, batchBase, def) : '')
+    let ext = blobExt(img.blob)
+    let blob = img.blob
+    if (isMobile && ext === 'svg') {
+      const png = await svgToPngBlob(await img.blob.text())
+      if (png) { blob = png; ext = 'png' }
+    }
+    downloadBlob(blob, ext, {
+      fileName: zipEntryName(img.renderedStyleId ?? activeStyle, img.fileName, seed, ext),
+      isSvg: ext === 'svg',
+    })
+  }, [activeStyle, batchBase, downloadBlob, isMobile])
+
+  // 打包下载:done 行集齐后 fflate 打包;同图同种子跑两次会撞名,逐条 dedupe。
+  // 微信内开头拦截(Task 8):改弹「在浏览器中打开」引导,不打无效的 a[download]
+  const handleDownloadZip = useCallback(async () => {
+    if (isWeChatUA()) {
+      setWechatZipHint(true)
+      return
+    }
+    const done = images.filter((r) => r.status === 'done' && r.blob)
+    if (done.length === 0) return
+    const def = getStyle(activeStyle)
+    const taken = new Set<string>()
+    const entries = done.map((r) => {
+      const seed = r.renderedSeed ?? (def ? rowEffectiveSeed(r, batchBase, def) : '')
+      const name = dedupeName(zipEntryName(r.renderedStyleId ?? activeStyle, r.fileName, seed, blobExt(r.blob!)), taken)
+      taken.add(name)
+      return { name, blob: r.blob! }
+    })
+    anchorDownload(await buildBatchZip(entries), 'pixel-forge-batch.zip')
+  }, [images, activeStyle, batchBase])
 
   // Pick the canvas the active style actually renders to:
   // shader styles -> canvasRef (WebGL), ASCII -> asciiCanvasRef (2D).
@@ -1156,8 +1182,47 @@ function App2D() {
           onCancel={() => setCloseDialog(null)}
         />
       )}
+      {/* 微信内 ZIP 引导(Task 8):纯告知,确认/取消都只收弹窗 */}
+      {wechatZipHint && (
+        <ConfirmDialog
+          message={t('mobile.openInBrowser')}
+          confirmLabel={t('mobile.gotIt')}
+          onConfirm={() => setWechatZipHint(false)}
+          onCancel={() => setWechatZipHint(false)}
+        />
+      )}
       {saveLightboxNode}
     </>
+  )
+
+  // 批量面板(两壳共用节点,Task 8):移动端经 MobileShell2D 的 batchPanel prop
+  // 挂进 m-batch-layer(variant=mobile 全屏卡片流,上传多图自动弹 v3 语义经
+  // showBatchPanel 在移动分支同样可达);桌面分支原位渲染(variant=desktop,
+  // DOM/class 与既有完全一致)。全套 props 是本组件状态,组装只能留在这里
+  const batchPanelNode = showBatchPanel && images.length > 0 && (
+    <BatchPanel
+      images={images}
+      selectedIndex={selectedIndex}
+      seedViews={rowsSeedView}
+      onRowSelect={handleSelect}
+      presets={presets}
+      onApplyPreset={handleApplyPreset}
+      seedMode={seedMode}
+      format={format}
+      activeStyleId={activeStyle}
+      isRunning={isBatchRunning}
+      onSeedModeChange={handleSeedModeChange}
+      onFormatChange={setFormat}
+      onRandomizeAll={handleRandomizeAll}
+      onStart={startProcessing}
+      licenseActive={getLicenseStatus().active}
+      onRetryRow={handleRetryRow}
+      onRerollRow={handleRerollRow}
+      onDownloadRow={handleDownloadRow}
+      onDownloadZip={handleDownloadZip}
+      onClose={closeBatchPanel}
+      variant={isMobile ? 'mobile' : 'desktop'}
+    />
   )
 
   if (isMobile) {
@@ -1242,10 +1307,11 @@ function App2D() {
           onDownloadJpg={handleDownloadJpg}
           onDownloadSvg={handleDownloadSvg}
           onRandom={handleRandom}
-          /* Task 8 接管:批量面板打开 */
-          onOpenBatch={() => {}}
+          /* Task 8 接管:dock 批量键开面板(有图才动作,与桌面 ActionBar 同语义) */
+          onOpenBatch={handleBatchOpen}
           imageInfo={imageInfo}
           paramPanel={mobileParamPanel}
+          batchPanel={batchPanelNode}
         />
         {/* 两壳共用弹窗(Task 7 收口):预设列表/确认弹窗/导出灯箱,z-index 1000
             高于 sheet 的 900,叠在 sheet 之上 */}
@@ -1346,31 +1412,8 @@ function App2D() {
       )}
       {/* 预设列表弹窗:两壳共用节点(见 presetPanelNode 定义处) */}
       {presetPanelNode}
-      {/* 批量面板:纯 props 视图,行状态/队列都在本组件;关闭只收面板不清图片 */}
-      {showBatchPanel && images.length > 0 && (
-        <BatchPanel
-          images={images}
-          selectedIndex={selectedIndex}
-          seedViews={rowsSeedView}
-          onRowSelect={handleSelect}
-          presets={presets}
-          onApplyPreset={handleApplyPreset}
-          seedMode={seedMode}
-          format={format}
-          activeStyleId={activeStyle}
-          isRunning={isBatchRunning}
-          onSeedModeChange={handleSeedModeChange}
-          onFormatChange={setFormat}
-          onRandomizeAll={handleRandomizeAll}
-          onStart={startProcessing}
-          licenseActive={getLicenseStatus().active}
-          onRetryRow={handleRetryRow}
-          onRerollRow={handleRerollRow}
-          onDownloadRow={handleDownloadRow}
-          onDownloadZip={handleDownloadZip}
-          onClose={closeBatchPanel}
-        />
-      )}
+      {/* 批量面板:两壳共用节点(见 batchPanelNode 定义处);关闭只收面板不清图片 */}
+      {batchPanelNode}
       {/* 确认弹窗组 + 导出灯箱:两壳共用节点(见 dialogsNode 定义处) */}
       {dialogsNode}
       {/* 会员浮窗:激活/状态/续费入口(付费墙);购买渠道未定,入口暂缓 */}

@@ -665,6 +665,7 @@
     "params": "参数",
     "longPressSave": "长按图片保存到相册",
     "openInBrowser": "批量 ZIP 下载请在浏览器中进行:点微信右上角「···」→「在浏览器中打开」",
+    "gotIt": "知道了",
     "pcOnly3d": "3D 功能请在电脑端访问"
   }
 }

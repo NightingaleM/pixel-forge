@@ -1,11 +1,13 @@
 // src/components/MobileShell2D.tsx
-// 移动端(≤767px)2D 外壳(Task 4 骨架 + Task 5 dock/会员圆标 + Task 6 sheets):
-// 顶栏(返回 + 风格名钮触发风格 sheet + 对比钮 + 会员小圆标)+ 画布区(CompareSlider /
-// 上传页)+ 图片条(ImageStrip)+ 底部 dock(下载主键 + 参数/随机/批量图标键)。
+// 移动端(≤767px)2D 外壳(Task 4 骨架 + Task 5 dock/会员圆标 + Task 6 sheets +
+// Task 8 批量层):顶栏(返回 + 风格名钮触发风格 sheet + 对比钮 + 会员小圆标)+
+// 画布区(CompareSlider / 上传页)+ 图片条(ImageStrip)+ 底部 dock(下载主键 +
+// 参数/随机/批量图标键)。
 // Task 6:dock「参数」与顶栏风格名各自触发 BottomSheet——参数 sheet 内嵌
 // ParamPanel(embedded)并把重置/随机收进 m-params-actions;风格 sheet 为
 // m-style-row 列表(label/description 已由 App2D 做 i18n,本组件不 t() 内容文案,
-// 仅 t() 界面固定文案)。布局与 safe-area/dvh 基建在 styles/mobile.css;props
+// 仅 t() 界面固定文案)。Task 8:批量面板经 batchPanel prop 挂入 m-batch-layer
+// 全屏层。布局与 safe-area/dvh 基建在 styles/mobile.css;props
 // 全部由 App2D 分流透传,行状态/渲染管线仍归 App2D,本组件纯视图 + sheet 开合状态。
 import { useState, type ReactNode, type RefObject } from 'react'
 import { Link } from 'react-router-dom'
@@ -71,7 +73,7 @@ export interface MobileShell2DProps {
   licenseActive: boolean
   onOpenLicense: () => void
   // dock:下载三键接 App2D 既有导出 handlers;随机与参数 sheet 内按钮同源;
-  // 重置收进参数 sheet(paramPanel.onReset);onOpenBatch Task 8 接管
+  // 重置收进参数 sheet(paramPanel.onReset);批量键走 App2D handleBatchOpen
   onDownloadPng: () => void
   onDownloadJpg: () => void
   onDownloadSvg: () => void
@@ -81,6 +83,10 @@ export interface MobileShell2DProps {
   // 参数 sheet 数据(无图时 null,dock「参数」无动作——与桌面 ParamPanel 只在
   // 有图时渲染同语义)
   paramPanel: MobileParamPanelProps | null
+  // 批量全屏层(Task 8):App2D 组装的 <BatchPanel variant="mobile" />(全套
+  // props 都是 App2D 状态,组装留在那边);null/false=不开,开时经 m-batch-layer
+  // 挂入,面板自身 fixed inset 0 覆盖画布与 dock
+  batchPanel: ReactNode | null
 }
 
 function MobileShell2D(props: MobileShell2DProps) {
@@ -212,6 +218,10 @@ function MobileShell2D(props: MobileShell2DProps) {
           ))}
         </BottomSheet>
       )}
+      {/* 批量全屏层(Task 8):BatchPanel(variant=mobile)由 App2D 组装传入;
+          面板自身 fixed inset 0 / z-index 800,盖住画布与 dock、让位 sheet(900)
+          与两壳共用弹窗(1000);上传多图自动弹(v3)与 dock 批量键共用此通道 */}
+      {props.batchPanel && <div className="m-batch-layer">{props.batchPanel}</div>}
     </div>
   )
 }
