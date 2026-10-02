@@ -659,5 +659,11 @@
     "tip2": "Clearing browser data also clears your membership credential; restoring it requires re-entering the code and consumes one device slot",
     "tip3": "Activate on a device you use regularly, to avoid consuming binding slots on temporary devices",
     "termsLink": "For the full terms, see the Terms of Service"
+  },
+  "mobile": {
+    "params": "Params",
+    "longPressSave": "Long-press the image to save",
+    "openInBrowser": "To download the ZIP, open in a browser: tap \"···\" (top-right) → \"Open in browser\"",
+    "pcOnly3d": "3D is desktop-only"
   }
 }

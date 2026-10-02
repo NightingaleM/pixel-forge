@@ -12,4 +12,11 @@
   .m-canvas-area { flex: 1; min-height: 0; display: flex; flex-direction: column; }
   /* 画布平移/捏合(Task 3 统一 Pointer Events)接管手势,禁浏览器默认滚动/缩放 */
   .m-canvas-area .canvas-wrapper { touch-action: none; }
+  /* 底部 dock(Task 5):下载主键 + 参数/随机/批量图标键 */
+  .m-dock { display: flex; gap: 8px; padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); background: #FFF; border-top: 2px solid #000; }
+  .m-dock-btn { flex: 1; min-height: 48px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 11px; background: #F0F0EB; border: 1px solid #000; border-radius: 10px; }
+  .m-dock-btn--primary { flex: 1.4; background: #000; color: #FFF; font-size: 13px; }
+  /* 顶栏会员小圆标(Task 5):无文字,未激活灰环,激活点亮 */
+  .m-member-dot { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #AAA; background: transparent; border: none; }
+  .m-member-dot--on { color: #C9A227; }
 }

@@ -1117,6 +1117,16 @@ function App2D() {
         onStyleChange={handleStyleChange}
         licenseActive={getLicenseStatus().active}
         onOpenLicense={() => setShowLicensePanel((v) => !v)}
+        onDownloadPng={handleDownloadPng}
+        onDownloadJpg={handleDownloadJpg}
+        onDownloadSvg={handleDownloadSvg}
+        onReset={handleReset}
+        onRandom={handleRandom}
+        /* Task 6 接管:参数 sheet 打开 */
+        onOpenParams={() => {}}
+        /* Task 8 接管:批量面板打开 */
+        onOpenBatch={() => {}}
+        imageInfo={imageInfo}
       />
     )
   }
