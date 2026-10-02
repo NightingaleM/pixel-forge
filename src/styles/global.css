@@ -25,6 +25,8 @@ body {
 .app-container {
   display: flex;
   height: 100vh;
+  /* dvh 渐进增强:移动端动态工具栏下取视觉视口;旧浏览器不识别回落上一行 */
+  height: 100dvh;
   background: #F5F5F0;
 }
 
@@ -94,6 +96,8 @@ body {
   flex-direction: column;
   min-width: 0;
   max-height: 100vh;
+  /* dvh 渐进增强:同 .app-container,不支持时回落上一行 */
+  max-height: 100dvh;
   overflow: hidden;
 }
 
@@ -183,6 +187,8 @@ body {
   border: 2px solid #000;
   width: 260px;
   max-height: calc(100vh - 80px);
+  /* dvh 渐进增强:固定定位浮窗随视觉视口收缩,不被移动端工具栏遮挡 */
+  max-height: calc(100dvh - 80px);
   display: flex;
   flex-direction: column;
 }

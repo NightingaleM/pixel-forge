@@ -14,6 +14,7 @@ import { exportWatermarked, injectSvgWatermark } from '../lib/license/watermark'
 import { loadPresets, savePreset, removePreset, mergeWithDefaults, type PresetEntry } from '../lib/presetStore'
 import { randomId } from '../lib/randomId'
 import { readImageFiles } from '../lib/readImageFiles'
+import { useMediaQuery } from '../lib/useMediaQuery'
 import { findMatchingBuiltInPreset, resolveBuiltInPreset } from '../lib/builtInPreset'
 import type { BuiltInPresetDefinition, StyleId } from '../types'
 import type { BatchImage, BatchBase } from '../lib/batch/imageList'
@@ -40,6 +41,7 @@ import { CompareSlider } from './CompareSlider'
 import ConfirmDialog from './ConfirmDialog'
 import BatchPanel, { type BatchSeedMode } from './BatchPanel'
 import LicensePanel from './LicensePanel'
+import MobileShell2D from './MobileShell2D'
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return bytes + ' B'
@@ -1083,6 +1085,41 @@ function App2D() {
     resetSession()
     setCloseDialog(null)
   }, [resetSession])
+
+  // 移动端(≤767px)分流(Task 4):断点与 mobile.css 的 @media 一致。移动端走
+  // MobileShell2D 骨架(顶栏+画布+图片条),桌面 JSX 原样保留零回归;窗口跨过
+  // 断点时 useMediaQuery 触发重渲实时切壳。行状态/队列/渲染管线全在本组件,
+  // 切壳不重置会话(canvasRef 由两壳共用,渲染 effect 无感续跑)
+  const isMobile = useMediaQuery('(max-width: 767px)')
+  if (isMobile) {
+    return (
+      <MobileShell2D
+        image={image}
+        canvasRef={canvasRef}
+        asciiCanvasRef={asciiCanvasRef}
+        renderMode={currentStyle?.renderMode}
+        compareMode={compareMode}
+        onToggleCompare={() => setCompareMode((prev) => !prev)}
+        onClose={() => setCloseDialog(isBatch ? 'batch' : 'single')}
+        onImagesLoad={handleImagesLoad}
+        images={images}
+        seedViews={rowsSeedView}
+        selectedIndex={selectedIndex}
+        stripMode={isBatch ? 'batch' : 'single'}
+        atLimit={images.length >= BATCH_MAX_ROWS}
+        onSelect={handleSelect}
+        onRemove={handleRemove}
+        onAddFiles={handleAddFiles}
+        testImages={testImages}
+        onTestImage={handleTestImageClick}
+        styles={styles}
+        activeStyle={activeStyle}
+        onStyleChange={handleStyleChange}
+        licenseActive={getLicenseStatus().active}
+        onOpenLicense={() => setShowLicensePanel((v) => !v)}
+      />
+    )
+  }
 
   return (
     <div className="app-container">

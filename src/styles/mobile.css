@@ -1,0 +1,15 @@
+/* src/styles/mobile.css — 移动端(≤767px)专用样式,只在此文件写 @media */
+
+@media (max-width: 767px) {
+  .m-app {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    background: #F5F5F0;
+    padding-top: env(safe-area-inset-top);
+  }
+  .m-topbar { display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 10px; background: #FFF; border-bottom: 2px solid #000; }
+  .m-canvas-area { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  /* 画布平移/捏合(Task 3 统一 Pointer Events)接管手势,禁浏览器默认滚动/缩放 */
+  .m-canvas-area .canvas-wrapper { touch-action: none; }
+}
