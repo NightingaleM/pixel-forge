@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { clampZoom, zoomAtCursor } from './useViewport'
+import { clampZoom, zoomAtCursor, pinchInfo, type Point } from './useViewport'
 
 describe('clampZoom', () => {
   it('returns value inside range unchanged', () => {
@@ -39,5 +39,25 @@ describe('zoomAtCursor', () => {
   it('clamps newZoom to [min, max]', () => {
     const next = zoomAtCursor({ zoom: 1, panX: 0, panY: 0 }, { x: 0, y: 0 }, 999)
     expect(next.zoom).toBe(16)
+  })
+})
+
+describe('pinchInfo', () => {
+  it('双指张开 scale>1,锚点为中点', () => {
+    const prev: [Point, Point] = [{ x: 100, y: 100 }, { x: 200, y: 100 }]
+    const next: [Point, Point] = [{ x: 50, y: 100 }, { x: 250, y: 100 }]
+    const r = pinchInfo(prev, next)
+    expect(r.scale).toBeCloseTo(2)
+    expect(r.anchor).toEqual({ x: 150, y: 100 })
+  })
+  it('双指捏合 scale<1', () => {
+    const prev: [Point, Point] = [{ x: 50, y: 0 }, { x: 250, y: 0 }]
+    const next: [Point, Point] = [{ x: 100, y: 0 }, { x: 200, y: 0 }]
+    expect(pinchInfo(prev, next).scale).toBeCloseTo(0.5)
+  })
+  it('上帧两点重合 scale=1 防除零', () => {
+    const prev: [Point, Point] = [{ x: 100, y: 100 }, { x: 100, y: 100 }]
+    const next: [Point, Point] = [{ x: 0, y: 0 }, { x: 200, y: 200 }]
+    expect(pinchInfo(prev, next).scale).toBe(1)
   })
 })

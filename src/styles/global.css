@@ -695,6 +695,8 @@ body {
   height: 100%;
   line-height: 0;
   overflow: hidden;
+  /* 触摸手势（单指平移/双指 pinch）由 Pointer Events 接管，禁掉页面跟滚/缩放 */
+  touch-action: none;
 }
 
 .canvas-scaler {

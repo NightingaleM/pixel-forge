@@ -46,7 +46,7 @@ function CompareSlider({
     return () => ro.disconnect()
   }, [renderMode, asciiCanvasRef, canvasRef])
 
-  const { viewport, panHandlers, setZoom, reset, isPanning } = useViewport(containerRef)
+  const { viewport, pointerHandlers, setZoom, reset, isPanning } = useViewport(containerRef)
 
   // compare 分割线位置 = canvas 内容坐标比例 [0,1]（非视口比例），这样放大后分割线/
   // clipPath（在缩放的 canvas-scaler 内）仍与鼠标对齐。读本地 ref + state，普通函数即可。
@@ -103,8 +103,8 @@ function CompareSlider({
   }, [])
 
   const onWrapperMouseDown = (e: React.MouseEvent) => {
-    if (compareMode) handleCompareMouseDown(e)
-    else panHandlers.onMouseDown(e)
+    if (!compareMode) return // 平移已由 pointerDown 统一处理
+    handleCompareMouseDown(e)
   }
 
   const cursor = compareMode ? 'ew-resize' : isPanning ? 'grabbing' : 'grab'
@@ -118,6 +118,7 @@ function CompareSlider({
         className="canvas-wrapper"
         ref={containerRef}
         onMouseDown={onWrapperMouseDown}
+        onPointerDown={compareMode ? undefined : pointerHandlers.onPointerDown}
         onTouchStart={compareMode ? handleCompareTouchStart : undefined}
         onDoubleClick={reset}
         style={{ cursor }}

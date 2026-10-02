@@ -54,10 +54,21 @@ export function zoomAtCursor(
   }
 }
 
+/** 两指从 prev 到 next 的增量：scale = 距离比，anchor = 当前帧中点。
+ *  上帧距离为 0 时 scale=1 防除零。 */
+export function pinchInfo(prev: [Point, Point], next: [Point, Point]): { scale: number; anchor: Point } {
+  const d0 = Math.hypot(prev[1].x - prev[0].x, prev[1].y - prev[0].y)
+  const d1 = Math.hypot(next[1].x - next[0].x, next[1].y - next[0].y)
+  return {
+    scale: d0 === 0 ? 1 : d1 / d0,
+    anchor: { x: (next[0].x + next[1].x) / 2, y: (next[0].y + next[1].y) / 2 },
+  }
+}
+
 export interface UseViewportResult {
   viewport: Viewport
-  /** 仅在非 compare 模式挂到 wrapper 的 onMouseDown。 */
-  panHandlers: { onMouseDown: (e: React.MouseEvent) => void }
+  /** 仅在非 compare 模式挂到 wrapper 的 onPointerDown（单指/鼠标=平移，双指=pinch）。 */
+  pointerHandlers: { onPointerDown: (e: React.PointerEvent) => void }
   /** 供 ZoomControl 按钮：以视口中心为锚点缩放。 */
   setZoom: (z: number) => void
   /** 复位到 {1,0,0}（双击调用）。 */
@@ -108,41 +119,86 @@ export function useViewport(
     return () => el.removeEventListener('wheel', handleWheel)
   }, [min, max])
 
-  // --- 拖动平移：window 级 mousemove/mouseup（pan 自由，不限制边界）---
-  const dragStart = useRef<Point | null>(null)
+  // --- 统一指针：单指/鼠标=平移，双指=pinch 缩放+平移，wheel 保留 ---
+  // 指针状态：pointerId → 上帧位置。el 内坐标（相对 getBoundingClientRect）。
+  const pointers = useRef(new Map<number, Point>())
   const startPan = useRef<Point | null>(null)
+  const dragStart = useRef<Point | null>(null)
 
-  const onMouseDown = useCallback((e: React.MouseEvent) => {
-    if (e.button !== 0) return
+  const onPointerDown = useCallback((e: React.PointerEvent) => {
+    if (e.button !== 0 && e.pointerType === 'mouse') return
     e.preventDefault()
-    dragStart.current = { x: e.clientX, y: e.clientY }
-    const vp = viewportRef.current
-    startPan.current = { x: vp.panX, y: vp.panY }
-    setIsPanning(true)
+    const rect = e.currentTarget.getBoundingClientRect()
+    pointers.current.set(e.pointerId, { x: e.clientX - rect.left, y: e.clientY - rect.top })
+    if (pointers.current.size === 1) {
+      dragStart.current = { x: e.clientX, y: e.clientY }
+      startPan.current = { x: viewportRef.current.panX, y: viewportRef.current.panY }
+      setIsPanning(true)
+    } else {
+      // 进入双指：清空单指平移基准，避免抬指后跳变
+      dragStart.current = null
+      startPan.current = null
+      setIsPanning(false)
+    }
+    ;(e.target as Element).setPointerCapture?.(e.pointerId)
   }, [])
 
   useEffect(() => {
-    const handleMove = (e: MouseEvent) => {
-      if (!dragStart.current || !startPan.current) return
-      const dx = e.clientX - dragStart.current.x
-      const dy = e.clientY - dragStart.current.y
-      const vp = viewportRef.current
-      setViewport({ ...vp, panX: startPan.current.x + dx, panY: startPan.current.y + dy })
+    const handleMove = (e: PointerEvent) => {
+      const rect = elRef.current?.getBoundingClientRect()
+      if (!rect || !pointers.current.has(e.pointerId)) return
+      const cur: Point = { x: e.clientX - rect.left, y: e.clientY - rect.top }
+      const prev = pointers.current.get(e.pointerId)!
+      pointers.current.set(e.pointerId, cur)
+
+      if (pointers.current.size === 1 && dragStart.current && startPan.current) {
+        // 单指/鼠标平移（屏幕坐标差，与 rect 无关）
+        const dx = e.clientX - dragStart.current.x
+        const dy = e.clientY - dragStart.current.y
+        setViewport({
+          ...viewportRef.current,
+          panX: startPan.current.x + dx,
+          panY: startPan.current.y + dy,
+        })
+      } else if (pointers.current.size >= 2) {
+        const ids = [...pointers.current.keys()].slice(0, 2)
+        const pair = ids.map((id) => pointers.current.get(id)!) as [Point, Point]
+        const prevPair = [
+          ids[0] === e.pointerId ? prev : pair[0],
+          ids[1] === e.pointerId ? prev : pair[1],
+        ] as [Point, Point]
+        const { scale, anchor } = pinchInfo(prevPair, pair)
+        // 缩放锚定在上帧中点（内容跟随手指），再叠加中点位移完成双指平移。
+        // （若直接以新中点为锚，纯双指平移时 pan 不动，违背「双指=缩放+平移」契约。）
+        const prevMid = {
+          x: (prevPair[0].x + prevPair[1].x) / 2,
+          y: (prevPair[0].y + prevPair[1].y) / 2,
+        }
+        const v = zoomAtCursor(viewportRef.current, prevMid, viewportRef.current.zoom * scale, min, max)
+        setViewport({
+          ...v,
+          panX: v.panX + (anchor.x - prevMid.x),
+          panY: v.panY + (anchor.y - prevMid.y),
+        })
+      }
     }
-    const handleUp = () => {
-      if (dragStart.current) {
+    const handleUp = (e: PointerEvent) => {
+      pointers.current.delete(e.pointerId)
+      if (pointers.current.size === 0) {
         dragStart.current = null
         startPan.current = null
         setIsPanning(false)
       }
     }
-    window.addEventListener('mousemove', handleMove)
-    window.addEventListener('mouseup', handleUp)
+    window.addEventListener('pointermove', handleMove)
+    window.addEventListener('pointerup', handleUp)
+    window.addEventListener('pointercancel', handleUp)
     return () => {
-      window.removeEventListener('mousemove', handleMove)
-      window.removeEventListener('mouseup', handleUp)
+      window.removeEventListener('pointermove', handleMove)
+      window.removeEventListener('pointerup', handleUp)
+      window.removeEventListener('pointercancel', handleUp)
     }
-  }, [])
+  }, [min, max])
 
   const setZoom = useCallback(
     (z: number) => {
@@ -163,5 +219,5 @@ export function useViewport(
     setViewport({ zoom: 1, panX: 0, panY: 0 })
   }, [])
 
-  return { viewport, panHandlers: { onMouseDown }, setZoom, reset, isPanning }
+  return { viewport, pointerHandlers: { onPointerDown }, setZoom, reset, isPanning }
 }
