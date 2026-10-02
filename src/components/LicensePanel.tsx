@@ -100,7 +100,14 @@ function LicensePanel({ onClose, onChanged }: LicensePanelProps) {
   }
 
   return (
-    <div className="preset-panel license-panel" ref={ref} style={{ left: pos.x, top: pos.y }}>
+    // 点击不冒泡(Task 9):移动端宿主 m-license-wrap 以"点遮罩关面板"监听点击,
+    // 面板内任意点击须就地拦下;桌面无祖先点击监听,行为不变
+    <div
+      className="preset-panel license-panel"
+      ref={ref}
+      style={{ left: pos.x, top: pos.y }}
+      onClick={(e) => e.stopPropagation()}
+    >
       <div className="param-panel-header" onMouseDown={onHeaderMouseDown}>
         <div className="param-panel-title-row">
           <div className="param-panel-title">{t('license.panelTitle')}</div>

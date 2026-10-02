@@ -1195,6 +1195,21 @@ function App2D() {
     </>
   )
 
+  // 水印降级一次性提示(Task 9 两壳共用):桌面保持原内联样式;移动端改挂
+  // wm-toast--m 类(mobile.css:定位 dock 上方避让),内联整体让位避免双源漂移。
+  // 基类 wm-toast 无样式规则,仅作语义钩子
+  const wmToastNode = wmToast && (
+    <div
+      role="status"
+      className={`wm-toast ${isMobile ? 'wm-toast--m' : ''}`}
+      style={isMobile ? undefined : { position: 'fixed', left: '50%', bottom: '72px', transform: 'translateX(-50%)',
+        background: 'rgba(30,30,30,0.92)', color: '#fff', padding: '8px 14px', borderRadius: 8,
+        fontSize: 13, zIndex: 1000, pointerEvents: 'none' }}
+    >
+      {t('license.toastCorner')}
+    </div>
+  )
+
   // 批量面板(两壳共用节点,Task 8):移动端经 MobileShell2D 的 batchPanel prop
   // 挂进 m-batch-layer(variant=mobile 全屏卡片流,上传多图自动弹 v3 语义经
   // showBatchPanel 在移动分支同样可达);桌面分支原位渲染(variant=desktop,
@@ -1317,6 +1332,19 @@ function App2D() {
             高于 sheet 的 900,叠在 sheet 之上 */}
         {presetPanelNode}
         {dialogsNode}
+        {/* 会员面板 sheet 化(Task 9):m-license-wrap 全屏遮罩(950,高于 sheet 低于
+            弹窗 1000)点按即关,面板内点击由 LicensePanel 根 stopPropagation 拦截;
+            实参照桌面分支,onChanged 触发重渲刷新横幅/会员圆标 */}
+        {showLicensePanel && (
+          <div className="m-license-wrap" onClick={() => setShowLicensePanel(false)}>
+            <LicensePanel
+              onClose={() => setShowLicensePanel(false)}
+              onChanged={() => setImages((v) => [...v])}
+            />
+          </div>
+        )}
+        {/* 水印降级提示:两壳共用节点,移动端经 wm-toast--m 挂 dock 上方 */}
+        {wmToastNode}
       </>
     )
   }
@@ -1423,17 +1451,9 @@ function App2D() {
           onChanged={() => setImages((v) => [...v])}
         />
       )}
-      {/* 水印降级一次性提示(无障碍:纯通知,pointerEvents 关闭不抢焦点) */}
-      {wmToast && (
-        <div
-          role="status"
-          style={{ position: 'fixed', left: '50%', bottom: '72px', transform: 'translateX(-50%)',
-            background: 'rgba(30,30,30,0.92)', color: '#fff', padding: '8px 14px', borderRadius: 8,
-            fontSize: 13, zIndex: 1000, pointerEvents: 'none' }}
-        >
-          {t('license.toastCorner')}
-        </div>
-      )}
+      {/* 水印降级一次性提示:两壳共用节点(见 wmToastNode 定义处,桌面内联样式
+          分支原样保留;无障碍:纯通知,pointerEvents 关闭不抢焦点) */}
+      {wmToastNode}
     </div>
   )
 }

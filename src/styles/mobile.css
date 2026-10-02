@@ -84,4 +84,17 @@
   /* 结果画廊:悬停浮层触屏无 hover,操作常显;画廊不再内滚(主滚动区统一) */
   .batch-panel--mobile .batch-cell-actions { opacity: 1; }
   .batch-panel--mobile .batch-gallery { max-height: none; }
+  /* 会员面板 sheet 化(Task 9):全屏遮罩点按关,面板本体底部升起。
+     层级 950:sheet(900)之上(会员入口可达时压住参数 sheet)、两壳弹窗/灯箱(1000)之下 */
+  .m-license-wrap { position: fixed; inset: 0; z-index: 950; display: flex; flex-direction: column; justify-content: flex-end; background: rgba(0, 0, 0, 0.35); }
+  /* 面板本体 static 化:.preset-panel 的 fixed + useDraggable 注入的行内 left/top
+     必须失效,否则面板脱离 flex 底部对齐漂浮在旧拖拽坐标(static 亦让其 z-index:1000
+     失效,层级统一由 wrap 接管);max-width:100% 压过 .license-panel 的
+     calc(100vw - 24px)——sheet 全宽,与 m-sheet 同形态。本文件后载,同特异性即胜 */
+  .m-license-wrap > * { position: static; width: 100%; max-width: 100%; max-height: 86dvh; overflow-y: auto; border-radius: 14px 14px 0 0; }
+  /* 44px 触控目标 + 16px 字号(防 iOS 聚焦缩放) */
+  .m-license-wrap input, .m-license-wrap button { min-height: 44px; font-size: 16px; }
+  /* 水印降级 toast(Task 9):挂 dock 上方(64px + 安全区留 20px 空隙);
+     z-index 1000 浮于 sheet/会员面板之上,信息不丢且 pointer-events 不挡操作 */
+  .wm-toast--m { position: fixed; left: 50%; bottom: calc(84px + env(safe-area-inset-bottom)); transform: translateX(-50%); background: rgba(30, 30, 30, 0.92); color: #fff; padding: 8px 14px; border-radius: 8px; font-size: 13px; z-index: 1000; pointer-events: none; }
 }
