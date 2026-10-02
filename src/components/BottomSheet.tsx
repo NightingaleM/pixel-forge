@@ -35,6 +35,7 @@ export default function BottomSheet({ open, onClose, title, full = false, childr
   }, [])
 
   const onHandleDown = useCallback((e: React.PointerEvent) => {
+    if (last.current) return // 拖拽中第二指再按把手:忽略,防 dragRef/drag 归零导致高度瞬跳回 base
     e.currentTarget.setPointerCapture?.(e.pointerId)
     last.current = { y: e.clientY, t: performance.now() }
     vel.current = 0

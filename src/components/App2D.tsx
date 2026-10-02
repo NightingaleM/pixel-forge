@@ -851,7 +851,13 @@ function App2D() {
     const plan = planDownload({ isSvg, forceLightbox: isMobile && isSvg })
     const fileName = opts?.fileName ?? `${activeStyle}_${Date.now()}.${ext}`
     if (plan === 'lightbox') {
-      setSaveLightbox({ objectUrl: URL.createObjectURL(blob), fileName, seed, ext })
+      // 函数式 setter:覆盖残留态前先 revoke 旧 objectUrl(防御——正常 UI 走 onClose
+      // 回收,此处兜底旧值未被关闭就再打开的场景,防 blob URL 泄漏)
+      const objectUrl = URL.createObjectURL(blob)
+      setSaveLightbox((prev) => {
+        if (prev) URL.revokeObjectURL(prev.objectUrl)
+        return { objectUrl, fileName, seed, ext }
+      })
       return // 灯箱关闭时 revoke(saveLightboxNode 的 onClose)
     }
     anchorDownload(blob, fileName)

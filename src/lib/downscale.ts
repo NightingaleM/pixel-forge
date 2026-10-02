@@ -16,14 +16,22 @@ export function scaledSize(w: number, h: number, max = MAX_IMAGE_EDGE): { w: num
  *  返回的 image 已 onload,可直接上纹理。 */
 export function downscaleImage(img: HTMLImageElement, max = MAX_IMAGE_EDGE): Promise<HTMLImageElement> {
   const { w, h } = scaledSize(img.width, img.height, max)
-  const c = document.createElement('canvas')
-  c.width = w
-  c.height = h
-  c.getContext('2d')!.drawImage(img, 0, 0, w, h)
   return new Promise((resolve, reject) => {
-    const out = new Image()
-    out.onload = () => resolve(out)
-    out.onerror = () => reject(new Error('downscale decode failed'))
-    out.src = c.toDataURL('image/png')
+    // 防御:本函数常在调用方 img.onload 回调里执行,canvas 创建若在 executor 外,
+    // getContext null(iOS Safari 内存压力)等同步 throw 会逃出 Promise,
+    // .catch 接不住、上传 Promise.all 永悬——故收进 executor,catch 后 reject,
+    // 让 readImageFiles 的 .catch 走退回原图分支。
+    try {
+      const c = document.createElement('canvas')
+      c.width = w
+      c.height = h
+      c.getContext('2d')!.drawImage(img, 0, 0, w, h)
+      const out = new Image()
+      out.onload = () => resolve(out)
+      out.onerror = () => reject(new Error('downscale decode failed'))
+      out.src = c.toDataURL('image/png')
+    } catch (err) {
+      reject(err instanceof Error ? err : new Error('downscale canvas failed'))
+    }
   })
 }

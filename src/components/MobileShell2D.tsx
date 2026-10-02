@@ -155,7 +155,8 @@ function MobileShell2D(props: MobileShell2DProps) {
         ) : (
           <button className="m-dock-btn m-dock-btn--primary" onClick={props.onDownloadPng}>{t('common.download')}</button>
         )}
-        <button className="m-dock-btn" onClick={() => setSheet('params')}>
+        {/* 无图时 paramPanel 为 null:sheet 不置位,否则传图后 p 变非空、参数 sheet 自己弹出 */}
+        <button className="m-dock-btn" onClick={() => { if (p) setSheet('params') }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
             {/* 滑杆图标:两根横线各带圆钮 */}
             <line x1="4" y1="7" x2="20" y2="7" /><circle cx="9" cy="7" r="2.4" fill="#FFF" />
