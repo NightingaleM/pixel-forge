@@ -15,6 +15,11 @@ export function clampPanelPos(
   }
 }
 
+export interface DraggableOptions {
+  /** false 时禁用拖拽：不绑任何事件、不做定位/reclamp（供 sheet 内嵌等静态宿主）。默认 true。 */
+  enabled?: boolean
+}
+
 /**
  * 浮动面板拖动：标题栏按下 → window mousemove 移动（按面板实际尺寸四边限位）→ mouseup 结束。
  * 窗口 resize / 挂载时对当前位置重新限位，防止面板滞留视口外。
@@ -22,7 +27,8 @@ export function clampPanelPos(
  * 不在 mousemove 每帧写；存储的旧位置超视口时由挂载 reclamp 拉回。
  * 返回 ref 挂在面板根节点、onHeaderMouseDown 挂在标题栏。
  */
-export function useDraggable(defaultPos?: DragPos, storageKey?: string) {
+export function useDraggable(defaultPos?: DragPos, storageKey?: string, opts?: DraggableOptions) {
+  const enabled = opts?.enabled ?? true
   const ref = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState<DragPos>(
     (storageKey ? loadPanelPos(storageKey) : null)
@@ -46,6 +52,8 @@ export function useDraggable(defaultPos?: DragPos, storageKey?: string) {
   }, [])
 
   useEffect(() => {
+    // 禁用时既不绑事件也不做挂载/resize reclamp（嵌入宿主自管布局）
+    if (!enabled) return
     // 面板尺寸会变（折叠/内容增减），每次拖动都读实时尺寸
     const clampToViewport = (raw: DragPos): DragPos => {
       const rect = ref.current?.getBoundingClientRect()
@@ -74,7 +82,7 @@ export function useDraggable(defaultPos?: DragPos, storageKey?: string) {
       window.removeEventListener('mouseup', onMouseUp)
       window.removeEventListener('resize', reclamp)
     }
-  }, [storageKey])
+  }, [storageKey, enabled])
 
   return { ref, pos, onHeaderMouseDown }
 }

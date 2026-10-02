@@ -19,4 +19,21 @@
   /* 顶栏会员小圆标(Task 5):无文字,未激活灰环,激活点亮 */
   .m-member-dot { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #AAA; background: transparent; border: none; }
   .m-member-dot--on { color: #C9A227; }
+  /* BottomSheet(Task 6):peek 60% / full 90% 两档;transition 只在非拖拽态启用 */
+  .m-sheet-mask { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.35); z-index: 900; display: flex; flex-direction: column; justify-content: flex-end; }
+  .m-sheet { background: #FFF; border-top: 2px solid #000; border-radius: 14px 14px 0 0; display: flex; flex-direction: column; max-height: 92dvh; padding-bottom: env(safe-area-inset-bottom); transition: height 0.22s ease-out; }
+  .m-sheet--dragging { transition: none; }
+  .m-sheet-handle { width: 40px; height: 5px; border-radius: 3px; background: #BBB; margin: 8px auto 4px; touch-action: none; }
+  .m-sheet-title { font-size: 14px; font-weight: 600; padding: 2px 14px 6px; }
+  .m-sheet-body { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 14px 14px; }
+  /* ParamPanel embedded(Task 6):sheet 内嵌,填满 sheet body 宽度 */
+  .param-panel-embedded { width: 100%; }
+  /* 参数 sheet 顶部小按钮(重置/随机,Task 6):与 dock 图标键同观感,44px 触达 */
+  .m-params-actions { display: flex; gap: 8px; margin-bottom: 8px; }
+  .m-mini-btn { flex: 1; min-height: 44px; font-size: 13px; background: #F0F0EB; border: 1px solid #000; border-radius: 10px; }
+  /* 风格 sheet 行(Task 6):label + 小字描述,当前风格反色高亮 */
+  .m-style-row { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; min-height: 44px; margin-bottom: 8px; padding: 9px 12px; text-align: left; background: #F0F0EB; border: 1px solid #000; border-radius: 10px; }
+  .m-style-row--on { background: #000; color: #FFF; }
+  .m-style-row-label { font-size: 14px; }
+  .m-style-row-desc { font-size: 11px; opacity: 0.7; }
 }

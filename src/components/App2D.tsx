@@ -41,7 +41,7 @@ import { CompareSlider } from './CompareSlider'
 import ConfirmDialog from './ConfirmDialog'
 import BatchPanel, { type BatchSeedMode } from './BatchPanel'
 import LicensePanel from './LicensePanel'
-import MobileShell2D from './MobileShell2D'
+import MobileShell2D, { type MobileParamPanelProps, type MobileStyleItem } from './MobileShell2D'
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return bytes + ' B'
@@ -1087,11 +1087,61 @@ function App2D() {
   }, [resetSession])
 
   // 移动端(≤767px)分流(Task 4):断点与 mobile.css 的 @media 一致。移动端走
-  // MobileShell2D 骨架(顶栏+画布+图片条),桌面 JSX 原样保留零回归;窗口跨过
-  // 断点时 useMediaQuery 触发重渲实时切壳。行状态/队列/渲染管线全在本组件,
-  // 切壳不重置会话(canvasRef 由两壳共用,渲染 effect 无感续跑)
+  // MobileShell2D 骨架(顶栏+画布+图片条+Task 6 参数/风格 sheet),桌面 JSX 原样
+  // 保留零回归;窗口跨过断点时 useMediaQuery 触发重渲实时切壳。行状态/队列/渲染
+  // 管线全在本组件,切壳不重置会话(canvasRef 由两壳共用,渲染 effect 无感续跑)
   const isMobile = useMediaQuery('(max-width: 767px)')
   if (isMobile) {
+    // 参数 sheet 数据(Task 6):与桌面 ParamPanel 实参完全同构——params 的 i18n
+    // 映射与 top 三件套(SeedBar/BuiltInPresetBar/PresetBar)照桌面分支实参搬。
+    // PresetBar 的 onToggleList 仍切换 showPresetPanel,但移动分支不渲染
+    // PresetPanel 弹窗(列表弹窗统一在 Task 7 收口);保存预设功能不依赖列表弹窗。
+    const mobileParamPanel: MobileParamPanelProps | null = image && currentStyle ? {
+      title: t(currentStyle.label),
+      description: t(currentStyle.description),
+      params: currentStyle.params.map(p => {
+        if (p.type === 'select') {
+          return {
+            ...p,
+            name: t(p.name),
+            description: p.description ? t(p.description) : undefined,
+            options: p.options.map(o => ({ ...o, label: t(o.label) })),
+          }
+        }
+        return { ...p, name: t(p.name), description: p.description ? t(p.description) : undefined }
+      }),
+      values: panelValues,
+      textValues: textParams,
+      onChange: handleParamChange,
+      onTextChange: handleTextChange,
+      fontValues: fontParams,
+      onFontChange: handleFontChange,
+      onRandom: handleRandom,
+      onReset: handleReset,
+      top: (
+        <>
+          <SeedBar seed={seed} onApply={handleApplySeed} presets={presets} onApplyPreset={handleApplyPreset} />
+          <BuiltInPresetBar
+            presets={currentStyle.presets ?? []}
+            activeId={activeBuiltInPresetId}
+            onApply={handleApplyBuiltInPreset}
+          />
+          <PresetBar
+            defaultName={presetDefaultName}
+            onSave={handleSavePreset}
+            onToggleList={() => setShowPresetPanel((v) => !v)}
+            listOpen={showPresetPanel}
+            count={presets.length}
+          />
+        </>
+      ),
+    } : null
+    // 风格 sheet 行(label/description 的 i18n 与桌面 StyleSelector 同规则)
+    const mobileStyleItems: MobileStyleItem[] = styles.map(s => ({
+      id: s.id,
+      label: t(s.label),
+      description: t(s.description),
+    }))
     return (
       <MobileShell2D
         image={image}
@@ -1112,21 +1162,20 @@ function App2D() {
         onAddFiles={handleAddFiles}
         testImages={testImages}
         onTestImage={handleTestImageClick}
-        styles={styles}
         activeStyle={activeStyle}
         onStyleChange={handleStyleChange}
+        styleLabel={currentStyle ? t(currentStyle.label) : ''}
+        styleItems={mobileStyleItems}
         licenseActive={getLicenseStatus().active}
         onOpenLicense={() => setShowLicensePanel((v) => !v)}
         onDownloadPng={handleDownloadPng}
         onDownloadJpg={handleDownloadJpg}
         onDownloadSvg={handleDownloadSvg}
-        onReset={handleReset}
         onRandom={handleRandom}
-        /* Task 6 接管:参数 sheet 打开 */
-        onOpenParams={() => {}}
         /* Task 8 接管:批量面板打开 */
         onOpenBatch={() => {}}
         imageInfo={imageInfo}
+        paramPanel={mobileParamPanel}
       />
     )
   }

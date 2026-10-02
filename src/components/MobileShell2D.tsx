@@ -1,17 +1,45 @@
 // src/components/MobileShell2D.tsx
-// 移动端(≤767px)2D 外壳(Task 4 骨架 + Task 5 dock/会员圆标):顶栏(返回 +
-// 风格名占位钮 + 对比钮 + 会员小圆标)+ 画布区(CompareSlider / 上传页)+
-// 图片条(ImageStrip)+ 底部 dock(下载主键 + 参数/随机/批量图标键)。布局与
-// safe-area/dvh 基建在 styles/mobile.css;props 全部由 App2D 分流透传,行状态/
-// 渲染管线仍归 App2D,本组件纯视图。Task 6 把风格名钮换成 sheet 触发并把重置
-// 收进参数 sheet,届时再消费 styles/onStyleChange/onReset。
-import { type RefObject } from 'react'
+// 移动端(≤767px)2D 外壳(Task 4 骨架 + Task 5 dock/会员圆标 + Task 6 sheets):
+// 顶栏(返回 + 风格名钮触发风格 sheet + 对比钮 + 会员小圆标)+ 画布区(CompareSlider /
+// 上传页)+ 图片条(ImageStrip)+ 底部 dock(下载主键 + 参数/随机/批量图标键)。
+// Task 6:dock「参数」与顶栏风格名各自触发 BottomSheet——参数 sheet 内嵌
+// ParamPanel(embedded)并把重置/随机收进 m-params-actions;风格 sheet 为
+// m-style-row 列表(label/description 已由 App2D 做 i18n,本组件不 t() 内容文案,
+// 仅 t() 界面固定文案)。布局与 safe-area/dvh 基建在 styles/mobile.css;props
+// 全部由 App2D 分流透传,行状态/渲染管线仍归 App2D,本组件纯视图 + sheet 开合状态。
+import { useState, type ReactNode, type RefObject } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { CompareSlider } from './CompareSlider'
 import ImageStrip, { type ImageStripProps } from './ImageStrip'
 import ImageUploader from './ImageUploader'
-import type { StyleId } from '../types'
+import ParamPanel from './ParamPanel'
+import BottomSheet from './BottomSheet'
+import type { ParamDef, StyleId } from '../types'
+
+/** 参数 sheet 数据:镜像 App2D 给桌面 ParamPanel 的全部实参(top 为
+ *  SeedBar/BuiltInPresetBar/PresetBar 三件 JSX,由 App2D 组装传入)。 */
+export interface MobileParamPanelProps {
+  title: string
+  description?: string
+  params: ParamDef[]
+  values: Record<string, number>
+  textValues: Record<string, string>
+  onChange: (uniform: string, value: number) => void
+  onTextChange: (uniform: string, value: string) => void
+  fontValues: Record<string, FontFace | null | undefined>
+  onFontChange: (uniform: string, font: FontFace | null) => void
+  onRandom: () => void
+  onReset: () => void
+  top: ReactNode
+}
+
+/** 风格 sheet 行:id/label/description 均由 App2D 组装(桌面 StyleSelector 同规则)。 */
+export interface MobileStyleItem {
+  id: StyleId
+  label: string
+  description?: string
+}
 
 export interface MobileShell2DProps {
   // 画布区
@@ -35,32 +63,38 @@ export interface MobileShell2DProps {
   onAddFiles: ImageStripProps['onAddFiles']
   testImages: ImageStripProps['testImages']
   onTestImage: ImageStripProps['onTestImage']
-  // 顶栏(风格名按钮 Task 6 换成 sheet 触发;onStyleChange 届时随 sheet 消费)
-  styles: { id: string }[]
+  // 顶栏:风格名钮触发风格 sheet,行点击走 onStyleChange
   activeStyle: StyleId
   onStyleChange: (id: StyleId) => void
+  styleLabel: string
+  styleItems: MobileStyleItem[]
   licenseActive: boolean
   onOpenLicense: () => void
-  // dock(Task 5):下载三键接 App2D 既有导出 handlers;onReset Task 6 收进参数
-  // sheet 时消费,onOpenParams/onOpenBatch 本任务由 App2D 传空实现占位
+  // dock:下载三键接 App2D 既有导出 handlers;随机与参数 sheet 内按钮同源;
+  // 重置收进参数 sheet(paramPanel.onReset);onOpenBatch Task 8 接管
   onDownloadPng: () => void
   onDownloadJpg: () => void
   onDownloadSvg: () => void
-  onReset: () => void
   onRandom: () => void
-  onOpenParams: () => void
   onOpenBatch: () => void
   imageInfo: { width: number; height: number; size: string } | null
+  // 参数 sheet 数据(无图时 null,dock「参数」无动作——与桌面 ParamPanel 只在
+  // 有图时渲染同语义)
+  paramPanel: MobileParamPanelProps | null
 }
 
 function MobileShell2D(props: MobileShell2DProps) {
   const { t } = useTranslation()
+  // sheet 状态机:params(参数)/style(风格)/null(关);开合归本组件,
+  // 数据与回调全由 App2D 透传
+  const [sheet, setSheet] = useState<'params' | 'style' | null>(null)
+  const p = props.paramPanel
   return (
     <div className="m-app">
       <div className="m-topbar">
         <Link to="/" aria-label={t('common.backToHome')}>←</Link>
-        {/* 风格名按钮 Task 6 换成 sheet 触发;骨架阶段空 onClick 占位 */}
-        <button type="button" className="m-style-btn" onClick={() => {}}>{props.activeStyle}</button>
+        {/* 风格名钮 = 风格 sheet 触发 */}
+        <button type="button" className="m-style-btn" onClick={() => setSheet('style')}>{props.styleLabel}</button>
         <div className="m-topbar-spacer" style={{ flex: 1 }} />
         <button type="button" onClick={props.onToggleCompare}>{t('compare.compare')}</button>
         {/* 顶栏会员小圆标:无文字,未激活灰环,激活点亮 */}
@@ -103,7 +137,7 @@ function MobileShell2D(props: MobileShell2DProps) {
           onTestImage={props.onTestImage}
         />
       </div>
-      {/* dock:下载为主按钮 + 参数/随机/批量图标键;重置收进参数 sheet(Task 6) */}
+      {/* dock:下载为主按钮 + 参数/随机/批量图标键;参数键直接开参数 sheet */}
       <div className="m-dock">
         {props.renderMode === 'canvas2d' ? (
           <>
@@ -115,7 +149,7 @@ function MobileShell2D(props: MobileShell2DProps) {
         ) : (
           <button className="m-dock-btn m-dock-btn--primary" onClick={props.onDownloadPng}>{t('common.download')}</button>
         )}
-        <button className="m-dock-btn" onClick={props.onOpenParams}>
+        <button className="m-dock-btn" onClick={() => setSheet('params')}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
             {/* 滑杆图标:两根横线各带圆钮 */}
             <line x1="4" y1="7" x2="20" y2="7" /><circle cx="9" cy="7" r="2.4" fill="#FFF" />
@@ -138,6 +172,46 @@ function MobileShell2D(props: MobileShell2DProps) {
           <span>{t('batch.apply')}</span>
         </button>
       </div>
+      {/* 参数 sheet:重置/随机收进顶部 m-params-actions(与种子/预设同区),
+          top 三件套 + ParamPanel embedded 填满 sheet body */}
+      {sheet === 'params' && p && (
+        <BottomSheet open onClose={() => setSheet(null)} title={p.title}>
+          <div className="m-params-actions">
+            <button type="button" className="m-mini-btn" onClick={p.onReset}>{t('common.reset')}</button>
+            <button type="button" className="m-mini-btn" onClick={p.onRandom}>{t('common.random')}</button>
+          </div>
+          {p.top}
+          <ParamPanel
+            embedded
+            params={p.params}
+            values={p.values}
+            textValues={p.textValues}
+            onChange={p.onChange}
+            onTextChange={p.onTextChange}
+            fontValues={p.fontValues}
+            onFontChange={p.onFontChange}
+          />
+        </BottomSheet>
+      )}
+      {/* 风格 sheet:行点击 = 切风格 + 关 sheet;当前风格高亮 */}
+      {sheet === 'style' && (
+        <BottomSheet open onClose={() => setSheet(null)} title={t('app2d.style')}>
+          {props.styleItems.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              className={`m-style-row${s.id === props.activeStyle ? ' m-style-row--on' : ''}`}
+              onClick={() => {
+                props.onStyleChange(s.id)
+                setSheet(null)
+              }}
+            >
+              <span className="m-style-row-label">{s.label}</span>
+              {s.description && <span className="m-style-row-desc">{s.description}</span>}
+            </button>
+          ))}
+        </BottomSheet>
+      )}
     </div>
   )
 }

@@ -32,6 +32,7 @@
   "app2d": {
     "confirmExit": "Are you sure you want to exit? Unsaved changes will be lost.",
     "confirmExitBtn": "Confirm Exit",
+    "style": "Style",
     "uploadFirst": "Please upload an image first",
     "loadFailed": "Load failed"
   },

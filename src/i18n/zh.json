@@ -32,6 +32,7 @@
   "app2d": {
     "confirmExit": "确定要退出当前编辑吗？未保存的修改将丢失。",
     "confirmExitBtn": "确认退出",
+    "style": "风格",
     "uploadFirst": "请先上传图片",
     "loadFailed": "加载失败"
   },
