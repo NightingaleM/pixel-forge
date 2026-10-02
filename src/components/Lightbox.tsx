@@ -8,12 +8,14 @@ export interface LightboxItem {
   ext: string
 }
 
-/** 结果灯箱:全屏遮罩大图,←/→ 导航,Esc 关闭。 */
-function Lightbox({ items, index, onClose, onNavigate }: {
+/** 结果灯箱:全屏遮罩大图,←/→ 导航,Esc 关闭。hint=导出分流(Task 7)的
+ *  「长按保存」提示,仅微信/移动 svg 导出路径传入。 */
+function Lightbox({ items, index, onClose, onNavigate, hint }: {
   items: LightboxItem[]
   index: number
   onClose: () => void
   onNavigate: (index: number) => void
+  hint?: string
 }) {
   const nav = useCallback((d: number) => {
     // 空列表时组件虽返回 null 但仍保持挂载,键盘事件仍会触发,直接忽略避免取模得到 NaN
@@ -57,6 +59,7 @@ function Lightbox({ items, index, onClose, onNavigate }: {
       )}
       <div className="batch-lightbox-stage" onClick={(e) => e.stopPropagation()}>
         <img src={cur.objectUrl} alt={cur.fileName} />
+        {hint && <div className="batch-lightbox-hint">{hint}</div>}
         <div className="batch-lightbox-info">{cur.fileName} · {cur.seed} · {cur.ext.toUpperCase()}</div>
       </div>
     </div>

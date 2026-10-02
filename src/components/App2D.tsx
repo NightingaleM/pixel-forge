@@ -15,6 +15,8 @@ import { loadPresets, savePreset, removePreset, mergeWithDefaults, type PresetEn
 import { randomId } from '../lib/randomId'
 import { readImageFiles } from '../lib/readImageFiles'
 import { useMediaQuery } from '../lib/useMediaQuery'
+import { planDownload, anchorDownload } from '../lib/downloadFlow'
+import { svgToPngBlob } from '../lib/svgToPng'
 import { findMatchingBuiltInPreset, resolveBuiltInPreset } from '../lib/builtInPreset'
 import type { BuiltInPresetDefinition, StyleId } from '../types'
 import type { BatchImage, BatchBase } from '../lib/batch/imageList'
@@ -42,6 +44,7 @@ import ConfirmDialog from './ConfirmDialog'
 import BatchPanel, { type BatchSeedMode } from './BatchPanel'
 import LicensePanel from './LicensePanel'
 import MobileShell2D, { type MobileParamPanelProps, type MobileStyleItem } from './MobileShell2D'
+import Lightbox, { type LightboxItem } from './Lightbox'
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return bytes + ' B'
@@ -80,16 +83,6 @@ const yieldFrame = () =>
   new Promise<void>((r) =>
     typeof requestAnimationFrame === 'function' ? requestAnimationFrame(() => r()) : setTimeout(r, 0),
   )
-
-// 触发浏览器下载:临时 <a> 点击后立即回收 URL(同步生命周期,无需延时兜底)
-function saveBlob(blob: Blob, name: string) {
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = name
-  a.click()
-  URL.revokeObjectURL(url)
-}
 
 // createCanvasRenderTask 实际只消费 baseline.fontParams(行级风格/参数/种子经
 // RenderTask 逐行传入),其余字段传空壳占位:任务重建只挂在字体变化上,避免无关
@@ -470,7 +463,7 @@ function App2D() {
     if (!img.blob) return
     const def = getStyle(activeStyle)
     const seed = img.renderedSeed ?? (def ? rowEffectiveSeed(img, batchBase, def) : '')
-    saveBlob(img.blob, zipEntryName(img.renderedStyleId ?? activeStyle, img.fileName, seed, blobExt(img.blob)))
+    anchorDownload(img.blob, zipEntryName(img.renderedStyleId ?? activeStyle, img.fileName, seed, blobExt(img.blob)))
   }, [activeStyle, batchBase])
 
   // 打包下载:done 行集齐后 fflate 打包;同图同种子跑两次会撞名,逐条 dedupe
@@ -485,7 +478,7 @@ function App2D() {
       taken.add(name)
       return { name, blob: r.blob! }
     })
-    saveBlob(await buildBatchZip(entries), 'pixel-forge-batch.zip')
+    anchorDownload(await buildBatchZip(entries), 'pixel-forge-batch.zip')
   }, [images, activeStyle, batchBase])
 
   // runningRef 变化不触发重绘,用行状态兜底:跑首行前的空窗期也能禁用格式切换
@@ -857,15 +850,27 @@ function App2D() {
     [activeStyle, params, textParams, currentStyle],
   )
 
-  const downloadBlob = useCallback((blob: Blob | null, ext: string) => {
+  // 移动端分流标志(Task 4 的 useMediaQuery 结果上移至此):downloadBlob 的
+  // 导出分流(Task 7)要读它决策灯箱路径;移动分支 JSX 仍在组件尾部
+  const isMobile = useMediaQuery('(max-width: 767px)')
+  // 导出灯箱(Task 7):微信内/移动端 svg 的长按保存视图;objectUrl 在 onClose
+  // 时回收,期间由本 state 持有引用
+  const [saveLightbox, setSaveLightbox] = useState<LightboxItem | null>(null)
+
+  // 单图导出分流(Task 7):blob 生成后决策交付方式——微信内或移动端 svg 走
+  // 长按保存灯箱(微信 WebView 拦截 a[download],svg 相册不认),其余保持
+  // a[download] 原路径(桌面零回归)。水印 gating 链路不受影响,只改最后交付
+  const downloadBlob = useCallback((blob: Blob | null, ext: string, opts?: { isSvg?: boolean }) => {
     if (!blob) return
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${activeStyle}_${Date.now()}.${ext}`
-    a.click()
-    URL.revokeObjectURL(url)
-  }, [activeStyle])
+    const isSvg = !!opts?.isSvg
+    const plan = planDownload({ isSvg, forceLightbox: isMobile && isSvg })
+    const fileName = `${activeStyle}_${Date.now()}.${ext}`
+    if (plan === 'lightbox') {
+      setSaveLightbox({ objectUrl: URL.createObjectURL(blob), fileName, seed, ext })
+      return // 灯箱关闭时 revoke(saveLightboxNode 的 onClose)
+    }
+    anchorDownload(blob, fileName)
+  }, [activeStyle, seed, isMobile])
 
   // Pick the canvas the active style actually renders to:
   // shader styles -> canvasRef (WebGL), ASCII -> asciiCanvasRef (2D).
@@ -908,18 +913,26 @@ function App2D() {
     downloadBlob(b, 'jpg')
   }, [activeStyle, params, getExportCanvas, downloadBlob, seed])
 
-  const handleDownloadSvg = useCallback(() => {
+  // SVG 导出:水印 gating 不变(先注入再交付);移动端 svg 相册不认,先 canvas
+  // 转 PNG(isSvg 标记让 downloadBlob 继续走灯箱——移动端非微信 svg 若走
+  // anchor 会下载出相册打不开的文件);转换失败退回原 svg 交付(微信内 svg
+  // 长按保存体验差,但属极端分支可接受)。桌面照旧直出 svg
+  const handleDownloadSvg = useCallback(async () => {
     const family = fontParams['uFont']?.family ?? 'monospace'
     const svg = asciiRendererRef.current?.exportSvg(family)
     if (!svg) return
     const d = decideSingleExport()
-    if (d.mode === 'corner') {
-      setWmToast(true)
-      downloadBlob(new Blob([injectSvgWatermark(svg, 'corner', seed)], { type: 'image/svg+xml' }), 'svg')
-      return
+    if (d.mode === 'corner') setWmToast(true)
+    const marked = d.mode === 'corner' ? injectSvgWatermark(svg, 'corner', seed) : svg
+    if (isMobile) {
+      const png = await svgToPngBlob(marked)
+      if (png) {
+        downloadBlob(png, 'png', { isSvg: true })
+        return
+      }
     }
-    downloadBlob(new Blob([svg], { type: 'image/svg+xml' }), 'svg')
-  }, [fontParams, downloadBlob, seed])
+    downloadBlob(new Blob([marked], { type: 'image/svg+xml' }), 'svg')
+  }, [fontParams, downloadBlob, seed, isMobile])
 
   // 测试图点击:ImageStrip 只透传 src,由 App2D 按模式分派——
   // 单图(含上传页)= v1 行为加载为唯一图;批量 = 追加为新行(受 20 上限)
@@ -1089,13 +1102,69 @@ function App2D() {
   // 移动端(≤767px)分流(Task 4):断点与 mobile.css 的 @media 一致。移动端走
   // MobileShell2D 骨架(顶栏+画布+图片条+Task 6 参数/风格 sheet),桌面 JSX 原样
   // 保留零回归;窗口跨过断点时 useMediaQuery 触发重渲实时切壳。行状态/队列/渲染
-  // 管线全在本组件,切壳不重置会话(canvasRef 由两壳共用,渲染 effect 无感续跑)
-  const isMobile = useMediaQuery('(max-width: 767px)')
+  // 管线全在本组件,切壳不重置会话(canvasRef 由两壳共用,渲染 effect 无感续跑)。
+  // isMobile 的 useMediaQuery 已上移到 downloadBlob 前(Task 7 导出分流要读它)
+
+  // ---------------------------------------------------------------------------
+  // 两壳共用的弹窗节点(Task 7 收口):移动分支此前缺全部弹窗渲染——导出灯箱 /
+  // 预设列表 / 两个确认弹窗抽成局部变量供两分支 JSX 引用,避免重复。桌面分支
+  // 的引用位置与原内联处完全一致(DOM 序不变,等 z-index 下堆叠零变化)
+  // ---------------------------------------------------------------------------
+
+  // PresetPanel:照桌面实参,showPresetPanel 门控——移动端 PresetBar 的列表键
+  // (Task 6 哑键)由此激活
+  const presetPanelNode = image && currentStyle && showPresetPanel && (
+    <PresetPanel
+      presets={presets}
+      onApply={handleApplyPreset}
+      onDelete={handleDeletePreset}
+      onClose={() => setShowPresetPanel(false)}
+    />
+  )
+
+  // 导出灯箱:微信内/移动端 svg 的长按保存视图;onClose 回收 objectUrl 再清态
+  const saveLightboxNode = saveLightbox && (
+    <Lightbox
+      items={[saveLightbox]}
+      index={0}
+      onClose={() => {
+        URL.revokeObjectURL(saveLightbox.objectUrl)
+        setSaveLightbox(null)
+      }}
+      onNavigate={() => {}}
+      hint={t('mobile.longPressSave')}
+    />
+  )
+
+  const dialogsNode = (
+    <>
+      {/* 独立→统一切换确认:丢弃各行独立种子,以选中行状态为整批基线 */}
+      {confirmUnifiedDialog && (
+        <ConfirmDialog
+          message={t('batch.confirmUnified')}
+          confirmLabel={t('batch.confirmUnifiedBtn')}
+          onConfirm={confirmUnifiedMode}
+          onCancel={() => setConfirmUnifiedDialog(false)}
+        />
+      )}
+      {/* 主画布 ×:单图=v1 退出确认(确认钮回落 confirmExitBtn);批量=会话关闭确认 */}
+      {closeDialog && (
+        <ConfirmDialog
+          message={closeDialog === 'batch' ? t('batch.confirmCloseSession') : t('app2d.confirmExit')}
+          confirmLabel={closeDialog === 'batch' ? t('batch.confirmCloseSessionBtn') : undefined}
+          onConfirm={handleClose}
+          onCancel={() => setCloseDialog(null)}
+        />
+      )}
+      {saveLightboxNode}
+    </>
+  )
+
   if (isMobile) {
     // 参数 sheet 数据(Task 6):与桌面 ParamPanel 实参完全同构——params 的 i18n
     // 映射与 top 三件套(SeedBar/BuiltInPresetBar/PresetBar)照桌面分支实参搬。
-    // PresetBar 的 onToggleList 仍切换 showPresetPanel,但移动分支不渲染
-    // PresetPanel 弹窗(列表弹窗统一在 Task 7 收口);保存预设功能不依赖列表弹窗。
+    // PresetBar 的 onToggleList 切换 showPresetPanel,列表弹窗由下方共用节点
+    // presetPanelNode 渲染(Task 7 收口,不再依赖桌面分支)。
     const mobileParamPanel: MobileParamPanelProps | null = image && currentStyle ? {
       title: t(currentStyle.label),
       description: t(currentStyle.description),
@@ -1143,40 +1212,46 @@ function App2D() {
       description: t(s.description),
     }))
     return (
-      <MobileShell2D
-        image={image}
-        canvasRef={canvasRef}
-        asciiCanvasRef={asciiCanvasRef}
-        renderMode={currentStyle?.renderMode}
-        compareMode={compareMode}
-        onToggleCompare={() => setCompareMode((prev) => !prev)}
-        onClose={() => setCloseDialog(isBatch ? 'batch' : 'single')}
-        onImagesLoad={handleImagesLoad}
-        images={images}
-        seedViews={rowsSeedView}
-        selectedIndex={selectedIndex}
-        stripMode={isBatch ? 'batch' : 'single'}
-        atLimit={images.length >= BATCH_MAX_ROWS}
-        onSelect={handleSelect}
-        onRemove={handleRemove}
-        onAddFiles={handleAddFiles}
-        testImages={testImages}
-        onTestImage={handleTestImageClick}
-        activeStyle={activeStyle}
-        onStyleChange={handleStyleChange}
-        styleLabel={currentStyle ? t(currentStyle.label) : ''}
-        styleItems={mobileStyleItems}
-        licenseActive={getLicenseStatus().active}
-        onOpenLicense={() => setShowLicensePanel((v) => !v)}
-        onDownloadPng={handleDownloadPng}
-        onDownloadJpg={handleDownloadJpg}
-        onDownloadSvg={handleDownloadSvg}
-        onRandom={handleRandom}
-        /* Task 8 接管:批量面板打开 */
-        onOpenBatch={() => {}}
-        imageInfo={imageInfo}
-        paramPanel={mobileParamPanel}
-      />
+      <>
+        <MobileShell2D
+          image={image}
+          canvasRef={canvasRef}
+          asciiCanvasRef={asciiCanvasRef}
+          renderMode={currentStyle?.renderMode}
+          compareMode={compareMode}
+          onToggleCompare={() => setCompareMode((prev) => !prev)}
+          onClose={() => setCloseDialog(isBatch ? 'batch' : 'single')}
+          onImagesLoad={handleImagesLoad}
+          images={images}
+          seedViews={rowsSeedView}
+          selectedIndex={selectedIndex}
+          stripMode={isBatch ? 'batch' : 'single'}
+          atLimit={images.length >= BATCH_MAX_ROWS}
+          onSelect={handleSelect}
+          onRemove={handleRemove}
+          onAddFiles={handleAddFiles}
+          testImages={testImages}
+          onTestImage={handleTestImageClick}
+          activeStyle={activeStyle}
+          onStyleChange={handleStyleChange}
+          styleLabel={currentStyle ? t(currentStyle.label) : ''}
+          styleItems={mobileStyleItems}
+          licenseActive={getLicenseStatus().active}
+          onOpenLicense={() => setShowLicensePanel((v) => !v)}
+          onDownloadPng={handleDownloadPng}
+          onDownloadJpg={handleDownloadJpg}
+          onDownloadSvg={handleDownloadSvg}
+          onRandom={handleRandom}
+          /* Task 8 接管:批量面板打开 */
+          onOpenBatch={() => {}}
+          imageInfo={imageInfo}
+          paramPanel={mobileParamPanel}
+        />
+        {/* 两壳共用弹窗(Task 7 收口):预设列表/确认弹窗/导出灯箱,z-index 1000
+            高于 sheet 的 900,叠在 sheet 之上 */}
+        {presetPanelNode}
+        {dialogsNode}
+      </>
     )
   }
 
@@ -1269,14 +1344,8 @@ function App2D() {
           }
         />
       )}
-      {image && currentStyle && showPresetPanel && (
-        <PresetPanel
-          presets={presets}
-          onApply={handleApplyPreset}
-          onDelete={handleDeletePreset}
-          onClose={() => setShowPresetPanel(false)}
-        />
-      )}
+      {/* 预设列表弹窗:两壳共用节点(见 presetPanelNode 定义处) */}
+      {presetPanelNode}
       {/* 批量面板:纯 props 视图,行状态/队列都在本组件;关闭只收面板不清图片 */}
       {showBatchPanel && images.length > 0 && (
         <BatchPanel
@@ -1302,24 +1371,8 @@ function App2D() {
           onClose={closeBatchPanel}
         />
       )}
-      {/* 独立→统一切换确认:丢弃各行独立种子,以选中行状态为整批基线 */}
-      {confirmUnifiedDialog && (
-        <ConfirmDialog
-          message={t('batch.confirmUnified')}
-          confirmLabel={t('batch.confirmUnifiedBtn')}
-          onConfirm={confirmUnifiedMode}
-          onCancel={() => setConfirmUnifiedDialog(false)}
-        />
-      )}
-      {/* 主画布 ×:单图=v1 退出确认(确认钮回落 confirmExitBtn);批量=会话关闭确认 */}
-      {closeDialog && (
-        <ConfirmDialog
-          message={closeDialog === 'batch' ? t('batch.confirmCloseSession') : t('app2d.confirmExit')}
-          confirmLabel={closeDialog === 'batch' ? t('batch.confirmCloseSessionBtn') : undefined}
-          onConfirm={handleClose}
-          onCancel={() => setCloseDialog(null)}
-        />
-      )}
+      {/* 确认弹窗组 + 导出灯箱:两壳共用节点(见 dialogsNode 定义处) */}
+      {dialogsNode}
       {/* 会员浮窗:激活/状态/续费入口(付费墙);购买渠道未定,入口暂缓 */}
       {showLicensePanel && (
         <LicensePanel

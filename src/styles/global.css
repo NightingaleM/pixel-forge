@@ -1886,6 +1886,9 @@ body {
 .batch-lightbox-nav { position: fixed; top: 50%; transform: translateY(-50%); background: rgba(0, 0, 0, 0.5); border: none; color: #ddd; cursor: pointer; padding: 10px 8px; }
 .batch-lightbox-nav--prev { left: 8px; }
 .batch-lightbox-nav--next { right: 8px; }
+/* 导出灯箱长按保存提示(Task 7):定位于遮罩(全屏 fixed)底部,info 条上方 */
+.batch-lightbox-hint { position: absolute; left: 50%; bottom: 64px; transform: translateX(-50%);
+  background: rgba(30,30,30,0.92); color: #fff; padding: 8px 14px; border-radius: 8px; font-size: 13px; }
 
 /* --- v3:批量浮窗配置 tab 行列表(只读) --- */
 .batch-rowlist {
