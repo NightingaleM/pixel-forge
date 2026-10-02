@@ -12,7 +12,11 @@
     background: #F5F5F0;
     padding-top: env(safe-area-inset-top);
   }
-  .m-topbar { display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 10px; background: #FFF; border-bottom: 2px solid #000; }
+  /* padding-right 62px:给固定定位右上角的语言钮(lang-switch,44px)让位,
+     否则盖住对比钮/会员圆标(Task 11 实测) */
+  .m-topbar { display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 62px 0 10px; background: #FFF; border-bottom: 2px solid #000; }
+  /* 返回箭头是 <Link>,默认浏览器蓝与黑白顶栏不搭 */
+  .m-topbar a { color: #000; text-decoration: none; }
   .m-canvas-area { flex: 1; min-height: 0; display: flex; flex-direction: column; }
   /* 画布平移/捏合(Task 3 统一 Pointer Events)接管手势,禁浏览器默认滚动/缩放 */
   .m-canvas-area .canvas-wrapper { touch-action: none; }
@@ -48,6 +52,9 @@
      的老浏览器保有 vh 原值),并整体收一档给 hint/info 条留位 */
   .batch-lightbox-stage { max-height: 80dvh; }
   .batch-lightbox-stage img { max-height: 72dvh; }
+  /* 灯箱关闭键:16px 图标 + 6px padding 仅 28px 命中,触屏撑到 40px;
+     下移避让右上角固定语言钮(Task 11 实测:EN z9999 盖住 top:14 的 ✕ 图标) */
+  .batch-lightbox-close { padding: 12px; top: calc(env(safe-area-inset-top) + 56px); }
   /* 批量全屏卡片流(Task 8):BatchPanel variant=mobile 经 m-batch-layer 挂入。
      覆盖 .param-panel/.batch-panel 的浮窗定位(本文件后载,同特异性即胜;行内
      left/top 在 mobile variant 下不注入,无 !important 之争) */
@@ -65,6 +72,9 @@
   /* 标题条折叠/关闭键桌面 20px,触屏撑到 32px(黑底反色观感不变) */
   .batch-panel--mobile .param-panel-collapse,
   .batch-panel--mobile .param-panel-close { width: 32px; height: 32px; }
+  /* 标题条给右上角固定定位的语言钮让位(Task 11:否则盖住 ▼/x 两键);
+     min-height 44 同步语言钮高度,不让其压到下方 tabs */
+  .batch-panel--mobile .param-panel-header { min-height: 44px; box-sizing: border-box; padding-right: 58px; }
   /* 触控目标:tab/图标键 44px,主按钮 48px */
   .batch-panel--mobile .batch-tab { min-height: 44px; }
   .batch-panel--mobile .batch-icon-btn { min-width: 44px; min-height: 44px; }
@@ -133,6 +143,8 @@
   .preset-panel:not(.license-panel) { max-width: 92vw; max-height: 80dvh; overflow-y: auto; }
 
   /* 语言切换钮(全局 fixed 右上,桌面 4px/10px padding 约 26px 高):扩到 44px 触控
-     目标;按钮默认 content-box 之外的 UA 差异用 border-box 显式钉死,min 尺寸含边距 */
-  .lang-switch { min-width: 44px; min-height: 44px; box-sizing: border-box; }
+     目标;按钮默认 content-box 之外的 UA 差异用 border-box 显式钉死,min 尺寸含边距。
+     Task 11:top 12px 会让 44px 钮垂到顶栏分隔线之下,视觉成"第二个按钮";改为
+     与 m-topbar 同带对齐(top=安全区顶,高 44),m-topbar/批量标题条各自让位见上 */
+  .lang-switch { min-width: 44px; min-height: 44px; box-sizing: border-box; top: env(safe-area-inset-top); right: 10px; height: 44px; }
 }
