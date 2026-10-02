@@ -25,6 +25,7 @@ export default function Home() {
               <div className="home-link-icon">🎭</div>
               <div className="home-link-title">{t('home.style3d')}</div>
               <div className="home-link-desc">{t('home.style3dDesc')}</div>
+              <span className="home-pc-only">{t('mobile.pcOnly3d')}</span>
             </div>
           </Link>
         </div>

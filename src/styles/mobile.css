@@ -1,5 +1,9 @@
 /* src/styles/mobile.css — 移动端(≤767px)专用样式,只在此文件写 @media */
 
+/* Home 3D 卡片「请在电脑端访问」角标(Task 10):基础态桌面隐藏。
+   放本文件是为满足"global.css 不动"约束——类由本任务引入,仅此一处定义 */
+.home-pc-only { display: none; }
+
 @media (max-width: 767px) {
   .m-app {
     display: flex;
@@ -97,4 +101,38 @@
   /* 水印降级 toast(Task 9):挂 dock 上方(64px + 安全区留 20px 空隙);
      z-index 1000 浮于 sheet/会员面板之上,信息不丢且 pointer-events 不挡操作 */
   .wm-toast--m { position: fixed; left: 50%; bottom: calc(84px + env(safe-area-inset-bottom)); transform: translateX(-50%); background: rgba(30, 30, 30, 0.92); color: #fff; padding: 8px 14px; border-radius: 8px; font-size: 13px; z-index: 1000; pointer-events: none; }
+
+  /* --- 外围页单栏化 + 弹窗宽度 + 触控目标(Task 10) --- */
+
+  /* Home 两卡纵排:桌面 .home-link-card 定宽 240px,横排 240*2+24 超出手机视口。
+     flex 纵排交叉轴默认 stretch,.home-link 被拉满宽后 240px 卡靠左,补 center 居中 */
+  .home-links { flex-direction: column; align-items: center; }
+  .home-pc-only {
+    display: inline-block;
+    font-size: 11px;
+    color: #888;
+    border: 1px solid #bbb;
+    border-radius: 8px;
+    padding: 2px 8px;
+    margin-top: 6px;
+  }
+
+  /* 信息页(InfoPage/About/Privacy/Terms/Help/LicenseHelp 共用):桌面双层 padding
+     (.info-page 48/24 + .info-card 40/48)在手机上左右各吃 72px,一并收窄;
+     标题实际类名 .info-title(32px→24px)。信息页无 <table>,横滚规则不需要 */
+  .info-page { padding: 16px 14px 40px; }
+  .info-card { padding: 24px 16px; }
+  .info-title { font-size: 24px; }
+
+  /* 确认弹窗:ConfirmDialog 根类是 .dialog-box(无 .confirm-dialog 类)。
+     width:90% 桌面已有,92vw 补防长词撑破;80dvh+滚动防长文案顶出屏 */
+  .dialog-box { max-width: 92vw; max-height: 80dvh; overflow-y: auto; }
+  /* 预设列表面板(PresetPanel,fixed+拖拽行内坐标):限宽限高兜底。
+     :not(.license-panel) 把会员面板排除——其移动端由上方 m-license-wrap > *
+     接管为全宽 sheet,同特异性本段后载,否则会把 Task 9 的 max-width:100% 压回 92vw */
+  .preset-panel:not(.license-panel) { max-width: 92vw; max-height: 80dvh; overflow-y: auto; }
+
+  /* 语言切换钮(全局 fixed 右上,桌面 4px/10px padding 约 26px 高):扩到 44px 触控
+     目标;按钮默认 content-box 之外的 UA 差异用 border-box 显式钉死,min 尺寸含边距 */
+  .lang-switch { min-width: 44px; min-height: 44px; box-sizing: border-box; }
 }
