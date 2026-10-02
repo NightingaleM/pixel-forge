@@ -1,6 +1,7 @@
 // src/lib/readImageFiles.ts
 // 文件列表异步解码为图片:FileReader → dataURL → Image,与 v1 上传路径同链路。
-// >4096 长边降采样(移动端内存保护)。
+// 降采样按需启用:仅当调用方传入 maxEdge(移动端内存保护,767px 断点)时长边>阈值
+// 才降采样;桌面传 undefined 保持原分辨率。
 // 独立成 lib 供两处消费:ImageUploader(首次上传)与 App2D 追加路径(ImageStrip [+]/
 // 批量模式测试图)。全部文件落定后一次性回调,保持文件选择顺序(顺序即行序);
 // 单个文件读取/解码失败只 console.warn 跳过(v1 批量面板口径),不阻塞其余文件。
@@ -11,7 +12,11 @@ export interface LoadedImage {
   name: string
 }
 
-export function readImageFiles(files: FileList | File[]): Promise<LoadedImage[]> {
+export function readImageFiles(
+  files: FileList | File[],
+  opts?: { maxEdge?: number },
+): Promise<LoadedImage[]> {
+  const cap = opts?.maxEdge
   const list = Array.from(files).filter((f) => f.type.startsWith('image/'))
   return Promise.all(
     list.map(
@@ -21,8 +26,8 @@ export function readImageFiles(files: FileList | File[]): Promise<LoadedImage[]>
           reader.onload = (e) => {
             const img = new Image()
             img.onload = () => {
-              if (needsDownscale(img.width, img.height)) {
-                downscaleImage(img)
+              if (cap && needsDownscale(img.width, img.height, cap)) {
+                downscaleImage(img, cap)
                   .then((small) => resolve({ image: small, name: file.name }))
                   .catch(() => resolve({ image: img, name: file.name })) // 降采样失败退回原图
               } else {

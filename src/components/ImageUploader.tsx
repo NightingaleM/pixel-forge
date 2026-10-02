@@ -1,6 +1,8 @@
 import { useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { readImageFiles } from '../lib/readImageFiles'
+import { MAX_IMAGE_EDGE } from '../lib/downscale'
+import { useMediaQuery } from '../lib/useMediaQuery'
 
 interface ImageUploaderProps {
   // 多选上传(v2):全部文件解码完成后一次性回调,顺序与文件选择一致。
@@ -11,9 +13,11 @@ interface ImageUploaderProps {
 function ImageUploader({ onImagesLoad }: ImageUploaderProps) {
   const { t } = useTranslation()
   const inputRef = useRef<HTMLInputElement>(null)
+  // 仅移动端启用 >4096 降采样(内存保护);桌面保持原分辨率
+  const isMobile = useMediaQuery('(max-width: 767px)')
 
   const handleFiles = (files: FileList) => {
-    void readImageFiles(files).then((loaded) => {
+    void readImageFiles(files, { maxEdge: isMobile ? MAX_IMAGE_EDGE : undefined }).then((loaded) => {
       // 全部失败(或非图片)时不回调:上传页保持原状,失败已在 lib 内逐个 warn
       if (loaded.length === 0) return
       onImagesLoad(loaded.map((l) => l.image), loaded.map((l) => l.name))

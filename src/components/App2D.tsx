@@ -14,6 +14,7 @@ import { exportWatermarked, injectSvgWatermark } from '../lib/license/watermark'
 import { loadPresets, savePreset, removePreset, mergeWithDefaults, type PresetEntry } from '../lib/presetStore'
 import { randomId } from '../lib/randomId'
 import { readImageFiles } from '../lib/readImageFiles'
+import { MAX_IMAGE_EDGE } from '../lib/downscale'
 import { useMediaQuery } from '../lib/useMediaQuery'
 import { planDownload, anchorDownload } from '../lib/downloadFlow'
 import { isWeChatUA } from '../lib/clientEnv'
@@ -532,11 +533,16 @@ function App2D() {
     maybeAutoOpenBatch(0, capped.length)
   }, [maybeAutoOpenBatch])
 
+  // 移动端分流标志:downloadBlob 导出分流(Task 7)与追加路径的降采样开关都读它;
+  // 移动分支 JSX 在组件尾部条件渲染(hooks 全部先于条件 return,顺序稳定)
+  const isMobile = useMediaQuery('(max-width: 767px)')
+
   // ImageStrip [+] 追加:20 上限双重守卫——入口 slice 截断 + updater 内复查
   // (异步解码落定时会话可能已被关闭或填满)。v3.1:上传页也能直接用底部 [+]
   // 选图建列,追加跨越到 ≥2 张同样走自动开面板判定(此前只有拖入上传页才弹)
   const handleAddFiles = useCallback((files: FileList | File[]) => {
-    void readImageFiles(files).then((loaded) => {
+    // 仅移动端启用 >4096 降采样(内存保护);桌面保持原分辨率
+    void readImageFiles(files, { maxEdge: isMobile ? MAX_IMAGE_EDGE : undefined }).then((loaded) => {
       if (loaded.length === 0) return
       // batchImagesRef 是已提交镜像,此刻(setImages 异步提交前)读到的正是
       // "追加前"数量
@@ -549,7 +555,7 @@ function App2D() {
       const room = Math.max(0, BATCH_MAX_ROWS - prev)
       maybeAutoOpenBatch(prev, Math.min(loaded.length, room))
     })
-  }, [maybeAutoOpenBatch])
+  }, [maybeAutoOpenBatch, isMobile])
 
   // 切换选中行:统一模式参数全行共享,只改 selectedIndex,渲染 effect 依赖派生
   // image 自然重绘;独立模式走懒同步——旧行工作副本编回行种子,新行种子解析载入
@@ -830,9 +836,6 @@ function App2D() {
     [activeStyle, params, textParams, currentStyle],
   )
 
-  // 移动端分流标志(Task 4 的 useMediaQuery 结果上移至此):downloadBlob 的
-  // 导出分流(Task 7)要读它决策灯箱路径;移动分支 JSX 仍在组件尾部
-  const isMobile = useMediaQuery('(max-width: 767px)')
   // 导出灯箱(Task 7):微信内/移动端 svg 的长按保存视图;objectUrl 在 onClose
   // 时回收,期间由本 state 持有引用
   const [saveLightbox, setSaveLightbox] = useState<LightboxItem | null>(null)
