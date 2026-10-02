@@ -12,12 +12,17 @@ function snapPx(snap: 'peek' | 'full', vh: number): number {
  *  拖动时 height = base − 累计下移量(min 120px)实时跟手;松手按 settleSnap
  *  吸附(offset=当前高度,velocity 下正)。transition 只在非拖拽态启用。
  *  拖拽位移用 clientY 逐事件差值累计(pointer capture 绑在把手上,事件不丢);
- *  vh 用 state 跟踪 resize,旋转/地址栏收展后两档像素重算。 */
-export default function BottomSheet({ open, onClose, title, full = false, children }: {
+ *  vh 用 state 跟踪 resize,旋转/地址栏收展后两档像素重算。
+ *  dismissible=false(批量面板):遮罩不关、下拉不 close——关闭必须走面板内
+ *  关闭钮(运行中须先经确认弹窗,遮罩误触不能绕过,用户验收反馈 #1)。
+ *  sheetClassName 追加到 .m-sheet(如批量场景改 body 布局,交 CSS 控制)。 */
+export default function BottomSheet({ open, onClose, title, full = false, dismissible = true, sheetClassName, children }: {
   open: boolean
   onClose: () => void
   title?: string
   full?: boolean
+  dismissible?: boolean
+  sheetClassName?: string
   children: ReactNode
 }) {
   const [snap, setSnap] = useState<'peek' | 'full'>(full ? 'full' : 'peek')
@@ -64,17 +69,19 @@ export default function BottomSheet({ open, onClose, title, full = false, childr
     const closeTh = Math.max(MIN_SHEET_PX, Math.round(peek * 0.3))
     const target = settleSnap(cur, vel.current, peek, fullPx, closeTh)
     setDrag(null)
-    if (target === 'close') onClose()
-    else setSnap(target)
-  }, [snap, vh, onClose])
+    if (target === 'close') {
+      if (dismissible) onClose()
+      else setSnap('peek') // 不可关闭场景:下拉意图只收到 peek,不 close
+    } else setSnap(target)
+  }, [snap, vh, onClose, dismissible])
 
   if (!open) return null
   const base = snapPx(snap, vh)
   const height = drag !== null ? Math.max(MIN_SHEET_PX, base - drag) : base
   return (
-    <div className="m-sheet-mask" onClick={onClose}>
+    <div className="m-sheet-mask" onClick={dismissible ? onClose : undefined}>
       <div
-        className={`m-sheet${drag !== null ? ' m-sheet--dragging' : ''}`}
+        className={`m-sheet${drag !== null ? ' m-sheet--dragging' : ''}${sheetClassName ? ` ${sheetClassName}` : ''}`}
         style={{ height }}
         onClick={(e) => e.stopPropagation()}
       >

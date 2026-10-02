@@ -839,10 +839,6 @@ function App2D() {
   // 导出灯箱(Task 7):微信内/移动端 svg 的长按保存视图;objectUrl 在 onClose
   // 时回收,期间由本 state 持有引用
   const [saveLightbox, setSaveLightbox] = useState<LightboxItem | null>(null)
-  // 微信内 ZIP 下载引导(Task 8):WebView 拦 a[download] 且 ZIP 无法长按保存,
-  // 弹「在浏览器中打开」确认框(两壳共用 dialogsNode;桌面微信窄窗同样命中,
-  // 与 Task 7 导出分流行为一致)
-  const [wechatZipHint, setWechatZipHint] = useState(false)
 
   // 单图导出分流(Task 7):blob 生成后决策交付方式——微信内或移动端 svg 走
   // 长按保存灯箱(微信 WebView 拦截 a[download],svg 相册不认),其余保持
@@ -888,12 +884,9 @@ function App2D() {
   }, [activeStyle, batchBase, downloadBlob, isMobile])
 
   // 打包下载:done 行集齐后 fflate 打包;同图同种子跑两次会撞名,逐条 dedupe。
-  // 微信内开头拦截(Task 8):改弹「在浏览器中打开」引导,不打无效的 a[download]
+  // 微信内不再走到此(按钮已在 BatchPanel 层换提示文案,验收反馈 #4);拦截兜底保留
   const handleDownloadZip = useCallback(async () => {
-    if (isWeChatUA()) {
-      setWechatZipHint(true)
-      return
-    }
+    if (isWeChatUA()) return // 双保险:按钮隐藏外的路径防线
     const done = images.filter((r) => r.status === 'done' && r.blob)
     if (done.length === 0) return
     const def = getStyle(activeStyle)
@@ -1191,15 +1184,6 @@ function App2D() {
           onCancel={() => setCloseDialog(null)}
         />
       )}
-      {/* 微信内 ZIP 引导(Task 8):纯告知,确认/取消都只收弹窗 */}
-      {wechatZipHint && (
-        <ConfirmDialog
-          message={t('mobile.openInBrowser')}
-          confirmLabel={t('mobile.gotIt')}
-          onConfirm={() => setWechatZipHint(false)}
-          onCancel={() => setWechatZipHint(false)}
-        />
-      )}
       {saveLightboxNode}
     </>
   )
@@ -1220,7 +1204,7 @@ function App2D() {
   )
 
   // 批量面板(两壳共用节点,Task 8):移动端经 MobileShell2D 的 batchPanel prop
-  // 挂进 m-batch-layer(variant=mobile 全屏卡片流,上传多图自动弹 v3 语义经
+  // 挂进 BottomSheet 从底部展开(variant=mobile 卡片流,上传多图自动弹 v3 语义经
   // showBatchPanel 在移动分支同样可达);桌面分支原位渲染(variant=desktop,
   // DOM/class 与既有完全一致)。全套 props 是本组件状态,组装只能留在这里
   const batchPanelNode = showBatchPanel && images.length > 0 && (
@@ -1246,6 +1230,7 @@ function App2D() {
       onDownloadZip={handleDownloadZip}
       onClose={closeBatchPanel}
       variant={isMobile ? 'mobile' : 'desktop'}
+      zipUnavailable={isWeChatUA()}
     />
   )
 
@@ -1336,6 +1321,7 @@ function App2D() {
           imageInfo={imageInfo}
           paramPanel={mobileParamPanel}
           batchPanel={batchPanelNode}
+          onBatchClose={closeBatchPanel}
         />
         {/* 两壳共用弹窗(Task 7 收口):预设列表/确认弹窗/导出灯箱,z-index 1000
             高于 sheet 的 900,叠在 sheet 之上 */}

@@ -6,7 +6,7 @@
 // Task 6:dock「参数」与顶栏风格名各自触发 BottomSheet——参数 sheet 内嵌
 // ParamPanel(embedded)并把重置/随机收进 m-params-actions;风格 sheet 为
 // m-style-row 列表(label/description 已由 App2D 做 i18n,本组件不 t() 内容文案,
-// 仅 t() 界面固定文案)。Task 8:批量面板经 batchPanel prop 挂入 m-batch-layer
+// 仅 t() 界面固定文案)。批量面板经 batchPanel prop 挂入 BottomSheet(验收 #1)
 // 全屏层。布局与 safe-area/dvh 基建在 styles/mobile.css;props
 // 全部由 App2D 分流透传,行状态/渲染管线仍归 App2D,本组件纯视图 + sheet 开合状态。
 import { useState, type ReactNode, type RefObject } from 'react'
@@ -84,9 +84,11 @@ export interface MobileShell2DProps {
   // 有图时渲染同语义)
   paramPanel: MobileParamPanelProps | null
   // 批量全屏层(Task 8):App2D 组装的 <BatchPanel variant="mobile" />(全套
-  // props 都是 App2D 状态,组装留在那边);null/false=不开,开时经 m-batch-layer
-  // 挂入,面板自身 fixed inset 0 覆盖画布与 dock
+  // props 都是 App2D 状态,组装留在那边);null/false=不开,开时包进 BottomSheet
+  // 从底部展开(用户验收反馈 #1);dismissible=false——关闭走面板内 x(运行中须确认)
   batchPanel: ReactNode | null
+  /** BottomSheet 的 onClose 兜底(dismissible=false 时不触发,保留接线) */
+  onBatchClose: () => void
 }
 
 function MobileShell2D(props: MobileShell2DProps) {
@@ -102,7 +104,7 @@ function MobileShell2D(props: MobileShell2DProps) {
         {/* 风格名钮 = 风格 sheet 触发 */}
         <button type="button" className="m-style-btn" onClick={() => setSheet('style')}>{props.styleLabel}</button>
         <div className="m-topbar-spacer" style={{ flex: 1 }} />
-        <button type="button" onClick={props.onToggleCompare}>{t('compare.compare')}</button>
+        {/* 对比入口只留画布上 CompareSlider 的浮动按钮(用户反馈:顶栏与画布两处重复) */}
         {/* 顶栏会员小圆标:无文字,未激活灰环,激活点亮 */}
         <button
           className={`m-member-dot ${props.licenseActive ? 'm-member-dot--on' : ''}`}
@@ -222,7 +224,11 @@ function MobileShell2D(props: MobileShell2DProps) {
       {/* 批量全屏层(Task 8):BatchPanel(variant=mobile)由 App2D 组装传入;
           面板自身 fixed inset 0 / z-index 800,盖住画布与 dock、让位 sheet(900)
           与两壳共用弹窗(1000);上传多图自动弹(v3)与 dock 批量键共用此通道 */}
-      {props.batchPanel && <div className="m-batch-layer">{props.batchPanel}</div>}
+      {props.batchPanel && (
+        <BottomSheet open onClose={props.onBatchClose} full dismissible={false} sheetClassName="m-sheet--batch">
+          {props.batchPanel}
+        </BottomSheet>
+      )}
     </div>
   )
 }

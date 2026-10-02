@@ -666,6 +666,7 @@
     "longPressSave": "Long-press the image to save",
     "openInBrowser": "To download the ZIP, open in a browser: tap \"···\" (top-right) → \"Open in browser\"",
     "gotIt": "Got it",
+    "zipUnavailable": "ZIP download is unavailable in WeChat: open each image and long-press to save it",
     "pcOnly3d": "3D is desktop-only"
   }
 }

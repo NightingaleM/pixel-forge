@@ -46,6 +46,9 @@ export interface BatchPanelProps {
   onRerollRow: (id: string) => void
   onDownloadRow: (img: BatchImage) => void
   onDownloadZip: () => void
+  /** 微信内置浏览器(App2D 组装时 isWeChatUA 判定):a[download] 不可用,ZIP 无法
+   *  交付——隐藏 ZIP 按钮改提示文案,引导逐张长按保存(用户验收反馈 #4) */
+  zipUnavailable?: boolean
   /** 确定性关闭:运行中须先经确认弹窗再调;App2D 侧终止队列并收面板(不清图片) */
   onClose: () => void
   /** 外壳形态(Task 8):desktop=可拖浮窗(默认,零回归);mobile=MobileShell 全屏
@@ -84,6 +87,7 @@ function BatchPanel({
   onRerollRow,
   onDownloadRow,
   onDownloadZip,
+  zipUnavailable = false,
   onClose,
   variant = 'desktop',
 }: BatchPanelProps) {
@@ -267,9 +271,13 @@ function BatchPanel({
                 </div>
               ))}
             </div>
-            <button className="batch-btn batch-btn--primary" onClick={onDownloadZip} disabled={doneCount === 0}>
-              {t('batch.downloadZip', { n: doneCount })}
-            </button>
+            {zipUnavailable ? (
+              <div className="batch-zip-hint">{t('mobile.zipUnavailable')}</div>
+            ) : (
+              <button className="batch-btn batch-btn--primary" onClick={onDownloadZip} disabled={doneCount === 0}>
+                {t('batch.downloadZip', { n: doneCount })}
+              </button>
+            )}
           </div>
         )}
       </div>

@@ -55,19 +55,40 @@
   /* 灯箱关闭键:16px 图标 + 6px padding 仅 28px 命中,触屏撑到 40px;
      下移避让右上角固定语言钮(Task 11 实测:EN z9999 盖住 top:14 的 ✕ 图标) */
   .batch-lightbox-close { padding: 12px; top: calc(env(safe-area-inset-top) + 56px); }
-  /* 批量全屏卡片流(Task 8):BatchPanel variant=mobile 经 m-batch-layer 挂入。
-     覆盖 .param-panel/.batch-panel 的浮窗定位(本文件后载,同特异性即胜;行内
-     left/top 在 mobile variant 下不注入,无 !important 之争) */
+  /* 批量卡片流(验收 #1 改版):BatchPanel variant=mobile 不再独立 fixed 全屏,
+     由 MobileShell 包进 BottomSheet(m-sheet--batch)从底部展开;此处仅解除
+     .param-panel/.batch-panel 的浮窗定位并填满 sheet 容器(safe-area 由
+     .m-sheet 承载,不重复叠加) */
   .batch-panel--mobile {
-    inset: 0;
-    z-index: 800; /* sheet(900)/两壳弹窗与灯箱(1000)之下 */
-    width: auto;
+    position: static;
+    inset: auto;
+    z-index: auto;
+    width: 100%;
     max-width: none;
     max-height: none;
     border: none;
     background: #F5F5F0;
-    padding-top: env(safe-area-inset-top);
-    padding-bottom: env(safe-area-inset-bottom);
+  }
+  /* 批量 sheet 的 body 填充模式:不自滚不内边距,滚动交给面板主滚动区
+     (.param-panel-body flex:1 overflow auto,Task 8 已统一),避免双滚动 */
+  .m-sheet--batch .m-sheet-body {
+    padding: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+  }
+  .m-sheet--batch .batch-panel--mobile { flex: 1; min-height: 0; }
+  /* 微信内 ZIP 不可用提示(验收 #4):替代 ZIP 按钮的文案块 */
+  .batch-zip-hint {
+    border: 1px dashed #999;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 13px;
+    color: #666;
+    background: #FFF;
+    line-height: 1.5;
   }
   /* 标题条折叠/关闭键桌面 20px,触屏撑到 32px(黑底反色观感不变) */
   .batch-panel--mobile .param-panel-collapse,

@@ -89,11 +89,18 @@ export function useViewport(
   const [isPanning, setIsPanning] = useState(false)
 
   // 用 ref 持有最新 viewport，供 window 级事件读取，避免 stale closure。
-  // 在 effect 中同步（而非 render 期间直接写 .current），避免违反 react-hooks/refs。
+  // effect 兜底同步（reset/外部 setViewport 等低频路径）+ commitViewport 事件内即时同步:
+  // 触摸双指每秒可产生 120-240 个 pointermove,若等 effect 提交,pinch 每帧读到的是
+  // 上上帧 stale viewport,增量丢失导致缩放/平移漂移不跟手。事件处理器内写 ref 合规
+  // (react-hooks 仅禁止 render 期间写)。
   const viewportRef = useRef(viewport)
   useEffect(() => {
     viewportRef.current = viewport
   }, [viewport])
+  const commitViewport = useCallback((next: Viewport) => {
+    viewportRef.current = next
+    setViewport(next)
+  }, [])
 
   // 中转外部 ref 到本地 ref：react-hooks v7 的 preserve-manual-memoization
   // 对“参数传入的 ref”(viewportEl) 不豁免、对“本地 useRef”豁免，故经 elRef 中转。
@@ -113,11 +120,11 @@ export function useViewport(
       const anchor: Point = { x: e.clientX - rect.left, y: e.clientY - rect.top }
       const cur = viewportRef.current
       const factor = e.deltaY < 0 ? ZOOM_FACTOR : 1 / ZOOM_FACTOR
-      setViewport(zoomAtCursor(cur, anchor, cur.zoom * factor, min, max))
+      commitViewport(zoomAtCursor(cur, anchor, cur.zoom * factor, min, max))
     }
     el.addEventListener('wheel', handleWheel, { passive: false })
     return () => el.removeEventListener('wheel', handleWheel)
-  }, [min, max])
+  }, [min, max, commitViewport])
 
   // --- 统一指针：单指/鼠标=平移，双指=pinch 缩放+平移，wheel 保留 ---
   // 指针状态：pointerId → 上帧位置。el 内坐标（相对 getBoundingClientRect）。
@@ -155,7 +162,7 @@ export function useViewport(
         // 单指/鼠标平移（屏幕坐标差，与 rect 无关）
         const dx = e.clientX - dragStart.current.x
         const dy = e.clientY - dragStart.current.y
-        setViewport({
+        commitViewport({
           ...viewportRef.current,
           panX: startPan.current.x + dx,
           panY: startPan.current.y + dy,
@@ -175,7 +182,7 @@ export function useViewport(
           y: (prevPair[0].y + prevPair[1].y) / 2,
         }
         const v = zoomAtCursor(viewportRef.current, prevMid, viewportRef.current.zoom * scale, min, max)
-        setViewport({
+        commitViewport({
           ...v,
           panX: v.panX + (anchor.x - prevMid.x),
           panY: v.panY + (anchor.y - prevMid.y),
@@ -198,26 +205,26 @@ export function useViewport(
       window.removeEventListener('pointerup', handleUp)
       window.removeEventListener('pointercancel', handleUp)
     }
-  }, [min, max])
+  }, [min, max, commitViewport])
 
   const setZoom = useCallback(
     (z: number) => {
       const el = elRef.current
       const target = clampZoom(z, min, max)
       if (!el) {
-        setViewport((vp) => ({ ...vp, zoom: target }))
+        commitViewport({ ...viewportRef.current, zoom: target })
         return
       }
       const rect = el.getBoundingClientRect()
       const anchor: Point = { x: rect.width / 2, y: rect.height / 2 }
-      setViewport(zoomAtCursor(viewportRef.current, anchor, target, min, max))
+      commitViewport(zoomAtCursor(viewportRef.current, anchor, target, min, max))
     },
-    [min, max],
+    [min, max, commitViewport],
   )
 
   const reset = useCallback(() => {
-    setViewport({ zoom: 1, panX: 0, panY: 0 })
-  }, [])
+    commitViewport({ zoom: 1, panX: 0, panY: 0 })
+  }, [commitViewport])
 
   return { viewport, pointerHandlers: { onPointerDown }, setZoom, reset, isPanning }
 }
