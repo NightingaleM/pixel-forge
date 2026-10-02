@@ -17,7 +17,7 @@ const VOIDED_KEY = 'pixel-forge.licenseVoided.v1'
 //    替换本值并重新构建。构建产物硬编码此值,无运行时后门;仅 dev 模式可经
 //    VITE_LICENSE_PUBKEY 覆盖为测试公钥,供浏览器回归脚本
 //    (scripts/verify-license.mjs)用测试私钥造码走通激活流 ──
-let publicKeyHex = '6bc88195c75c5b4c05a539e340ef29254decdebd8b5772d949fb26ab201dba6f'
+let publicKeyHex = '99fba9f2714f8c84597d97ecef10dbc7d10f9c71b49679de4d957cf5991269ae'
 if (import.meta.env.DEV && import.meta.env.VITE_LICENSE_PUBKEY) {
   publicKeyHex = import.meta.env.VITE_LICENSE_PUBKEY as string
 }
