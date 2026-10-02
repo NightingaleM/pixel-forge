@@ -77,13 +77,17 @@ export default function BottomSheet({ open, onClose, title, full = false, childr
         style={{ height }}
         onClick={(e) => e.stopPropagation()}
       >
+        {/* 把手命中区:透明 zone 撑到 ≥44px 高(全宽),视觉圆条仍 40×5;
+            pointer 事件挂 zone(捕获/拖拽/松手都在 zone 上) */}
         <div
-          className="m-sheet-handle"
+          className="m-sheet-handle-zone"
           onPointerDown={onHandleDown}
           onPointerMove={onHandleMove}
           onPointerUp={onHandleUp}
           onPointerCancel={onHandleUp}
-        />
+        >
+          <div className="m-sheet-handle" />
+        </div>
         {title && <div className="m-sheet-title">{title}</div>}
         <div className="m-sheet-body">{children}</div>
       </div>
