@@ -14,7 +14,7 @@ import { exportWatermarked, injectSvgWatermark } from '../lib/license/watermark'
 import { loadPresets, savePreset, removePreset, mergeWithDefaults, type PresetEntry } from '../lib/presetStore'
 import { randomId } from '../lib/randomId'
 import { readImageFiles } from '../lib/readImageFiles'
-import { MAX_IMAGE_EDGE } from '../lib/downscale'
+import { MAX_IMAGE_EDGE, needsDownscale, downscaleImage } from '../lib/downscale'
 import { useMediaQuery } from '../lib/useMediaQuery'
 import { planDownload, anchorDownload } from '../lib/downloadFlow'
 import { isWeChatUA } from '../lib/clientEnv'
@@ -28,6 +28,11 @@ import {
   type BatchFormat,
 } from '../lib/batch/imageList'
 import { BATCH_MAX_ROWS, canRunBatch, dedupeName, zipEntryName } from '../lib/batch/batchJob'
+import {
+  buildSessionRecord, normalizeStoredSession,
+  type StoredSession, type StoredSessionRow,
+} from '../lib/batch/sessionCodec'
+import { saveSessionRecord, loadSessionRecord, clearSessionRecord } from '../lib/batch/sessionIdb'
 import {
   buildBatchZip, createBatchRunner, createCanvasRenderTask, resolveRowRenderState,
   type ProcessingBaseline, type ProcessingJob, type RenderTaskFn,
@@ -78,6 +83,42 @@ function makeRow(image: HTMLImageElement, fileName: string, originFile: Blob | n
 // 测试图行名:从 /local_test_pic/cake.jpg 一类路径取末段,批量输出命名可辨识
 function testImageName(src: string): string {
   return src.split('/').pop() || 'test-image'
+}
+
+// 存储行 → 内存行(会话恢复方案B):originBlob→objectURL→Image 重建;移动端与
+// 上传同口径降采样(>4096,失败退回原图)。解码失败返回 null,调用方跳过该行。
+// img 解码完成后 revoke objectURL 安全(位图已在内存,后续 drawImage 不依赖 src);
+// done 行的结果 blob 单独建 objectUrl(与 updateRow 的结果 URL 管理口径一致)
+async function rowFromStored(r: StoredSessionRow, maxEdge?: number): Promise<BatchImage | null> {
+  const url = URL.createObjectURL(r.originBlob)
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image()
+      el.onload = () => resolve(el)
+      el.onerror = () => reject(new Error('restore decode failed'))
+      el.src = url
+    })
+    let image = img
+    const w = img.naturalWidth || img.width
+    const h = img.naturalHeight || img.height
+    if (maxEdge && needsDownscale(w, h, maxEdge)) {
+      try { image = await downscaleImage(img, maxEdge) } catch { /* 降采样失败退回原图 */ }
+    }
+    return {
+      ...makeRow(image, r.fileName, r.originBlob),
+      id: r.id,
+      seed: r.seed,
+      status: r.status,
+      blob: r.resultBlob,
+      objectUrl: r.status === 'done' && r.resultBlob ? URL.createObjectURL(r.resultBlob) : null,
+      renderedSeed: r.renderedSeed,
+      renderedStyleId: r.renderedStyleId,
+    }
+  } catch {
+    return null
+  } finally {
+    URL.revokeObjectURL(url)
+  }
 }
 
 // 让出一帧给 React:setImages 提交与 ref 同步 effect 落定后再读,否则 drain 首轮
@@ -184,6 +225,92 @@ function App2D() {
   const batchImagesRef = useRef(images)
   useEffect(() => { batchImagesRef.current = images }, [images])
 
+  // ---------------------------------------------------------------------------
+  // 会话持久化(方案B IndexedDB):异常关闭(微信被杀/标签回收/意外刷新)后恢复
+  // 完整会话。写入分层缩小丢失窗口:输入变化防抖 500ms / 批量逐张 done 即写
+  // (断点保护)/ pagehide+visibilitychange→hidden+卸载兜底全量;正常关闭
+  // (resetSession)删记录。IDB 异常在 sessionIdb 内静默降级(console.warn),
+  // 本层无感——降级后 save/load 均为 no-op,功能回到无持久化行为。
+  // ---------------------------------------------------------------------------
+
+  // 跨闭包最新输入(与 previewInputsRef 同模式):防抖回调与兜底 flush 触发时
+  // 现取,不吃过期闭包。本 effect 声明在持久化触发 effect 之前,执行时序保证
+  // 触发方读到的 ref 已更新
+  const sessInputsRef = useRef({ activeStyle, seedMode, format, selectedIndex, params, textParams, base: batchBase, rows: images })
+  useEffect(() => {
+    sessInputsRef.current = { activeStyle, seedMode, format, selectedIndex, params, textParams, base: batchBase, rows: images }
+  }, [activeStyle, seedMode, format, selectedIndex, params, textParams, batchBase, images])
+
+  // 写串行链:防抖/即写/兜底并发触发时按序落盘(同 key 覆盖,后写胜)
+  const persistChainRef = useRef<Promise<void>>(Promise.resolve())
+  const persistTimerRef = useRef<number | undefined>(undefined)
+  // persistNow 从 updateRow(done 即写)与卸载兜底 listener 调用,经 ref 取最新实现
+  const persistNowRef = useRef<(rows?: readonly BatchImage[]) => void>(() => {})
+
+  const persistNow = useCallback((rows?: readonly BatchImage[]) => {
+    const cur = sessInputsRef.current
+    const effective = rows ?? cur.rows
+    if (effective.length === 0) return // 空会话不写(正常关闭由 resetSession 显式删)
+    const rec = buildSessionRecord({
+      activeStyle: cur.activeStyle,
+      seedMode: cur.seedMode,
+      format: cur.format,
+      selectedIndex: cur.selectedIndex,
+      params: cur.params,
+      textParams: cur.textParams,
+      base: cur.base,
+      rows: effective,
+    })
+    if (!rec) return // 全部行无 originFile(测试图 fetch 未落定窗口):跳过本次
+    persistChainRef.current = persistChainRef.current
+      .then(async () => { await saveSessionRecord(rec) })
+      .catch(() => { /* sessionIdb 已降级处理,链不能断 */ })
+  }, [])
+  useEffect(() => { persistNowRef.current = persistNow }, [persistNow])
+
+  const schedulePersist = useCallback(() => {
+    window.clearTimeout(persistTimerRef.current)
+    persistTimerRef.current = window.setTimeout(() => persistNowRef.current(), 500)
+  }, [])
+
+  // 触发:图片集(上传/追加/行种子/结果)或任何会话级输入变化 → 防抖落盘
+  useEffect(() => {
+    if (sessInputsRef.current.rows.length === 0) return
+    schedulePersist()
+  }, [images, activeStyle, params, textParams, seedMode, format, batchBase, selectedIndex, schedulePersist])
+
+  // 兜底全量快照:pagehide(WebView 回收前最后可靠信号)/visibilitychange→hidden
+  // (切后台即写,不赌 pagehide 是否来得及)/组件卸载(路由离开 /2d 也该能恢复)。
+  // StrictMode(dev)假卸载时 images 多为初始空态,空守卫挡住误写
+  useEffect(() => {
+    const flush = () => persistNowRef.current()
+    const onVis = () => { if (document.visibilityState === 'hidden') flush() }
+    window.addEventListener('pagehide', flush)
+    document.addEventListener('visibilitychange', onVis)
+    return () => {
+      window.removeEventListener('pagehide', flush)
+      document.removeEventListener('visibilitychange', onVis)
+      flush()
+    }
+  }, [])
+
+  // 挂载检测未结束会话:有记录 → 弹确认「N 张 · X 分钟前」→ 恢复/丢弃(已确认
+  // 决策:提示式恢复,不静默自动)。alive 防 StrictMode 双挂载时首挂的迟到结果
+  // 落进已重挂的组件(重复 load 无害)
+  const [restoreOffer, setRestoreOffer] = useState<{ rows: number; savedAt: number } | null>(null)
+  const [restoring, setRestoring] = useState(false)
+  const restoreRecRef = useRef<StoredSession | null>(null)
+  useEffect(() => {
+    let alive = true
+    void (async () => {
+      const rec = normalizeStoredSession(await loadSessionRecord())
+      if (!alive || !rec) return
+      restoreRecRef.current = rec
+      setRestoreOffer({ rows: rec.rows.length, savedAt: rec.savedAt })
+    })()
+    return () => { alive = false }
+  }, [])
+
   // 离屏渲染任务:仅字体参与任务闭包(行级状态走 RenderTask),字体变化时重建
   const renderTaskRef = useRef<RenderTaskFn | null>(null)
   useEffect(() => {
@@ -201,6 +328,9 @@ function App2D() {
     if (patch.status === 'done' && patch.blob) {
       if (!batchAliveRef.current || !batchImagesRef.current.some((r) => r.id === id)) return
       patch.objectUrl = URL.createObjectURL(patch.blob)
+      // done 即落盘(断点保护):不等防抖。setImages 异步提交,此刻 ref 快照还没
+      // 有刚 done 的 blob——把 patch 合并进覆盖视图传给 persistNow
+      persistNowRef.current(batchImagesRef.current.map((r) => (r.id === id ? { ...r, ...patch } : r)))
     }
     setImages((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)))
   }, [])
@@ -539,6 +669,75 @@ function App2D() {
   // 移动分支 JSX 在组件尾部条件渲染(hooks 全部先于条件 return,顺序稳定)
   const isMobile = useMediaQuery('(max-width: 767px)')
 
+  // ---------------------------------------------------------------------------
+  // 会话恢复执行(方案B)
+  // ---------------------------------------------------------------------------
+
+  // 「X 分钟前」文案:不足 1 分钟 → 刚刚;不换小时单位(会话恢复语境下分钟数
+  // 已够用,超长留存本就罕见)
+  const savedAgoLabel = useCallback((savedAt: number): string => {
+    const minutes = Math.floor((Date.now() - savedAt) / 60000)
+    return minutes < 1 ? t('session.timeJustNow') : t('session.minutesAgo', { n: minutes })
+  }, [t])
+
+  // 恢复:逐行 originBlob→Image 重建(移动端沿用上传同款降采样),done 行连结果
+  // blob 一起回来(processing/failed 已在 normalize 归一 pending)。工作副本换装:
+  // 统一=基线拷贝;独立=选中行种子解析(loadWorking,seed null 回基线)。字体不
+  // 持久化(FontFace 不可序列化,与「字体不随种子/预设携带」既有语义一致);
+  // styleMemory 不恢复(切风格回默认)。全部行解码失败 → 丢弃记录回上传页
+  const handleRestore = useCallback(async () => {
+    const rec = restoreRecRef.current
+    setRestoreOffer(null)
+    if (!rec) return
+    // 确认弹窗遮罩挡住上传入口,但解码落定前用户仍可能抢跑(极端时序):已有图
+    // 即放弃恢复,不覆盖用户操作
+    if (batchImagesRef.current.length > 0) {
+      restoreRecRef.current = null
+      void clearSessionRecord()
+      return
+    }
+    setRestoring(true)
+    try {
+      const rows: BatchImage[] = []
+      for (const r of rec.rows) {
+        const row = await rowFromStored(r, isMobile ? MAX_IMAGE_EDGE : undefined)
+        if (row) rows.push(row)
+      }
+      if (rows.length === 0) {
+        console.warn('[session] restore skipped: all rows undecodable')
+        void clearSessionRecord()
+        return
+      }
+      const sel = Math.min(rec.selectedIndex, rows.length - 1)
+      setActiveStyle(rec.activeStyle)
+      setSeedMode(rec.seedMode)
+      setFormat(rec.format)
+      setBaseParams({ ...rec.batchBase.params })
+      setBaseTextParams({ ...rec.batchBase.textParams })
+      setImages(rows)
+      setSelectedIndex(sel)
+      const def = getStyle(rec.activeStyle)
+      if (rec.seedMode === 'perImage' && def) {
+        const w = loadWorking(rows[sel], { params: rec.batchBase.params, textParams: rec.batchBase.textParams }, def)
+        setParams(w.params)
+        setTextParams(w.textParams)
+      } else {
+        setParams({ ...rec.batchBase.params })
+        setTextParams({ ...rec.batchBase.textParams })
+      }
+    } finally {
+      setRestoring(false)
+      restoreRecRef.current = null
+    }
+  }, [isMobile])
+
+  // 丢弃:删记录留在上传页
+  const handleDiscardRestore = useCallback(() => {
+    setRestoreOffer(null)
+    restoreRecRef.current = null
+    void clearSessionRecord()
+  }, [])
+
   // ImageStrip [+] 追加:20 上限双重守卫——入口 slice 截断 + updater 内复查
   // (异步解码落定时会话可能已被关闭或填满)。v3.1:上传页也能直接用底部 [+]
   // 选图建列,追加跨越到 ≥2 张同样走自动开面板判定(此前只有拖入上传页才弹)
@@ -585,6 +784,12 @@ function App2D() {
     stopBatch()
     // 会话清空 = 新会话:自动开面板判定恢复初始(回上传页再建列会再弹)
     batchDismissedRef.current = false
+    // 正常关闭(方案B语义):删 IDB 记录 + 手动清 ref 的 rows——setImages 异步
+    // 提交,若清理与提交之间触发兜底 flush(pagehide),读到的也必须是空,
+    // 防已关闭会话被旧快照回写;防抖中的挂起写入一并取消
+    sessInputsRef.current = { ...sessInputsRef.current, rows: [] }
+    window.clearTimeout(persistTimerRef.current)
+    void clearSessionRecord()
     setImages([])
     setSelectedIndex(0)
     setCompareMode(false)
@@ -1190,6 +1395,27 @@ function App2D() {
           onConfirm={confirmUnifiedMode}
           onCancel={() => setConfirmUnifiedDialog(false)}
         />
+      )}
+      {/* 会话恢复确认(方案B):挂载检测到未结束会话 → 恢复/丢弃(两壳共用) */}
+      {restoreOffer && (
+        <ConfirmDialog
+          message={t('session.found', {
+            count: restoreOffer.rows,
+            time: savedAgoLabel(restoreOffer.savedAt),
+          })}
+          confirmLabel={t('session.restore')}
+          cancelLabel={t('session.discard')}
+          onConfirm={() => { void handleRestore() }}
+          onCancel={handleDiscardRestore}
+        />
+      )}
+      {/* 恢复解码中提示(大图可达秒级):dialog 皮无按钮,短暂阻断误操作 */}
+      {restoring && (
+        <div className="dialog-overlay">
+          <div className="dialog-box">
+            <p className="dialog-message">{t('session.restoring')}</p>
+          </div>
+        </div>
       )}
       {/* 主画布 ×:单图=v1 退出确认(确认钮回落 confirmExitBtn);批量=会话关闭确认 */}
       {closeDialog && (

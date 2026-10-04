@@ -534,6 +534,14 @@
     "rowListTitle": "Images & Seeds",
     "seedList": "Preset List"
   },
+  "session": {
+    "found": "Found an unfinished session: {{count}} images ({{time}}). Restore it?",
+    "timeJustNow": "just now",
+    "minutesAgo": "{{n}} min ago",
+    "restore": "Restore session",
+    "discard": "Discard",
+    "restoring": "Restoring session…"
+  },
   "seed": {
     "label": "Seed",
     "copy": "Copy",

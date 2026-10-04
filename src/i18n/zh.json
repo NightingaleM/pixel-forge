@@ -534,6 +534,14 @@
     "rowListTitle": "图片与种子",
     "seedList": "配置列表"
   },
+  "session": {
+    "found": "检测到上次未完成的会话：{{count}} 张图片（{{time}}），是否恢复？",
+    "timeJustNow": "刚刚",
+    "minutesAgo": "{{n}} 分钟前",
+    "restore": "恢复会话",
+    "discard": "丢弃",
+    "restoring": "正在恢复会话…"
+  },
   "seed": {
     "label": "种子",
     "copy": "复制",
