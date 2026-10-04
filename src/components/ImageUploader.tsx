@@ -7,7 +7,8 @@ import { useMediaQuery } from '../lib/useMediaQuery'
 interface ImageUploaderProps {
   // 多选上传(v2):全部文件解码完成后一次性回调,顺序与文件选择一致。
   // 单图模式 = 数组长度 1,消费方(App2D)按张数分派三态,组件自身不感知模式。
-  onImagesLoad: (images: HTMLImageElement[], names: string[]) => void
+  // files 与 images 同序一一对应(会话持久化需要原始 File,方案B)。
+  onImagesLoad: (images: HTMLImageElement[], names: string[], files: File[]) => void
 }
 
 function ImageUploader({ onImagesLoad }: ImageUploaderProps) {
@@ -20,7 +21,7 @@ function ImageUploader({ onImagesLoad }: ImageUploaderProps) {
     void readImageFiles(files, { maxEdge: isMobile ? MAX_IMAGE_EDGE : undefined }).then((loaded) => {
       // 全部失败(或非图片)时不回调:上传页保持原状,失败已在 lib 内逐个 warn
       if (loaded.length === 0) return
-      onImagesLoad(loaded.map((l) => l.image), loaded.map((l) => l.name))
+      onImagesLoad(loaded.map((l) => l.image), loaded.map((l) => l.name), loaded.map((l) => l.file))
     })
   }
 

@@ -55,8 +55,9 @@ function formatFileSize(bytes: number): string {
 }
 
 // 新建批量图片行(v2 状态从 v1 BatchJob 上移 App2D,上传即建行):
-// seed=null 跟随整批基线;blob/objectUrl 等处理字段由队列写入
-function makeRow(image: HTMLImageElement, fileName: string): BatchImage {
+// seed=null 跟随整批基线;blob/objectUrl 等处理字段由队列写入;
+// originFile=行原图的持久化来源(会话恢复方案B,null=该行不可持久化)
+function makeRow(image: HTMLImageElement, fileName: string, originFile: Blob | null = null): BatchImage {
   return {
     id: randomId(),
     fileName,
@@ -70,6 +71,7 @@ function makeRow(image: HTMLImageElement, fileName: string): BatchImage {
     renderedStyleId: null,
     previewUrl: null,
     previewSig: null,
+    originFile,
   }
 }
 
@@ -525,10 +527,10 @@ function App2D() {
   // 追加路径各有守卫,此处不截会让 strip 计数击穿(如 25/20)且再无回落入口。
   // v3:首载 ≥2 张自动打开批量浮窗;追加路径([+]/测试图)不碰 showBatchPanel,
   // 手动关闭后本会话不再自动弹。删到 0 张回上传页再传会再弹(视为新会话)
-  const handleImagesLoad = useCallback((imgs: HTMLImageElement[], names: string[]) => {
+  const handleImagesLoad = useCallback((imgs: HTMLImageElement[], names: string[], files?: File[]) => {
     if (imgs.length === 0) return
     const capped = imgs.slice(0, BATCH_MAX_ROWS)
-    setImages(capped.map((img, i) => makeRow(img, names[i] ?? '')))
+    setImages(capped.map((img, i) => makeRow(img, names[i] ?? '', files?.[i] ?? null)))
     setSelectedIndex(0)
     maybeAutoOpenBatch(0, capped.length)
   }, [maybeAutoOpenBatch])
@@ -550,7 +552,7 @@ function App2D() {
       setImages((prevImages) => {
         const room = BATCH_MAX_ROWS - prevImages.length
         if (room <= 0) return prevImages
-        return [...prevImages, ...loaded.slice(0, room).map((l) => makeRow(l.image, l.name))]
+        return [...prevImages, ...loaded.slice(0, room).map((l) => makeRow(l.image, l.name, l.file))]
       })
       const room = Math.max(0, BATCH_MAX_ROWS - prev)
       maybeAutoOpenBatch(prev, Math.min(loaded.length, room))
@@ -966,13 +968,26 @@ function App2D() {
   // 单图(含上传页)= v1 行为加载为唯一图;批量 = 追加为新行(受 20 上限)
   const handleTestImageClick = useCallback(
     (src: string) => {
+      // 测试图无 File 对象:fetch 同源 blob 异步补 originFile(会话持久化来源,
+      // 方案B)。行可能未被真正加入(批量满额/落定前被替换),setImages 按 id
+      // 匹配天然 no-op;fetch 失败则该行不持久化(buildSessionRecord 剔除)
+      const fillOrigin = (rowId: string) => {
+        fetch(src)
+          .then((r) => (r.ok ? r.blob() : null))
+          .then((blob) => {
+            if (!blob) return
+            setImages((prev) => prev.map((x) => (x.id === rowId ? { ...x, originFile: blob } : x)))
+          })
+          .catch(() => { /* 同源静态资源,失败仅损失该行的持久化能力 */ })
+      }
       const img = new Image()
       img.crossOrigin = 'anonymous'
       img.onload = () => {
+        const row = makeRow(img, testImageName(src))
         if (isBatch) {
           const prev = batchImagesRef.current.length
           setImages((prevImgs) =>
-            prevImgs.length >= BATCH_MAX_ROWS ? prevImgs : [...prevImgs, makeRow(img, testImageName(src))],
+            prevImgs.length >= BATCH_MAX_ROWS ? prevImgs : [...prevImgs, row],
           )
           if (prev < BATCH_MAX_ROWS) maybeAutoOpenBatch(prev, 1)
         } else {
@@ -983,9 +998,10 @@ function App2D() {
             if (r.objectUrl) URL.revokeObjectURL(r.objectUrl)
             if (r.previewUrl) URL.revokeObjectURL(r.previewUrl)
           })
-          setImages([makeRow(img, testImageName(src))])
+          setImages([row])
           setSelectedIndex(0)
         }
+        fillOrigin(row.id)
       }
       img.src = src
     },

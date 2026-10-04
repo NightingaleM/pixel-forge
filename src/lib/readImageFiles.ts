@@ -10,6 +10,9 @@ import { needsDownscale, downscaleImage } from './downscale'
 export interface LoadedImage {
   image: HTMLImageElement
   name: string
+  /** 原始 File(File extends Blob):会话持久化(方案B)的行原图来源。
+   *  image 可能是降采样产物,originFile 恒为用户选中的原文件。 */
+  file: File
 }
 
 export function readImageFiles(
@@ -28,10 +31,10 @@ export function readImageFiles(
             img.onload = () => {
               if (cap && needsDownscale(img.width, img.height, cap)) {
                 downscaleImage(img, cap)
-                  .then((small) => resolve({ image: small, name: file.name }))
-                  .catch(() => resolve({ image: img, name: file.name })) // 降采样失败退回原图
+                  .then((small) => resolve({ image: small, name: file.name, file }))
+                  .catch(() => resolve({ image: img, name: file.name, file })) // 降采样失败退回原图
               } else {
-                resolve({ image: img, name: file.name })
+                resolve({ image: img, name: file.name, file })
               }
             }
             img.onerror = () => {

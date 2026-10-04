@@ -35,6 +35,7 @@ function makeRow(overrides: Partial<BatchImage> = {}): BatchImage {
     renderedStyleId: null,
     previewUrl: null,
     previewSig: null,
+    originFile: null,
     ...overrides,
   }
 }

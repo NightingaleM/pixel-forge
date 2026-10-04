@@ -32,6 +32,10 @@ export interface BatchImage {
   previewSig: string | null
   /** v2 行种子限定当前风格,此值恒等于 activeStyle;字段保留以兼容命名/灯箱。 */
   renderedStyleId: StyleId | null
+  /** 行原图的持久化来源(方案B 会话恢复):上传路径=原始 File(可能长边超 4096,
+   *  image 是移动端降采样产物,此字段恒为用户选中的原文件);测试图行经 fetch
+   * 异步补 blob。null=不可持久化(buildSessionRecord 剔除该行)。 */
+  originFile: Blob | null
 }
 
 /** 整批共享基线:统一模式即唯一状态;独立模式是行 seed=null 的回退目标。 */
