@@ -221,11 +221,12 @@ function MobileShell2D(props: MobileShell2DProps) {
           ))}
         </BottomSheet>
       )}
-      {/* 批量全屏层(Task 8):BatchPanel(variant=mobile)由 App2D 组装传入;
-          面板自身 fixed inset 0 / z-index 800,盖住画布与 dock、让位 sheet(900)
-          与两壳共用弹窗(1000);上传多图自动弹(v3)与 dock 批量键共用此通道 */}
+      {/* 批量 sheet:与参数/风格 sheet 完全同款交互(把手拖拽两档+遮罩关闭),
+          peek 起步可拖 full;关闭经 onBatchClose(App2D 侧运行中先弹确认,验收 #1
+          语义保留)。BatchPanel(variant=mobile)由 App2D 组装传入,面板内不再渲染
+          桌面浮窗标题条 */}
       {props.batchPanel && (
-        <BottomSheet open onClose={props.onBatchClose} full dismissible={false} sheetClassName="m-sheet--batch">
+        <BottomSheet open onClose={props.onBatchClose} title={t('batch.title')} sheetClassName="m-sheet--batch">
           {props.batchPanel}
         </BottomSheet>
       )}

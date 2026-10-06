@@ -135,17 +135,21 @@ function BatchPanel({
         e.preventDefault()
       }}
     >
-      <div className="param-panel-header" onMouseDown={onHeaderMouseDown}>
-        <div className="param-panel-title-row">
-          <div className="param-panel-title">{t('batch.title')}</div>
-          <div className="param-panel-actions">
-            <button className="param-panel-collapse" onClick={() => setCollapsed(c => !c)}>
-              {collapsed ? '▸' : '▾'}
-            </button>
-            <button className="param-panel-close" onClick={() => (isRunning ? setConfirmClose(true) : onClose())}>x</button>
+      {/* 标题条仅桌面浮窗渲染(拖拽把手+折叠+关闭);mobile 由 BottomSheet 承载
+          (把手/标题/遮罩关闭),面板内不再重复这些 affordance */}
+      {variant !== 'mobile' && (
+        <div className="param-panel-header" onMouseDown={onHeaderMouseDown}>
+          <div className="param-panel-title-row">
+            <div className="param-panel-title">{t('batch.title')}</div>
+            <div className="param-panel-actions">
+              <button className="param-panel-collapse" onClick={() => setCollapsed(c => !c)}>
+                {collapsed ? '▸' : '▾'}
+              </button>
+              <button className="param-panel-close" onClick={() => (isRunning ? setConfirmClose(true) : onClose())}>x</button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
       {/* 折叠时隐藏面板主体(队列在 App2D,面板显示与否不影响处理) */}
       {!collapsed && (
       <div className="param-panel-body">

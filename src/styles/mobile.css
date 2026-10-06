@@ -90,12 +90,8 @@
     background: #FFF;
     line-height: 1.5;
   }
-  /* 标题条折叠/关闭键桌面 20px,触屏撑到 32px(黑底反色观感不变) */
-  .batch-panel--mobile .param-panel-collapse,
-  .batch-panel--mobile .param-panel-close { width: 32px; height: 32px; }
-  /* 标题条给右上角固定定位的语言钮让位(Task 11:否则盖住 ▼/x 两键);
-     min-height 44 同步语言钮高度,不让其压到下方 tabs */
-  .batch-panel--mobile .param-panel-header { min-height: 44px; box-sizing: border-box; padding-right: 58px; }
+  /* 标题条(param-panel-header/折叠/关闭键)已随 mobile 退役:关闭走 BottomSheet
+     遮罩/把手,与参数 sheet 同款;相关触屏撑大/EN 钮让位规则一并移除 */
   /* 触控目标:tab/图标键 44px,主按钮 48px */
   .batch-panel--mobile .batch-tab { min-height: 44px; }
   .batch-panel--mobile .batch-icon-btn { min-width: 44px; min-height: 44px; }

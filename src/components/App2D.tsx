@@ -598,6 +598,15 @@ function App2D() {
   // 等操作(v1 同策;drain 收尾后若无后续渲染,禁用态多停留一帧,可接受)
   const isBatchRunning = images.some((r) => r.status === 'processing') || batchRunningRef.current
 
+  // 批量 sheet 关闭请求(BottomSheet 遮罩/下拉):非运行直接关;运行中先弹确认
+  // ——面板内标题条(含 x 钮)在 mobile 已退役,关闭路径统一收口到 App2D,
+  // 「遮罩误触不能绕过确认」语义保留(验收 #1)
+  const [confirmBatchClose, setConfirmBatchClose] = useState(false)
+  const handleBatchSheetClose = useCallback(() => {
+    if (isBatchRunning) setConfirmBatchClose(true)
+    else closeBatchPanel()
+  }, [isBatchRunning, closeBatchPanel])
+
   // ---------------------------------------------------------------------------
   // Render pipeline
   // ---------------------------------------------------------------------------
@@ -1396,6 +1405,15 @@ function App2D() {
           onCancel={() => setConfirmUnifiedDialog(false)}
         />
       )}
+      {/* 批量 sheet 关闭确认(mobile):运行中经遮罩/下拉关闭时拦截(验收 #1) */}
+      {confirmBatchClose && (
+        <ConfirmDialog
+          message={t('batch.closeConfirm')}
+          confirmLabel={t('batch.confirmClose')}
+          onConfirm={() => { closeBatchPanel(); setConfirmBatchClose(false) }}
+          onCancel={() => setConfirmBatchClose(false)}
+        />
+      )}
       {/* 会话恢复确认(方案B):挂载检测到未结束会话 → 恢复/丢弃(两壳共用) */}
       {restoreOffer && (
         <ConfirmDialog
@@ -1563,7 +1581,7 @@ function App2D() {
           imageInfo={imageInfo}
           paramPanel={mobileParamPanel}
           batchPanel={batchPanelNode}
-          onBatchClose={closeBatchPanel}
+          onBatchClose={handleBatchSheetClose}
         />
         {/* 两壳共用弹窗(Task 7 收口):预设列表/确认弹窗/导出灯箱,z-index 1000
             高于 sheet 的 900,叠在 sheet 之上 */}
