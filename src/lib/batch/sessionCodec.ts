@@ -115,14 +115,15 @@ export function normalizeStoredSession(raw: unknown): StoredSession | null {
     if (!isPlainRecord(r)) continue
     if (typeof r.id !== 'string' || r.id === '') continue
     if (!(r.originBlob instanceof Blob)) continue
-    const hasResult = r.resultBlob instanceof Blob
+    // done 且结果确为 Blob 才保留 done(局部变量保住 instanceof narrow)
+    const result = r.status === 'done' && r.resultBlob instanceof Blob ? r.resultBlob : null
     rows.push({
       id: r.id,
       fileName: typeof r.fileName === 'string' ? r.fileName : '',
       seed: typeof r.seed === 'string' ? r.seed : null,
-      status: r.status === 'done' && hasResult ? 'done' : 'pending',
+      status: result !== null ? 'done' : 'pending',
       originBlob: r.originBlob,
-      resultBlob: r.status === 'done' && hasResult ? r.resultBlob : null,
+      resultBlob: result,
       renderedSeed: typeof r.renderedSeed === 'string' ? r.renderedSeed : null,
       renderedStyleId: typeof r.renderedStyleId === 'string' ? r.renderedStyleId as StyleId : null,
     })
