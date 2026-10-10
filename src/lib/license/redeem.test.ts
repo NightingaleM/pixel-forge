@@ -247,17 +247,53 @@ describe('voided 终态(退款作废,410 增补契约)', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('续费遇 voided:同样标记本机凭证失效', async () => {
+  it('续费遇 voided 且仲裁 refresh 确认链作废:标记本机凭证失效(链终态)', async () => {
     const did = getOrCreateDeviceId()
     vi.stubGlobal('fetch', vi.fn()
-      .mockResolvedValueOnce(res(200, { code: credentialFor(did, NOW_S + 86400), expAt: NOW_S + 86400, count: 4 }))
-      .mockResolvedValueOnce(voidedRes()))
+      .mockResolvedValueOnce(res(200, { code: credentialFor(did, NOW_S + 86400), expAt: NOW_S + 86400, count: 4 })))
     await activateCode(unredeemedA, NOW)
+    // redeem 与仲裁 refresh 均 410 voided:作废主体是当前链
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(voidedRes()))
     expect(await renewCode(unredeemedB, NOW)).toEqual({
       ok: false, reason: 'voided', voidedAt: VOIDED_AT, voidReason: VOID_REASON,
     })
     expect(getLicenseStatus(NOW)).toEqual({ active: false })
     expect(getVoidedInfo()).toEqual({ voidedAt: VOIDED_AT, reason: VOID_REASON })
+  })
+
+  it('续费贴入作废码、当前链健康(refresh 仲裁 200):只提示码作废,不标记本机凭证', async () => {
+    const did = getOrCreateDeviceId()
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(res(200, { code: credentialFor(did, NOW_S + 86400), expAt: NOW_S + 86400, count: 4 })))
+    await activateCode(unredeemedA, NOW)
+    expect(getLicenseStatus(NOW)).toEqual({ active: true, expAt: NOW_S + 86400 })
+
+    // redeem 对贴入码返回 410 voided(码被退款作废,与当前链无关);仲裁 refresh 200 重签
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(voidedRes())
+      .mockResolvedValueOnce(res(200, { code: credentialFor(did, NOW_S + 86400), expAt: NOW_S + 86400, count: 4 }))
+    vi.stubGlobal('fetch', fetchMock)
+    expect(await renewCode(unredeemedB, NOW)).toEqual({
+      ok: false, reason: 'voided', voidedAt: VOIDED_AT, voidReason: VOID_REASON,
+    })
+    expect(fetchMock.mock.calls[1][0]).toMatch(/\/api\/license\/refresh$/)   // 第二次请求是仲裁
+    expect(getVoidedInfo()).toBe(null)
+    expect(getLicenseStatus(NOW)).toEqual({ active: true, expAt: NOW_S + 86400 })   // 会员态保留
+  })
+
+  it('续费遇 voided 但仲裁 refresh 网络失败:保守不标记(下次刷新再感知),返回码作废提示', async () => {
+    const did = getOrCreateDeviceId()
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(res(200, { code: credentialFor(did, NOW_S + 86400), expAt: NOW_S + 86400, count: 4 })))
+    await activateCode(unredeemedA, NOW)
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(voidedRes())
+      .mockRejectedValueOnce(new Error('net down')))
+    expect(await renewCode(unredeemedB, NOW)).toEqual({
+      ok: false, reason: 'voided', voidedAt: VOIDED_AT, voidReason: VOID_REASON,
+    })
+    expect(getVoidedInfo()).toBe(null)
+    expect(getLicenseStatus(NOW)).toEqual({ active: true, expAt: NOW_S + 86400 })
   })
 
   it('激活遇 voided:返回作废信息但不标记本机凭证(作废的是贴入的码,可能异链)', async () => {

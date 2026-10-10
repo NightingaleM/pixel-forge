@@ -246,7 +246,18 @@ export async function renewCode(code: string, now: number = Date.now()): Promise
   if (!u.ok) return { ok: false, reason: u.reason }
   const deviceId = getOrCreateDeviceId()
   const rr = await redeemRenew(code.trim(), deviceId, stored)
-  if (!rr.ok && rr.reason === 'voided') markVoided(c.cid, rr.voidedAt, rr.voidReason)
+  if (!rr.ok && rr.reason === 'voided') {
+    // redeem 的 voided 有两种主体且响应同形:当前链被作废(前置校验)/ 贴入的码被
+    // 退款作废。不能直接标记本机凭证——会员期内贴入作废码会把正常会员误打成
+    // "免费版·已作废"。用 refresh 仲裁(不带输入码,结果只关当前链):
+    //   链作废 → refreshCredential 内部标记并返回链的作废信息;
+    //   链健康或仲裁不可判(network 等)→ 不动本地,返回贴入码的作废提示。
+    const arb = await refreshCredential(now)
+    if (!arb.ok && arb.reason === 'voided') {
+      return { ok: false, reason: 'voided', voidedAt: arb.voidedAt, voidReason: arb.voidReason }
+    }
+    return { ok: false, reason: 'voided', voidedAt: rr.voidedAt, voidReason: rr.voidReason }
+  }
   return settle(rr, deviceId, now)
 }
 

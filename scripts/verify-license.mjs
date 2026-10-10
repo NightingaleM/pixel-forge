@@ -4,7 +4,9 @@
 //   成身份码(存储区为 v2 凭证,did 绑定);C1b 会员态续费(补充包,exp 延长+次数+1);
 //   C1c 刷新同步;C2 会员超额无 toast;C3 清存储重输身份码恢复(绑新设备);
 //   C4 篡改 deviceId → 凭证失效(设备绑定);C5 退款作废——mock /void 标记链 →
-//   刷新收到 410 voided → 作废提示(时间+原因)+ 本地标记 + 会员态落地失效。
+//   刷新收到 410 voided → 作废提示(时间+原因)+ 本地标记 + 会员态落地失效;
+//   C6 会员期贴入被作废的码续费——refresh 仲裁确认链健康:只提示码作废,
+//   会员态与凭证原样保留(2026-10-10 修复)。
 // 用法: 先起 mock 目标的 dev: API_PROXY_TARGET=http://localhost:3999 npx vite
 //   (端口 5177 由 vite.config.ts 指定),然后 node scripts/verify-license.mjs <port>
 //   测试公钥在本脚本内经 setLicensePublicKey 注入页面(此 vite 8 下 env 文件/命令行
@@ -31,6 +33,10 @@ const sign = (payload) => {
 const NOW_S = Math.floor(Date.now() / 1000)
 const codeA = sign({ v: 1, tier: 'day', iat: NOW_S })      // 身份码候选 A
 const codeB = sign({ v: 1, tier: 'week', iat: NOW_S })     // 补充包候选 B
+// C6 专用码须与 A/B 不同字符串:同 tier+iat+私钥会签出逐字节相同的码(C6 实际
+// 激活的就是已被 C5 作废的 codeA,410 voided 直接超时——2026-10-10 排查)
+const codeC = sign({ v: 1, tier: 'month', iat: NOW_S })    // C6 身份码候选(新链)
+const codeD = sign({ v: 1, tier: 'year', iat: NOW_S })     // C6 贴入前即被作废的码
 const b64urlJson = (code) => JSON.parse(Buffer.from(code.split('.')[1], 'base64url').toString('utf8'))
 
 const EDGE = ['C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
@@ -51,8 +57,18 @@ const errors = []
 page.on('pageerror', (e) => errors.push(String(e)))
 
 // ---------- 场景 A:水印绘制像素验证(vite dev 动态 import 源模块) ----------
+// 清存储回落干净态:localStorage + 会话 IDB 一并清——下载会写 pixel-forge-session,
+// 只清 localStorage 的话 reload 后挂载检测恢复会话,app 被切到批量态,点测试图
+// 走批量分支不再渲染主画布,C3 起的场景会全体误判超时(2026-10-10 排查)。
+const resetStorage = () => page.evaluate(async () => {
+  localStorage.clear()
+  try {
+    const ds = await indexedDB.databases()
+    for (const d of ds) if (d.name) indexedDB.deleteDatabase(d.name)
+  } catch { indexedDB.deleteDatabase('pixel-forge-session') }
+})
 await page.goto(`${BASE}/2d`, { waitUntil: 'networkidle0' })
-await page.evaluate(() => localStorage.clear())
+await resetStorage()
 
 const wm = await page.evaluate(async () => {
   const m = await import('/src/lib/license/watermark.ts')
@@ -223,7 +239,7 @@ for (let i = 0; i < 7; i++) {
 ok('C2 会员超额下载无降级 toast', !memberToastLeak)
 
 // C3:清存储回落免费 → 重输身份码 A(mock 幂等,绑新 deviceId,扣次)→ 恢复会员
-await page.evaluate(() => localStorage.clear())
+await resetStorage()
 await page.reload({ waitUntil: 'networkidle0' })
 await sniffVerifyUrls()   // reload 重置模块图,?t= 变体可能变化
 await applyTestPubkey()   // reload 重置了模块内公钥
@@ -256,7 +272,7 @@ ok('C4 deviceId 被换 → 凭证判定非会员(复制到未绑定设备无效)
 
 // C5:退款作废(410 voided,2026-10-01 契约)——干净态重激活 → mock 作废链 →
 // 刷新感知 → 提示含时间与原因(区别于"已过期"),本地标记落库,会员态失效
-await page.evaluate(() => localStorage.clear())
+await resetStorage()
 await page.reload({ waitUntil: 'networkidle0' })
 await sniffVerifyUrls()
 await applyTestPubkey()
@@ -287,6 +303,43 @@ await new Promise(r => setTimeout(r, 400))   // 等 onChanged 重渲
 const c5panel = await page.evaluate(() => document.querySelector('.license-panel')?.textContent ?? '')
 ok('C5d 面板切免费态并显示"已作废"tag', /已作废|[Vv]oided/.test(c5panel), c5panel.slice(0, 120))
 await page.screenshot({ path: path.join(OUT, 'c5-voided.png') })
+await closePanel()
+
+// C6:会员期内贴入被作废的码续费(2026-10-10 修复)——作废主体是贴入的码而非
+// 当前链:refresh 仲裁确认链健康 → 只提示码作废(时间+原因),会员态与凭证保留。
+// (C5 已作废 codeA 的链,故另起新链 codeC;codeD 作 unused 码级作废)
+await resetStorage()
+await page.reload({ waitUntil: 'networkidle0' })
+await sniffVerifyUrls()
+await applyTestPubkey()
+await page.click('img[src*="local_test_pic"]')
+await page.waitForFunction(() => document.querySelectorAll('canvas').length >= 2, { timeout: 10000 })
+await inputCodeViaUi(codeC)
+await page.waitForFunction(() => document.querySelector('.license-msg--ok') !== null, { timeout: 8000 })
+const voidDResp = await fetch('http://localhost:3999/api/license/void', {
+  method: 'POST', headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ code: codeD, reason: '退款 #2048', at: '2026-10-01T09:00:00.000Z' }),
+}).then(r => r.json())
+ok('C6a mock 作废贴入码成功(unused 码级作废)', voidDResp.ok === true, JSON.stringify(voidDResp))
+await inputCodeViaUi(codeD)
+await page.waitForFunction(() => document.querySelector('.license-msg--err') !== null, { timeout: 8000 })
+const c6msg = await page.evaluate(() => document.querySelector('.license-msg--err')?.textContent ?? '')
+ok('C6b 续费贴入作废码 → 提示含作废/时间/原因',
+  /作废|[Vv]oided/.test(c6msg) && c6msg.includes('退款 #2048') && c6msg.includes('2026'), c6msg)
+const c6marker = await page.evaluate(() => localStorage.getItem('pixel-forge.licenseVoided.v1'))
+const c6status = await page.evaluate(async (pub) => {
+  const m = await import('/src/lib/license/verify.ts')
+  m.setLicensePublicKey(pub)
+  return m.getLicenseStatus()
+}, TEST_PUBLIC_KEY_HEX)
+ok('C6c 会员态保留:无 voided 标记落库、getLicenseStatus 仍 active(本修复核心断言)',
+  c6marker === null && c6status.active === true,
+  `marker=${c6marker} status=${JSON.stringify(c6status)}`)
+await new Promise(r => setTimeout(r, 400))   // 等 onChanged 重渲
+const c6panel = await page.evaluate(() => document.querySelector('.license-panel')?.textContent ?? '')
+ok('C6d 面板仍会员态(有效期可见,未掉"免费版·已作废")',
+  /有效期|Active until/.test(c6panel) && !/免费版|Free/.test(c6panel), c6panel.slice(0, 120))
+await page.screenshot({ path: path.join(OUT, 'c6-renew-voided-code.png') })
 await closePanel()
 
 // ---------- 场景 D:3D 页无碍 ----------

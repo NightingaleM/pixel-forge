@@ -102,12 +102,17 @@ function redeem({ code, deviceId, credential }) {
   return { cid: rec.cid, exp: chain.exp, count: chain.count }
 }
 
-/** mock 专用控制端点:标记链(按 code 或 cid)或未用码为已作废(回归场景 C5 用)。 */
+/** mock 专用控制端点:标记链(按 code 或 cid)或未用码为已作废(回归场景 C5/C6 用)。 */
 function voidTarget({ code, cid, reason, at }) {
   const v = { at: at ?? new Date().toISOString(), reason: reason ?? '退款' }
   if (typeof code === 'string') {
-    const rec = codes.get(code)
-    if (!rec) throw { status: 404, error: 'not_found' }
+    let rec = codes.get(code)
+    if (!rec) {
+      // 真后端 generate 即入库,未兑换码可被退款作废;mock 惰性入库下首见码补记
+      // 为 unused 再作废(tier 仅消耗路径用,补记 null 无害)
+      codes.set(code, { tier: null, status: 'unused', cid: null, voided: v })
+      return { cid: null }
+    }
     if (rec.status === 'unused') { rec.voided = v; return { cid: null } }
     cid = rec.cid   // identity/supplement 码 → 作废其所属链
   }
