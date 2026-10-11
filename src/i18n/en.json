@@ -363,6 +363,20 @@
       "randomScaleDesc": "Random per-character scaling for depth. 0 disables.",
       "bgFilter": "Background Filter",
       "bgFilterDesc": "Skip flat low-contrast regions; higher skips more."
+    },
+    "glassdistort": {
+      "label": "Glass Distort",
+      "desc": "Remaps the whole picture through a noise-driven displacement field, as if viewed through uneven glass — rolling waves, pressed grid, or orange peel.",
+      "glassType": "Glass Type",
+      "glassTypeDesc": "Surface texture of the glass.",
+      "typeWave": "Rolling Waves",
+      "typeGrid": "Pressed Grid",
+      "typePeel": "Orange Peel",
+      "strength": "Distortion Strength",
+      "strengthDesc": "Displacement amount preset.",
+      "strengthSubtle": "Subtle",
+      "strengthStandard": "Standard",
+      "strengthStrong": "Strong"
     }
   },
   "base": {

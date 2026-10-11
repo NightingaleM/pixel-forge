@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>玻璃扭曲试验台 glass-lab</title>
+<style>
+  :root {
+    --bg: #101218;
+    --panel: #181b23;
+    --line: #262a35;
+    --text: #d7dae2;
+    --dim: #8a8f9c;
+    --accent: #6ea8fe;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg); color: var(--text);
+    font: 13px/1.5 system-ui, "Segoe UI", "Microsoft YaHei", sans-serif;
+    display: flex; overflow: hidden;
+  }
+  #stage {
+    flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center;
+    position: relative;
+  }
+  #gl { max-width: 100%; max-height: 100%; display: block; }
+  #panel {
+    width: 264px; flex: none; background: var(--panel);
+    border-left: 1px solid var(--line); padding: 14px;
+    overflow-y: auto; display: flex; flex-direction: column; gap: 14px;
+  }
+  h1 { font-size: 14px; font-weight: 600; }
+  h1 small { display: block; color: var(--dim); font-weight: 400; font-size: 11px; }
+  .group { display: flex; flex-direction: column; gap: 8px; }
+  .group > .label { color: var(--dim); font-size: 11px; letter-spacing: 0.08em; }
+  .row { display: flex; gap: 6px; }
+  button {
+    flex: 1; background: #20242f; color: var(--text); border: 1px solid var(--line);
+    border-radius: 6px; padding: 6px 8px; cursor: pointer; font: inherit;
+  }
+  button:hover { border-color: #3a4152; }
+  button.active { background: #26304a; border-color: var(--accent); color: #fff; }
+  button.pressed { background: #3a2530; border-color: #d06a7e; color: #ffd7de; }
+  .param { display: flex; flex-direction: column; gap: 3px; }
+  .param .head { display: flex; justify-content: space-between; }
+  .param .head .val { color: var(--accent); font-variant-numeric: tabular-nums; }
+  input[type="range"] { width: 100%; accent-color: var(--accent); }
+  .toggle-row { display: flex; align-items: center; gap: 8px; color: var(--dim); }
+  .toggle-row input { accent-color: var(--accent); }
+  #drop-hint {
+    position: absolute; inset: 12px; border: 2px dashed var(--accent); border-radius: 10px;
+    background: rgba(16,18,24,0.82); display: none; align-items: center; justify-content: center;
+    font-size: 16px; color: var(--accent); pointer-events: none;
+  }
+  #stage.drag #drop-hint { display: flex; }
+  #refs { display: flex; gap: 6px; }
+  #refs img {
+    width: 50%; aspect-ratio: auto; max-height: 130px; object-fit: contain;
+    border: 1px solid var(--line); border-radius: 6px; background: #000;
+  }
+  #err {
+    position: absolute; left: 12px; top: 12px; max-width: 70%;
+    background: #3a1d24; color: #ff9aa8; border: 1px solid #6e2a38;
+    border-radius: 8px; padding: 10px 12px; font: 12px/1.5 ui-monospace, Consolas, monospace;
+    white-space: pre-wrap; display: none;
+  }
+  .foot { color: var(--dim); font-size: 11px; }
+  @media (max-width: 720px) {
+    body { flex-direction: column; }
+    #panel { width: 100%; max-height: 46%; border-left: none; border-top: 1px solid var(--line); }
+  }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="gl"></canvas>
+  <div id="drop-hint">松开以载入图片</div>
+  <div id="err"></div>
+</div>
+<div id="panel">
+  <h1>玻璃扭曲试验台<small>噪声位移场 · UV 重映射 · WebGL1</small></h1>
+
+  <div class="group">
+    <div class="label">玻璃类型（噪声场）</div>
+    <div class="row" id="modes"></div>
+  </div>
+
+  <div class="group">
+    <div class="label">强度 <span id="strength-val" style="color:var(--accent)"></span></div>
+    <input type="range" id="strength" min="0" max="1" step="0.01" value="0.78">
+    <div class="row" id="presets">
+      <button data-s="0.25">弱</button>
+      <button data-s="0.48">中</button>
+      <button data-s="0.85">强</button>
+    </div>
+  </div>
+
+  <div class="group">
+    <div class="label">气质细调</div>
+    <div id="params" style="display:flex;flex-direction:column;gap:10px"></div>
+  </div>
+
+  <div class="group" id="seam-group" style="display:none">
+    <div class="label">玻璃自身光学</div>
+    <label class="toggle-row"><input type="checkbox" id="seam" checked> 缝亮脊 + 逐格曝光</label>
+  </div>
+
+  <div class="group">
+    <div class="label">对比</div>
+    <button id="bypass">按住看原图</button>
+    <button id="upload-btn">换图（或拖拽图片到画布）</button>
+    <input type="file" id="file" accept="image/*" style="display:none">
+  </div>
+
+  <div class="group">
+    <div class="label">参考图</div>
+    <div id="refs">
+      <img src="ref-glass-1.png" alt="参考1 方格压花">
+      <img src="ref-glass-2.png" alt="参考2 橘皮">
+    </div>
+  </div>
+
+  <div class="foot">纹理钳制 2048 与生产一致。各模式默认参数与强度 = 票1 用户定稿值；弱/中/强快捷键仅试验用，正式三档锚点待票2 收口。</div>
+</div>
+
+<script>
+"use strict";
+
+/* ============ 模式与参数定义（UI 与 uniform 的单一来源） ============ */
+
+const MODES = [
+  {
+    name: "大波浪",
+    strength: 0.78,   // 用户定稿（默认档）
+    params: [
+      { uni: "uP0", label: "波长尺度（小=更绵长）", min: 0.5, max: 2.2, step: 0.01, value: 0.73 },
+      { uni: "uP1", label: "倍频粗糙度",            min: 0.15, max: 0.8, step: 0.01, value: 0.52 },
+      { uni: "uP2", label: "方向拉伸（y 向密）",     min: 1.0, max: 2.6, step: 0.01, value: 1.37 },
+    ],
+  },
+  {
+    name: "方格压花",
+    strength: 0.51,   // 用户定稿
+    seam: true,
+    params: [
+      { uni: "uP0", label: "格数 N（每画宽）",   min: 5, max: 22, step: 0.5, value: 20.5 },
+      { uni: "uP1", label: "逐格错位（格单位）", min: 0, max: 0.8, step: 0.01, value: 0.52 },
+      { uni: "uP2", label: "透镜鼓包强度",       min: 0, max: 1.4, step: 0.01, value: 0.32 },
+      { uni: "uP3", label: "格子翻转概率",       min: 0, max: 0.5, step: 0.01, value: 0.16 },
+    ],
+  },
+  {
+    name: "橘皮",
+    strength: 0.34,   // 用户定稿
+    params: [
+      { uni: "uP0", label: "鼓包密度（基频）",   min: 10, max: 40, step: 0.5, value: 26 },
+      { uni: "uP1", label: "低频流动叠加",       min: 0, max: 1, step: 0.01, value: 0.25 },
+      { uni: "uP2", label: "边界破碎（domain warp）", min: 0, max: 0.4, step: 0.01, value: 0.12 },
+      { uni: "uP3", label: "疏密包络",           min: 0, max: 1, step: 0.01, value: 0.12 },
+    ],
+  },
+];
+
+/* ============ 状态 ============ */
+
+const state = {
+  mode: 0,
+  strength: MODES[0].strength,
+  bypass: false,
+  seam: true,
+  params: MODES.map(m => Object.fromEntries(m.params.map(p => [p.uni, p.value]))),
+};
+
+/* ============ WebGL ============ */
+
+const canvas = document.getElementById("gl");
+const gl = canvas.getContext("webgl", { antialias: false, preserveDrawingBuffer: true });
+const errBox = document.getElementById("err");
+function fatal(msg) { errBox.style.display = "block"; errBox.textContent = msg; }
+
+const VERT = `
+attribute vec2 aPos;
+void main() { gl_Position = vec4(aPos, 0.0, 1.0); }
+`;
+
+const FRAG = `
+precision highp float;
+
+uniform sampler2D uImage;
+uniform vec2  uResolution;   // 画布像素
+uniform vec2  uImageSize;    // 图片像素
+uniform int   uMode;         // 0 大波浪 / 1 方格压花 / 2 橘皮
+uniform float uStrength;     // 0..1
+uniform float uBypass;       // 1 = 直通原图
+uniform float uSeam;         // 方格模式：缝亮脊 + 逐格曝光
+uniform float uP0, uP1, uP2, uP3;
+
+/* ---- 基础噪声（复用 crosshatch.frag 的 hash+value noise 思路，quintic 平滑保 C2） ---- */
+
+float hash(vec2 p) {
+  p = fract(p * vec2(123.34, 456.21));
+  p += dot(p, p + 45.32);
+  return fract(p.x * p.y);
+}
+
+float vnoise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  vec2 u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+  float a = hash(i);
+  float b = hash(i + vec2(1.0, 0.0));
+  float c = hash(i + vec2(0.0, 1.0));
+  float d = hash(i + vec2(1.0, 1.0));
+  return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+}
+
+/* ---- 高度场：三套玻璃各一个 ---- */
+
+/* 大波浪：低频 fBm，连绵起伏 */
+float heightWave(vec2 p) {
+  float scale = uP0;            // 波长尺度
+  float gain  = uP1;            // 倍频增益
+  vec2  q = vec2(p.x, p.y * uP2);
+  float f = 1.8 / scale;        // 基频 cycles/画宽
+  float a = 1.0;
+  float norm = 0.0;
+  float h = 0.0;
+  for (int i = 0; i < 3; i++) {
+    h += a * vnoise(q * f + float(i) * 17.0);
+    norm += a; a *= gain; f *= 2.1;
+  }
+  return h / norm;
+}
+
+/* 橘皮：主能量集中在中频鼓包 + 疏密包络 + domain warp + 低频流动 */
+float heightPeel(vec2 p) {
+  float base = uP0;             // 鼓包基频
+  float warp = uP2;
+  float envA = uP3;
+  vec2 w = vec2(vnoise(p * 3.1 + 7.3), vnoise(p * 3.1 + 3.7)) - 0.5;
+  vec2 q = p + warp * w;
+  float env = 1.0 - envA * 0.5 + envA * vnoise(p * 6.0 + 11.0);
+  float a = 1.0, f = base, norm = 0.0, h = 0.0;
+  /* gain×lacunarity < 1：让高频 octave 的位移/波长比逐级衰减，抑制采样折叠碎屑，
+     高频只留圆润棱线感（gain 0.35 × lac 1.95 ≈ 0.68/octave） */
+  for (int i = 0; i < 4; i++) {
+    h += a * vnoise(q * f);
+    norm += a; a *= 0.35; f *= 1.95;
+  }
+  h = h / norm - 0.5;
+  float low = vnoise(p * 1.6 + 5.0) - 0.5;
+  return h * env + uP1 * 0.6 * low;
+}
+
+/* ---- 方格压花：格点透镜阵（结构化场，不走 fBm） ---- */
+/* 返回位移（图片 uv 单位）与格内坐标，缝亮脊信息由主函数复用 */
+vec2 latticeDisp(vec2 p, out vec2 fOut, out vec2 cellOut, out float flipSign) {
+  float N = uP0;
+  vec2 g = p * N;
+  vec2 cell = floor(g);
+  vec2 f = fract(g) - 0.5;                  // [-0.5, 0.5]
+  float flip = hash(cell + 91.3) < uP3 ? -1.0 : 1.0;
+  /* 逐格随机错位：跨缝不连续的关键（连续正弦场做不出） */
+  vec2 jit = (vec2(hash(cell), hash(cell + 37.7)) - 0.5) * 2.0 * uP1;
+  /* 透镜包络：中心 0、边缘大（钟形，t 空间保证非负）→ 枕形鼓包 + 拖尾 */
+  vec2 t = f + 0.5;                                          // [0,1]
+  float bell = 16.0 * t.x * t.y * (1.0 - t.x) * (1.0 - t.y); // 中心 1、缝 0
+  vec2 lens = f * bell * uP2 * flip;
+  fOut = f; cellOut = cell; flipSign = flip;
+  return (jit * flip + lens) / N;
+}
+
+/* ---- 镜像 wrap：防采样越界拉丝（kaleidoscope tileMirror 教训） ---- */
+vec2 mirrorWrap(vec2 uv) {
+  vec2 u = mod(uv, 2.0);
+  return min(u, 2.0 - u);
+}
+
+/* ---- 通用：数值梯度（两模式共用，高度函数由 uMode 分支） ---- */
+float heightAt(vec2 p) {
+  if (uMode == 0) return heightWave(p);
+  if (uMode == 2) return heightPeel(p);
+  return 0.0;
+}
+vec2 gradAt(vec2 p, float e) {
+  float h0 = heightAt(p);
+  return vec2(heightAt(p + vec2(e, 0.0)) - h0,
+              heightAt(p + vec2(0.0, e)) - h0) / e;
+}
+
+/* ---- 强度映射：pow 曲线让弱档细腻、强档猛 ---- */
+float strengthCurve(float s) { return pow(s, 1.5); }
+
+void main() {
+  /* aspect-fit：图片 uv 空间（噪声频率以画宽计，与画布尺寸无关） */
+  vec2 screenUv = gl_FragCoord.xy / uResolution;
+  float cAspect = uResolution.x / uResolution.y;
+  float iAspect = uImageSize.x / uImageSize.y;
+  vec2 uv;
+  if (iAspect > cAspect) {
+    uv = vec2(screenUv.x, (screenUv.y - 0.5) * (cAspect / iAspect) + 0.5);
+  } else {
+    uv = vec2((screenUv.x - 0.5) * (iAspect / cAspect) + 0.5, screenUv.y);
+  }
+  if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
+    gl_FragColor = vec4(0.086, 0.094, 0.11, 1.0);   // letterbox
+    return;
+  }
+
+  float s = strengthCurve(uStrength);
+  vec2 disp;
+
+  if (uBypass > 0.5 || uStrength <= 0.0) {
+    disp = vec2(0.0);
+  } else if (uMode == 1) {
+    vec2 f, cell; float flip;
+    disp = latticeDisp(uv, f, cell, flip) * s;
+  } else {
+    /* 梯度折射位移：透镜感的来源（纯 value 位移只有涂抹感）。
+       橘皮：高频场梯度比波浪场大一个量级，且辨认度随强度应陡峭回落——
+       用原始强度的二次曲线 + 更小 Kmax，弱档温和、强档才有冲击力 */
+    float K = uMode == 0 ? 0.11 * s : 0.032 * uStrength * uStrength;
+    vec2 g = gradAt(uv, 0.004);
+    disp = -K * g;
+  }
+  /* 方格模式的强度缩放直接乘进 uP1/uP2 的外部包络 */
+  vec2 srcUv = mirrorWrap(uv + disp);
+
+  vec3 col = texture2D(uImage, srcUv).rgb;
+
+  /* 方格压花：缝亮脊 + 逐格曝光（玻璃自身光学层，可开关） */
+  if (uMode == 1 && uSeam > 0.5 && uBypass < 0.5 && uStrength > 0.0) {
+    float N = uP0;
+    vec2 g2 = uv * N;
+    vec2 f2 = fract(g2) - 0.5;
+    vec2 cell2 = floor(g2);
+    float edge = 0.5 - max(abs(f2.x), abs(f2.y));            // 距缝（格单位）
+    float ridge = 1.0 - smoothstep(0.0, 0.06, edge);
+    float facet = 0.9 + 0.2 * hash(cell2 + 7.3);             // 逐格明暗
+    col *= facet;
+    float ridgeLight = ridge * (0.10 + 0.22 * hash(cell2 + 3.1));
+    col += ridgeLight * vec3(1.0, 0.98, 0.94);
+    col -= ridge * 0.10;                                      // 脊线旁暗影
+  }
+
+  gl_FragColor = vec4(col, 1.0);
+}
+`;
+
+function compile(type, src) {
+  const sh = gl.createShader(type);
+  gl.shaderSource(sh, src);
+  gl.compileShader(sh);
+  if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
+    fatal("shader 编译失败:\n" + gl.getShaderInfoLog(sh));
+    throw new Error(gl.getShaderInfoLog(sh));
+  }
+  return sh;
+}
+
+const prog = gl.createProgram();
+gl.attachShader(prog, compile(gl.VERTEX_SHADER, VERT));
+gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FRAG));
+gl.linkProgram(prog);
+if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+  fatal("link 失败: " + gl.getProgramInfoLog(prog));
+  throw new Error(gl.getProgramInfoLog(prog));
+}
+gl.useProgram(prog);
+
+const buf = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+const aPos = gl.getAttribLocation(prog, "aPos");
+gl.enableVertexAttribArray(aPos);
+gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+const U = {};
+for (const name of ["uResolution","uImageSize","uMode","uStrength","uBypass","uSeam","uP0","uP1","uP2","uP3"]) {
+  U[name] = gl.getUniformLocation(prog, name);
+}
+
+/* ============ 纹理 ============ */
+
+const MAX_TEX = 2048;   // 与生产 ShaderRenderer.ts:18 一致
+const tex = gl.createTexture();
+gl.bindTexture(gl.TEXTURE_2D, tex);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+
+let imageSize = [1, 1];
+let dirty = true;
+
+function uploadImage(source, w, h) {
+  const scale = Math.min(1, MAX_TEX / Math.max(w, h));
+  if (scale < 1) {
+    const c = document.createElement("canvas");
+    c.width = Math.round(w * scale); c.height = Math.round(h * scale);
+    c.getContext("2d").drawImage(source, 0, 0, c.width, c.height);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, c);
+    imageSize = [c.width, c.height];
+  } else {
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
+    imageSize = [w, h];
+  }
+  dirty = true;
+}
+
+/* ============ 默认测试图：程序化生成（各频段信息齐全，扭曲敏感） ============ */
+
+function makeTestImage() {
+  const S = 1024;
+  const c = document.createElement("canvas");
+  c.width = S; c.height = S;
+  const x = c.getContext("2d");
+
+  // 天空渐变
+  const sky = x.createLinearGradient(0, 0, 0, S * 0.72);
+  sky.addColorStop(0, "#2b3a67"); sky.addColorStop(0.7, "#b46a8a"); sky.addColorStop(1, "#e8a87c");
+  x.fillStyle = sky; x.fillRect(0, 0, S, S * 0.72);
+
+  // 太阳
+  x.fillStyle = "#ffd166";
+  x.beginPath(); x.arc(S * 0.66, S * 0.24, 64, 0, Math.PI * 2); x.fill();
+
+  // 远山两层
+  x.fillStyle = "#4a3f63";
+  x.beginPath(); x.moveTo(0, S * 0.55);
+  for (let i = 0; i <= 8; i++) x.lineTo(S * i / 8, S * (0.46 + 0.07 * Math.abs(Math.sin(i * 2.3))));
+  x.lineTo(S, S * 0.72); x.lineTo(0, S * 0.72); x.fill();
+  x.fillStyle = "#2c3150";
+  x.beginPath(); x.moveTo(0, S * 0.62);
+  for (let i = 0; i <= 6; i++) x.lineTo(S * i / 6, S * (0.55 + 0.06 * Math.abs(Math.sin(i * 1.7 + 2))));
+  x.lineTo(S, S * 0.72); x.lineTo(0, S * 0.72); x.fill();
+
+  // 地面
+  x.fillStyle = "#191b26"; x.fillRect(0, S * 0.72, S, S * 0.28);
+
+  // 中景剪影：房子 + 树
+  x.fillStyle = "#12141f";
+  x.fillRect(S * 0.08, S * 0.52, S * 0.16, S * 0.2);
+  x.beginPath(); x.moveTo(S * 0.06, S * 0.52); x.lineTo(S * 0.16, S * 0.44); x.lineTo(S * 0.26, S * 0.52); x.fill();
+  x.beginPath(); x.arc(S * 0.36, S * 0.60, 52, 0, Math.PI * 2); x.fill();
+  x.fillRect(S * 0.355, S * 0.60, 10, S * 0.12);
+
+  // 大字：文字对扭曲最敏感
+  x.font = "bold 88px system-ui, sans-serif";
+  x.textAlign = "center";
+  x.fillStyle = "rgba(255,255,255,0.94)";
+  x.fillText("玻璃扭曲 GLASS", S * 0.5, S * 0.40);
+  x.font = "bold 40px system-ui, sans-serif";
+  x.fillStyle = "rgba(255,255,255,0.75)";
+  x.fillText("0123456789 弱中强", S * 0.5, S * 0.46);
+
+  // 右上角棋盘：透镜放大/缩小检测
+  const cb = 16, cbN = 8, cbSize = cb * cbN;
+  for (let i = 0; i < cbN; i++) for (let j = 0; j < cbN; j++) {
+    x.fillStyle = (i + j) % 2 ? "#e6e6e6" : "#1a1a1a";
+    x.fillRect(S - cbSize - 8 + i * cb, 8 + j * cb, cb, cb);
+  }
+
+  // 左中同心圆：放大缩小检测
+  x.strokeStyle = "#ffffff"; x.lineWidth = 5;
+  for (let r = 18; r <= 90; r += 18) {
+    x.beginPath(); x.arc(S * 0.15, S * 0.30, r, 0, Math.PI * 2); x.stroke();
+  }
+  x.fillStyle = "#ff5566";
+  x.beginPath(); x.arc(S * 0.15, S * 0.30, 8, 0, Math.PI * 2); x.fill();
+
+  // 底部高频条纹：位移场最敏感区
+  for (let i = 0; i < S / 8; i++) {
+    x.fillStyle = i % 2 ? "#d8d8d8" : "#222";
+    x.fillRect(i * 8, S * 0.86, 8, S * 0.14);
+  }
+
+  return c;
+}
+
+uploadImage(makeTestImage(), 1024, 1024);
+
+/* ============ 渲染循环（dirty flag） ============ */
+
+function resize() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const availW = document.getElementById("stage").clientWidth;
+  const availH = document.getElementById("stage").clientHeight;
+  let w = Math.min(availW - 16, 1400), h = w / (imageSize[0] / imageSize[1]);
+  if (h > availH - 16) { h = availH - 16; w = h * (imageSize[0] / imageSize[1]); }
+  w = Math.max(w, 60); h = Math.max(h, 60);
+  const pw = Math.round(w * dpr), ph = Math.round(h * dpr);
+  if (canvas.width !== pw || canvas.height !== ph) {
+    canvas.width = pw; canvas.height = ph;
+    canvas.style.width = w + "px"; canvas.style.height = h + "px";
+    gl.viewport(0, 0, pw, ph);
+    dirty = true;
+  }
+}
+
+function render() {
+  resize();
+  if (dirty) {
+    gl.uniform2f(U.uResolution, canvas.width, canvas.height);
+    gl.uniform2f(U.uImageSize, imageSize[0], imageSize[1]);
+    gl.uniform1i(U.uMode, state.mode);
+    gl.uniform1f(U.uStrength, state.strength);
+    gl.uniform1f(U.uBypass, state.bypass ? 1 : 0);
+    gl.uniform1f(U.uSeam, state.seam ? 1 : 0);
+    const p = state.params[state.mode];
+    gl.uniform1f(U.uP0, p.uP0 ?? 0);
+    gl.uniform1f(U.uP1, p.uP1 ?? 0);
+    gl.uniform1f(U.uP2, p.uP2 ?? 0);
+    gl.uniform1f(U.uP3, p.uP3 ?? 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    dirty = false;
+  }
+  requestAnimationFrame(render);
+}
+requestAnimationFrame(render);
+
+/* ============ UI ============ */
+
+const modesEl = document.getElementById("modes");
+MODES.forEach((m, i) => {
+  const b = document.createElement("button");
+  b.textContent = m.name;
+  b.addEventListener("click", () => { state.mode = i; syncUI(); });
+  modesEl.appendChild(b);
+});
+
+const paramsEl = document.getElementById("params");
+function buildParams() {
+  paramsEl.innerHTML = "";
+  MODES[state.mode].params.forEach(p => {
+    const wrap = document.createElement("div");
+    wrap.className = "param";
+    const head = document.createElement("div");
+    head.className = "head";
+    const name = document.createElement("span"); name.textContent = p.label;
+    const val = document.createElement("span"); val.className = "val";
+    head.append(name, val);
+    const input = document.createElement("input");
+    input.type = "range"; input.min = p.min; input.max = p.max; input.step = p.step;
+    input.value = state.params[state.mode][p.uni];
+    const show = () => { val.textContent = Number(input.value).toFixed(2); };
+    input.addEventListener("input", () => {
+      state.params[state.mode][p.uni] = Number(input.value);
+      show(); dirty = true;
+    });
+    show();
+    wrap.append(head, input);
+    paramsEl.appendChild(wrap);
+  });
+  document.getElementById("seam-group").style.display = MODES[state.mode].seam ? "" : "none";
+}
+
+const strengthEl = document.getElementById("strength");
+const strengthVal = document.getElementById("strength-val");
+strengthEl.addEventListener("input", () => {
+  state.strength = Number(strengthEl.value);
+  strengthVal.textContent = state.strength.toFixed(2);
+  dirty = true;
+});
+
+document.querySelectorAll("#presets button").forEach(b => {
+  b.addEventListener("click", () => {
+    state.strength = Number(b.dataset.s);
+    strengthEl.value = state.strength;
+    strengthVal.textContent = state.strength.toFixed(2);
+    dirty = true;
+  });
+});
+
+document.getElementById("seam").addEventListener("change", e => {
+  state.seam = e.target.checked; dirty = true;
+});
+
+const bypassBtn = document.getElementById("bypass");
+function setBypass(v) { state.bypass = v; bypassBtn.classList.toggle("pressed", v); dirty = true; }
+bypassBtn.addEventListener("pointerdown", () => setBypass(true));
+window.addEventListener("pointerup", () => { if (state.bypass) setBypass(false); });
+bypassBtn.addEventListener("pointerleave", () => { if (state.bypass) setBypass(false); });
+
+function syncUI() {
+  [...modesEl.children].forEach((b, i) => b.classList.toggle("active", i === state.mode));
+  /* 切模式带出该模式的定稿强度（票1 用户拍板值） */
+  const ms = MODES[state.mode].strength;
+  state.strength = ms;
+  strengthEl.value = ms;
+  strengthVal.textContent = ms.toFixed(2);
+  buildParams();
+  dirty = true;
+}
+
+/* 上传与拖拽 */
+const fileInput = document.getElementById("file");
+document.getElementById("upload-btn").addEventListener("click", () => fileInput.click());
+fileInput.addEventListener("change", () => {
+  if (fileInput.files[0]) loadFile(fileInput.files[0]);
+  fileInput.value = "";
+});
+function loadFile(file) {
+  const img = new Image();
+  img.onload = () => { uploadImage(img, img.naturalWidth, img.naturalHeight); };
+  img.src = URL.createObjectURL(file);
+}
+const stage = document.getElementById("stage");
+window.addEventListener("dragover", e => { e.preventDefault(); stage.classList.add("drag"); });
+window.addEventListener("dragleave", e => { if (!e.relatedTarget) stage.classList.remove("drag"); });
+window.addEventListener("drop", e => {
+  e.preventDefault(); stage.classList.remove("drag");
+  const f = e.dataTransfer.files[0];
+  if (f && f.type.startsWith("image/")) loadFile(f);
+});
+
+syncUI();
+strengthVal.textContent = state.strength.toFixed(2);
+</script>
+</body>
+</html>

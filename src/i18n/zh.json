@@ -363,6 +363,20 @@
       "randomScaleDesc": "为字符添加随机缩放增强层次感，0 为关闭。",
       "bgFilter": "背景过滤",
       "bgFilterDesc": "过滤低对比度的平淡区域，数值越大过滤越多。"
+    },
+    "glassdistort": {
+      "label": "玻璃扭曲",
+      "desc": "通过噪声位移场全幅重映射画面，如同隔着非平滑玻璃观看——大波浪、方格压花与橘皮三种玻璃质感。",
+      "glassType": "玻璃类型",
+      "glassTypeDesc": "玻璃表面的纹理形态。",
+      "typeWave": "大波浪",
+      "typeGrid": "方格压花",
+      "typePeel": "橘皮",
+      "strength": "扭曲强度",
+      "strengthDesc": "扭曲位移的幅度档位。",
+      "strengthSubtle": "轻微",
+      "strengthStandard": "标准",
+      "strengthStrong": "强烈"
     }
   },
   "base": {

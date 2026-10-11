@@ -316,6 +316,28 @@ export const styles: StyleDefinition[] = [
       { name: 'style.ascii.bgFilter', uniform: 'uBgFilter', min: 0, max: 0.5, step: 0.01, default: 0.07, description: 'style.ascii.bgFilterDesc' },
     ],
   },
+
+  // ---------------------------------------------------------------------------
+  // Glass Distort (noise displacement field, single pass)
+  // ---------------------------------------------------------------------------
+  {
+    id: 'glassdistort',
+    label: 'style.glassdistort.label',
+    description: 'style.glassdistort.desc',
+    shaderImports: [() => import('../shaders/glassdistort.frag?raw').then(m => m.default)],
+    params: [
+      { name: 'style.glassdistort.glassType', uniform: 'uGlassType', type: 'select' as const, options: [
+        { label: 'style.glassdistort.typeWave', value: 0 },
+        { label: 'style.glassdistort.typeGrid', value: 1 },
+        { label: 'style.glassdistort.typePeel', value: 2 },
+      ], default: 0, description: 'style.glassdistort.glassTypeDesc' },
+      { name: 'style.glassdistort.strength', uniform: 'uStrengthLevel', type: 'select' as const, options: [
+        { label: 'style.glassdistort.strengthSubtle',   value: 0 },
+        { label: 'style.glassdistort.strengthStandard', value: 1 },
+        { label: 'style.glassdistort.strengthStrong',   value: 2 },
+      ], default: 1, description: 'style.glassdistort.strengthDesc' },
+    ],
+  },
 ]
 
 /**

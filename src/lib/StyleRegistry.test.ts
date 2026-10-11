@@ -57,3 +57,13 @@ describe('defaultParams / defaultTextParams', () => {
     }
   })
 })
+
+describe('glassdistort', () => {
+  it('占据 styles 数组末位(种子码按序号入码,插入中间会废掉旧码)', () => {
+    expect(styles[styles.length - 1]?.id).toBe('glassdistort')
+  })
+
+  it('默认参数:大波浪 + 标准强度,且仅此两个参数', () => {
+    expect(defaultParams('glassdistort')).toEqual({ uGlassType: 0, uStrengthLevel: 1 })
+  })
+})
