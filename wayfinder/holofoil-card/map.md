@@ -38,10 +38,11 @@ tracker: local-markdown
 - [研究票——转卡导出 HTML 方案与兼容矩阵](tickets/02-export-html-research.md): **推荐方案 (i) WebGL 实时**——内嵌 holofoil.frag+冻结参数+源图 JPEG q85 base64，倾角作 uniform，逐像素保真、0.8–1.8 MB、工程量最低；K 帧被体积+iOS 内存双杀、CSS 近似保真仅 4–6 成，均否决；降级链＝WebGL 失败→内置静态烘焙帧。兼容：WebGL1 全绿（含微信 XWeb）、Android file:// 可行（MDN secure context）；**iPhone 无本地打开动态 HTML 的路径→交付形态＝托管或电脑打开**（已挂拍板门）；陀螺仪现实只在 https 托管场景生效，触摸回退标准件已定。体积为本机实测。全文见 [assets/research-export-html.md](assets/research-export-html.md)。
 - [样张票——转卡交互 demo（手感三参数可调）](tickets/04-card-tilt-demo.md): [assets/card-demo/](assets/card-demo/) 交付（单文件 base64 内嵌，file:// 双击即用，即导出 HTML 方案雏形）——幅度滑杆 5–20° 默认 12、三开关（箔色流动 band+=dot(tilt,dir)*2.6 / 闲置自摆 2.5s / 阴影高光微动）、质感三档+素材三选+实时读数；verify 13/13＋视觉复核五项过。**实测修正（执行票必带）**：纹理上传必须 `UNPACK_FLIP_Y_WEBGL=true`（漏设=卡面倒置，app 先例 ShaderRenderer.ts:119）；拉丝高饱和观感会被 vision 模型误判为 bug（与 app 用户认可定稿同观感）。拍板门定稿四问：幅度默认值/自摆默认/阴影默认/流动增益 2.6。
 - [拍板门——线程砍留与手感定稿](tickets/05-gate-grilling.md): **双线程全保留**；iPhone 现实接受+三分法文案口径；点选面**做**；掩码**双语义选项、默认仅烫箔**；分区 k=4/xyw=0.5 照准；**手感四值定稿**（幅度 12°/自摆做且默认开/阴影微动做且默认开/流动增益 2.6，产品常量不入码）；分区算法+导出 HTML 方案（WebGL 实时+降级链+陀螺仪内置）照准；**H5 预览陀螺仪彩蛋裁决不做**。
+- [规格收口与设计确认](tickets/06-spec-lock.md): **全规格锁定，设计确认门过（Q1–Q13）**——参数表 8→13：uScope 三档 select（默认全图保旧码）+边缘 4 滑杆（阈值/宽度/软带羽化/滞后容差，均入码+随机，改判开放）+分区 uZoneBoost toggle（默认仅烫箔）；k/xyw 固定常量；**选中集合不入码**（恢复=全选）；转卡=工具条按钮+compare 互斥+桌面 hover 跟随/H5 单指转卡双指缩放+手感悬浮窗（幅度+三开关，不入码，改判开窗）；HTML 导出= ActionBar/H5 并列按钮+gating 首个格式拒绝型（非会员开 LicensePanel+toast，会员无水印）+票 02 模板照抄；**静态 PNG 角度序列砍掉**（改判）；验收=341 只增+模板 verify 自检+码长上限 23。全文见票内 Resolution，执行票 07 照抄。
 
 ## Not yet specified
 
-（无——拍板门已关，全部雾项毕业或裁决；前沿＝票 06 规格收口。）
+（无——规格已锁，全部雾项毕业或裁决；前沿＝票 07 执行交付。）
 
 ## Out of scope
 
