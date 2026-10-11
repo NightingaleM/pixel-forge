@@ -33,7 +33,7 @@ tracker: local-markdown
 
 ## Decisions so far
 
-（无——制图期约束见 Notes；票 01/02 研究进行中。）
+- [研究票——边缘检测与自动分区选型（选择性加箔）](tickets/01-partition-research.md): 三层全可行——边缘＝单 pass Sobel+多基线 max+smoothstep（prism idiom 照搬，全图模式零改动保旧码等价）；分区＝自研 k-means lite 256² 低清格+连通域（<50ms 桌面/<150ms 移动；ml-kmeans 备选，SLIC/opencv.js/image-q 出局）；点选＝label grid O(1) 查表；掩膜走 textraster 图集管线 + uZoneMask/uZoneEnabled 默认 0。风险：分区跨设备复现性→种子码选中集合编码方式已并入票 06 裁决。全文见 [assets/research-partition.md](assets/research-partition.md)。
 
 ## Not yet specified
 

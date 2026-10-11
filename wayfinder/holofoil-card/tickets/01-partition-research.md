@@ -1,7 +1,7 @@
 ---
 title: 研究票——边缘检测与自动分区选型（选择性加箔）
 labels: [wayfinder:research]
-status: open
+status: closed
 assignee: 研究子代理（建图时已发）
 blocked-by: []
 ---
@@ -17,3 +17,13 @@ blocked-by: []
 输入：`src/shaders/holofoil.frag`（现有单 pass 结构）、`src/shaders/prism.frag`（luma 梯度先例）、`src/lib/StyleRegistry.ts`、`src/types.ts`（ParamDef/visibleWhen）。约束：不得重开 map Notes 制图期裁决。
 
 产出落 `../assets/research-partition.md`：三分层各一节（方案对比表、推荐+理由、备选、性能量级、掩膜纹理整合方式）+ 结论摘要 ≤10 行。
+
+## Resolution
+
+**2026-10-11 研究完成**，全文见 [assets/research-partition.md](../assets/research-partition.md)（含代码事实核对、npm 库查证来源）。结论：
+
+1. **边缘加箔**：单 pass 内 Sobel 基座 + holofoil 现有 ±2px 多基线梯度取 max，smoothstep 软阈值（prism 紫边 idiom 照搬，复用度 ~80%），邻域 max 做边宽（1–4）；真 Canny 出局；**全图模式路径零改动，保旧码逐字节等价**。2048² 桌面 1–4ms。
+2. **自动分区**：自研 k-means lite（RGB+xy、k≈6、固定 seed）在 ≤256² 低清格 + 两遍 union-find 连通域 + 小区并入；一次性 **<50ms 桌面 / <150ms 移动**；ml-kmeans 7.0.0（活跃、~63kB）为可信备选；SLIC（npm 库不可靠）/ opencv.js（8MB）/ image-q（停更）出局。
+3. **点选开关面**：label grid 留 CPU，点击＝坐标换算 + O(1) 查表（毫秒级、无 GPU readPixels），H5 同套 pointer 换算无特化；on-the-fly flood fill 仅作「容差」增强备选。
+4. **掩膜整合**：0/1 掩膜 canvas → texImage2D → bindTexture(3) + setSampler('uZoneMask')，逐行照抄 textraster 文字图集管线（renderImage.ts:88-110 先例）；holofoil 末尾加 `uZoneMask`/`uZoneEnabled` 两 uniform，**uZoneEnabled 默认 0 保旧码安全**；选择集走组件旁路 state（textParams 先例），不塞参数表。
+5. **遗留裁决点（已并入票 06）**：分区跨设备浮点复现性 → 种子码「选中集合」编码方式（特征整数化 vs 本地不入码）须规格票裁决；低端移动 GPU 边宽核 fetch 需实测（超预算降档纯 smoothstep 带宽）；k 与 xy 权重默认值样张阶段定。
