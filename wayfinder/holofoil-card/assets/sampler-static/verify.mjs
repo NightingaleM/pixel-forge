@@ -1,8 +1,11 @@
-/* 样张页实测：静态 server + Edge headless + 断言 + PNG 归档（用完删） */
+/* 样张页实测：静态 server + Edge headless + 断言 + PNG 归档
+   用法: node verify.mjs [img1.png img2.png ...]（默认 car.png + scene2.png;点选交互段仅对 car.png 细测） */
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import puppeteer from 'puppeteer-core';
+
+const IMGS = process.argv.length > 2 ? process.argv.slice(2) : ['car.png', 'scene2.png'];
 
 const ROOT = path.resolve('wayfinder/holofoil-card/assets/sampler-static');
 const PORT = 8931;
@@ -33,7 +36,7 @@ try {
     headless: 'new',
   });
 
-  for (const img of ['car.png', 'scene2.png']) {
+  for (const img of IMGS) {
     const page = await browser.newPage();
     page.on('pageerror', e => console.log('PAGEERROR:', e.message));
     await page.goto(`http://localhost:${PORT}/sampler.html?img=${img}`, { waitUntil: 'load' });

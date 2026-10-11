@@ -33,4 +33,13 @@ blocked-by: [01-partition-research]
 
 **点选粗 demo**：活 canvas 点击区块 toggle 加箔/原图（label grid O(1) 查表实测毫秒级）+ 徽章开关 + 全选/全不选，断言过（14→13 徽章切换、画布重渲）。羽化带 3×3 众数容差未做（粗版约定），留票 06。
 
-**样张页使用**：`?img=car.png|scene2.png` 换图；`?edgeThresh=&edgeWidth=&maskMode=&k=&xyw=&zones=&texture=&strength=` 等全参可调；`?debug=edge|grad|lap` 输出检测中间场（正式版执行票的调试基建）。验收重跑：`node wayfinder/holofoil-card/assets/sampler-static/verify.mjs`（内嵌静态 server + Edge headless，18 断言含点选交互）。
+**样张页使用**：`?img=car.png|scene2.png|cartoon.png` 换图；`?edgeThresh=&edgeWidth=&maskMode=&k=&xyw=&zones=&texture=&strength=` 等全参可调；`?debug=edge|grad|lap` 输出检测中间场（正式版执行票的调试基建）。验收重跑：`node wayfinder/holofoil-card/assets/sampler-static/verify.mjs [图名...]`（内嵌静态 server + Edge headless，25 断言含点选交互）。
+
+### 2026-10-12 补充（用户反馈驱动）
+
+用户过目照片样张后裁决两条，均已实测落定：
+
+1. **照片素材边缘观感差（用户实测反馈）**——边缘描边美学在多纹理照片上确实不佳（即使算法已收敛到 1.3% 覆盖）。**卡通/插画才是边缘模式的主场素材**（用户另供 cartoon.png 舰船拟人立绘验证：轮廓镭射描边成立、平涂色块零污染）。正式版定位时边缘模式应按素材类型引导（插画类推荐边缘、照片类推荐分区），拍板门输入。
+2. **边缘检测参数对用户开放（用户明确定方向）**——不同素材的最优阈值差异巨大（照片 t0.5、卡通因放大摊薄更低），单默认无法覆盖。正式版「阈值/宽度」入参数表开放自调，拍板门只须确认开放范围与默认值。
+3. **重大技术发现：检测步进必须按纹理分辨率（uTexSize），不能按渲染分辨率（uResolution）**。卡通素材 350px 放大 960 渲染时，canvas 步进只移动 0.37 纹素，LINEAR 插值把梯度摊薄 2.7×，细线全部漏检（响应覆盖 0.2%，视觉复核确认无效果）。修复=边缘检测三函数（sobel/grad/lap）+ dilate 步进统一用 `1.0/uTexSize` 后：响应覆盖恢复、镭射描边成立，car/scene2（960 原生）逐项无回归（25/25 断言过）。**注意：app 版 holofoil.frag 现有 ±2px 梯度同样存在此解耦**（全图模式下仅影响光谱扰动幅度，无碍；边缘模式致命）——正式版整合时边缘检测必须走 uTexSize，已记入执行票注意点。
+4. 卡通素材分区表现：10 区/5 大区 88.6%（扁平插画为分区理想素材，k=4/xyw=0.5 默认同样适用）。

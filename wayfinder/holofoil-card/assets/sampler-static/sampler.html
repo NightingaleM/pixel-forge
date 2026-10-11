@@ -158,6 +158,10 @@ uniform float uEdgeWidth;      // 1..4, 默认 2
 uniform float uMaskMode;       // 1 仅烫箔(未选=原图) / 0 光谱流彩(金属底全图)
 uniform sampler2D uZoneMask;
 uniform float uZoneEnabled;    // 0 默认=全图,旧码安全
+uniform vec2 uTexSize;         // 纹理原始尺寸——边缘检测步进须按纹理像素走
+                               // (渲染放大≠纹理放大:350px 图渲染 960 时,canvas 步进只移 0.37 纹素,
+                               //  LINEAR 插值把梯度摊薄 2.7x,细线全漏——2026-10-12 卡通素材实测定位;
+                               //  app 版 holofoil 同样存在此解耦,正式版整合时边缘检测必须用 uTexSize)
 
 float hash(vec2 p) {
   p = fract(p * vec2(123.34, 456.21));
@@ -184,7 +188,7 @@ vec3 hsv2rgb(vec3 c) {
    ② 滞后核心——强阶跃才成核心,弱响应只在核心的 dilate 邻域内保留为软带,
    弥漫纹理弱响应因无核心邻接被剔除。真 Canny 仍出局,此为单 pass 近似。 */
 float sobelMag(vec2 uv) {
-  vec2 px = 1.0 / uResolution;
+  vec2 px = 1.0 / uTexSize;
   float l00 = luma(texture2D(uImage, uv + px * vec2(-1.0, -1.0)).rgb);
   float l10 = luma(texture2D(uImage, uv + px * vec2( 0.0, -1.0)).rgb);
   float l20 = luma(texture2D(uImage, uv + px * vec2( 1.0, -1.0)).rgb);
@@ -198,7 +202,7 @@ float sobelMag(vec2 uv) {
   return length(vec2(gx, gy));
 }
 float gradMag(vec2 uv) {
-  vec2 px = 1.0 / uResolution;
+  vec2 px = 1.0 / uTexSize;
   float lx = luma(texture2D(uImage, uv + vec2(px.x * 2.0, 0.0)).rgb)
            - luma(texture2D(uImage, uv - vec2(px.x * 2.0, 0.0)).rgb);
   float ly = luma(texture2D(uImage, uv + vec2(0.0, px.y * 2.0)).rgb)
@@ -206,7 +210,7 @@ float gradMag(vec2 uv) {
   return length(vec2(lx, ly));
 }
 float lapMag(vec2 uv) {
-  vec2 px = 1.0 / uResolution;
+  vec2 px = 1.0 / uTexSize;
   float l0 = luma(texture2D(uImage, uv).rgb);
   float lap = luma(texture2D(uImage, uv + vec2(px.x, 0.0)).rgb) + luma(texture2D(uImage, uv - vec2(px.x, 0.0)).rgb)
             + luma(texture2D(uImage, uv + vec2(0.0, px.y)).rgb) + luma(texture2D(uImage, uv - vec2(0.0, px.y)).rgb)
@@ -227,11 +231,11 @@ vec2 edgePair(vec2 uv) {
 }
 float edgeZone() {
   vec2 self = edgePair(vUv);
-  /* 核心邻域 dilate:8 方向步进 uEdgeWidth 像素取核心 max —— 软带只在核心附近保留 */
+  /* 核心邻域 dilate:8 方向步进 uEdgeWidth 纹理像素取核心 max —— 软带只在核心附近保留 */
   float coreNear = self.x;
   for (int i = 0; i < 8; i++) {
     float ang = float(i) * 0.7853981633;
-    vec2 o = vec2(cos(ang), sin(ang)) / uResolution * uEdgeWidth;
+    vec2 o = vec2(cos(ang), sin(ang)) / uTexSize * uEdgeWidth;
     coreNear = max(coreNear, edgePair(vUv + o).x);
   }
   return max(self.x, self.y * coreNear);
@@ -345,7 +349,7 @@ gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
 const U = {};
 for (const n of ['uResolution','uTexture','uStrength','uBandDensity','uBandAngle',
   'uFoilColorR','uFoilColorG','uFoilColorB','uCrackleDensity','uStreakDensity','uSparkleDensity',
-  'uScope','uEdgeThreshold','uEdgeWidth','uMaskMode','uZoneEnabled']) U[n] = gl.getUniformLocation(prog, n);
+  'uScope','uEdgeThreshold','uEdgeWidth','uMaskMode','uZoneEnabled','uTexSize']) U[n] = gl.getUniformLocation(prog, n);
 
 /* 纹理: unit0 = 原图, unit2 = 分区掩膜(照 textraster 图集管线惯例) */
 function makeTex(unit) {
@@ -366,6 +370,7 @@ gl.uniform1i(gl.getUniformLocation(prog, 'uZoneMask'), 2);
 function setBaseUniforms() {
   const [fr, fg, fb] = hex2rgb(Q.foilColor);
   gl.uniform2f(U.uResolution, canvas.width, canvas.height);
+  gl.uniform2f(U.uTexSize, img.width, img.height);
   gl.uniform1f(U.uTexture, Q.texture);
   gl.uniform1f(U.uStrength, Q.strength);
   gl.uniform1f(U.uBandDensity, Q.bandDensity);
