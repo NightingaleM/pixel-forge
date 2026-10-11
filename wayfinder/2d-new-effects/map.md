@@ -1,7 +1,7 @@
 ---
 title: 2D 新风格第二批（光学/镜头优先）
 labels: [wayfinder:map]
-status: open
+status: closed
 tracker: local-markdown
 ---
 
@@ -30,6 +30,7 @@ tracker: local-markdown
 - [代表候选实渲染样张](tickets/03-sampler-renders.md): [assets/sampler/](assets/sampler/) 5 效果粗 shader 真渲染（car 图 + 用户俯拍山景图两版），样张页升级为可换图工具（`?img=&bandY=&bandTilt=`）；移轴首版 7px 轻糊判错、修复为 FBO 重虚化后渲染成立但用户仍未认可。关键学到：**全图色彩/质感变换一眼可认可，「清晰度重分配」类难获认可——后续候选评估调高「一眼可见」权重**。
 - [用户拍板选型](tickets/02-shortlist-grilling.md): **本批 = 全息箔 + 棱镜彩虹色散**（均单 pass，「简单可多个」）；移轴微缩出局本批、另立新图深入研究（见 Out of scope）；晕光（top1）留在候选池下批优先。
 - [规格收口与设计确认](tickets/04-spec-lock.md): **设计确认门通过（用户「认可」）**。holofoil 8 参数（质感 select 三档 + 强度/密度/角度 + 底色 color 随机 + visibleWhen 专属参数）、prism 4 参数（模式 select 三档 + 色散量 + visibleWhen）；styles 末位追加 holofoil→prism；不做 presets；i18n 34 键×2；拉丝/珠光无样档执行时实测定稿、复核可砍。
+- [注册表接入与三端验收执行](tickets/05-execute.md): **已交付本地 main（99ef607，未 push）——图目的地达成**。341/341 测试（329→341）、lint 持平、tsc 0 错、三端 18/18、旧码回填渲染逐字节一致；拉丝/珠光实测定稿成立（verify/ 8 图视觉复核），用户复核仍可砍档；H5 实测先清 IDB、shader 测试源图三条教训在票内。
 
 ## Not yet specified
 
