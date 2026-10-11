@@ -1,8 +1,8 @@
 ---
 title: 拍板门——线程砍留与手感定稿
 labels: [wayfinder:grilling]
-status: open
-assignee:
+status: closed
+assignee: wayfinder 主会话（2026-10-12 认领）
 blocked-by: [01-partition-research, 02-export-html-research, 03-static-samples, 04-card-tilt-demo]
 ---
 
@@ -24,3 +24,18 @@ blocked-by: [01-partition-research, 02-export-html-research, 03-static-samples, 
 7. **iPhone 交付现实**（票 02 关键论断，产品预期裁决）：iOS 无本地打开动态 HTML 的系统路径（「文件」App 预览不执行 JS、Safari 无 file://、微信禁 file://）——动态卡在 iPhone 的现实形态＝**在线托管或电脑打开**。确认接受此预期并定交付文案口径（三分法：电脑打开 / Android 任意浏览器 / iOS 需托管），或据此调整范围。
 
 产出裁决清单，毕业规格票。
+
+## Resolution
+
+2026-10-12 拍板门 grilling 两轮，用户逐项裁决（Round 1/2 均按推荐定稿）：
+
+1. **线程砍留**：静态、转卡**两条线程都做**。
+2. **iPhone 交付现实**：**接受**——动态卡在 iOS 的现实形态＝在线托管或电脑打开；交付文案定**三分法口径**（电脑打开 / Android 任意浏览器 / iOS 需托管），一句话进导出成功提示。
+3. **点选开关面**：**做**（label grid 点选检测出的整块面；多选/容差/误点撤销等交互细节进票 06 细化）。
+4. **掩码语义（a）**：**两种都做成选项，默认＝仅烫箔**（未选=原图，烫印观感；光谱流彩=金属底全图，整卡箔材质）。
+5. **分区默认参数（c）**：**照准** k=4 / xyw=0.5。
+6. **转卡手感四值**：幅度 **12°**（滑杆 5–20°）、idle 自摆**做+默认开**、阴影高光微动**做+默认开**、流动增益 **2.6**；产品常量，不入种子码。
+7. **研究方案照准**：分区算法＝自研 k-means lite 256² 低清格+连通域（ml-kmeans 备选）；导出 HTML＝WebGL 实时+降级链（WebGL 失败→内置静态烘焙帧）；**导出 HTML 陀螺仪内置**（iOS 权限按钮+触摸回退，https 托管场景生效，本地打开自动走触摸回退）。
+8. **H5 预览端陀螺仪彩蛋**：**裁决不做**（微信 WebView 陀螺仪不稳是主战场现实、验收不覆盖，价值/成本比不成立）。
+
+b/d/e 三项预裁决经拍板门确认生效，不重议。规格票 06 解锁。

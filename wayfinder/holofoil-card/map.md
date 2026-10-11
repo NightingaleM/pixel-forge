@@ -37,13 +37,11 @@ tracker: local-markdown
 - [样张票——静态线程样张（边缘/分区/点选粗 demo）](tickets/03-static-samples.md): [assets/sampler-static/](assets/sampler-static/) 交付（三素材 car/scene2/cartoon 各 13 渲染+debug 场+verify 25/25 断言+视觉复核五项过），边缘/分区/点选成立。**实测修正**：边缘方案升级 A+B+Laplacian 门控+滞后阈值近似+双尺度一致（纯阈值在高纹理照片弥漫 31%→收敛 1.3%；demo ~150 fetch/px 执行票须优化）；**检测步进必须按纹理分辨率 uTexSize**（350px 卡通放大渲染时 canvas 步进摊薄梯度 2.7× 全漏检；app 版 holofoil 同有此解耦，正式版必须修）；分区默认 k=4/xyw=0.5；小区并入须批量收敛+Uint16；两种掩码语义入拍板门。**2026-10-12 用户反馈定案**：照片素材边缘观感差、卡通/插画为主场（cartoon 轮廓镭射描边成立）；边缘检测阈值/宽度**对用户开放自调**（用户已定方向）——均入拍板门票 05 第 3 条。
 - [研究票——转卡导出 HTML 方案与兼容矩阵](tickets/02-export-html-research.md): **推荐方案 (i) WebGL 实时**——内嵌 holofoil.frag+冻结参数+源图 JPEG q85 base64，倾角作 uniform，逐像素保真、0.8–1.8 MB、工程量最低；K 帧被体积+iOS 内存双杀、CSS 近似保真仅 4–6 成，均否决；降级链＝WebGL 失败→内置静态烘焙帧。兼容：WebGL1 全绿（含微信 XWeb）、Android file:// 可行（MDN secure context）；**iPhone 无本地打开动态 HTML 的路径→交付形态＝托管或电脑打开**（已挂拍板门）；陀螺仪现实只在 https 托管场景生效，触摸回退标准件已定。体积为本机实测。全文见 [assets/research-export-html.md](assets/research-export-html.md)。
 - [样张票——转卡交互 demo（手感三参数可调）](tickets/04-card-tilt-demo.md): [assets/card-demo/](assets/card-demo/) 交付（单文件 base64 内嵌，file:// 双击即用，即导出 HTML 方案雏形）——幅度滑杆 5–20° 默认 12、三开关（箔色流动 band+=dot(tilt,dir)*2.6 / 闲置自摆 2.5s / 阴影高光微动）、质感三档+素材三选+实时读数；verify 13/13＋视觉复核五项过。**实测修正（执行票必带）**：纹理上传必须 `UNPACK_FLIP_Y_WEBGL=true`（漏设=卡面倒置，app 先例 ShaderRenderer.ts:119）；拉丝高饱和观感会被 vision 模型误判为 bug（与 app 用户认可定稿同观感）。拍板门定稿四问：幅度默认值/自摆默认/阴影默认/流动增益 2.6。
+- [拍板门——线程砍留与手感定稿](tickets/05-gate-grilling.md): **双线程全保留**；iPhone 现实接受+三分法文案口径；点选面**做**；掩码**双语义选项、默认仅烫箔**；分区 k=4/xyw=0.5 照准；**手感四值定稿**（幅度 12°/自摆做且默认开/阴影微动做且默认开/流动增益 2.6，产品常量不入码）；分区算法+导出 HTML 方案（WebGL 实时+降级链+陀螺仪内置）照准；**H5 预览陀螺仪彩蛋裁决不做**。
 
 ## Not yet specified
 
-- **H5 预览端陀螺仪彩蛋**：视「转卡导出 HTML 方案与兼容矩阵」的结论与拍板门态度，决定是否成票。
-- **点选面的交互细节**（多选/容差/误点撤销）：若拍板门留下点选，在规格票细化。
-- **导出 HTML 的交付分流**（微信 UA 下 blob 下载/长按 Lightbox 是否适用 HTML）：执行时按 downloadFlow 现状核对。
-- **批量端对 holofoil 新参数的呈现**：registry 驱动自动复用预期成立，执行票核对即可。
+（无——拍板门已关，全部雾项毕业或裁决；前沿＝票 06 规格收口。）
 
 ## Out of scope
 
@@ -54,3 +52,4 @@ tracker: local-markdown
 - **免费用户水印版 HTML**：HTML 导出格式级封死，非会员只能导出图片。
 - **批量动态导出**；**3D 侧效果**；**视频/GIF 时间轴动画导出**（本图动态以转卡交互 HTML 为界）。
 - **手摆画笔蒙版**（手画区域类）：依旧出局；本图「点选检测出的面」是拍板门要正面裁决的对照项，不是复活手摆。
+- **H5 预览端陀螺仪彩蛋**（编辑器预览甩手机转卡）：拍板门裁决不做（票 05）——微信 WebView 陀螺仪不稳是主战场现实、验收不覆盖；导出 HTML 内置陀螺仪不受影响。
