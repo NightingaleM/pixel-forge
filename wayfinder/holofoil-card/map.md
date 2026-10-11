@@ -34,6 +34,7 @@ tracker: local-markdown
 ## Decisions so far
 
 - [研究票——边缘检测与自动分区选型（选择性加箔）](tickets/01-partition-research.md): 三层全可行——边缘＝单 pass Sobel+多基线 max+smoothstep（prism idiom 照搬，全图模式零改动保旧码等价）；分区＝自研 k-means lite 256² 低清格+连通域（<50ms 桌面/<150ms 移动；ml-kmeans 备选，SLIC/opencv.js/image-q 出局）；点选＝label grid O(1) 查表；掩膜走 textraster 图集管线 + uZoneMask/uZoneEnabled 默认 0。风险：分区跨设备复现性→种子码选中集合编码方式已并入票 06 裁决。全文见 [assets/research-partition.md](assets/research-partition.md)。
+- [样张票——静态线程样张（边缘/分区/点选粗 demo）](tickets/03-static-samples.md): [assets/sampler-static/](assets/sampler-static/) 交付（两素材 26 渲染+debug 场+verify 18/18 断言+视觉复核四项过），边缘/分区/点选在真实照片上成立。**实测修正**：边缘方案升级 A+B+Laplacian 门控+滞后阈值近似+双尺度一致（纯阈值在高纹理照片弥漫 31% 画面→收敛 1.3% 且轮廓连贯；demo ~150 fetch/px，执行票须优化）；分区默认 k=4/xyw=0.5（两图扫描定夺，k=5/6 山景碎长尾）；小区并入须每轮批量收敛+regionIds Uint16（首版 2000+ 碎区截断教训）；两种掩码语义（仅烫箔/光谱流彩）为研究票未覆盖的新裁决点，已入拍板门清单。
 - [研究票——转卡导出 HTML 方案与兼容矩阵](tickets/02-export-html-research.md): **推荐方案 (i) WebGL 实时**——内嵌 holofoil.frag+冻结参数+源图 JPEG q85 base64，倾角作 uniform，逐像素保真、0.8–1.8 MB、工程量最低；K 帧被体积+iOS 内存双杀、CSS 近似保真仅 4–6 成，均否决；降级链＝WebGL 失败→内置静态烘焙帧。兼容：WebGL1 全绿（含微信 XWeb）、Android file:// 可行（MDN secure context）；**iPhone 无本地打开动态 HTML 的路径→交付形态＝托管或电脑打开**（已挂拍板门）；陀螺仪现实只在 https 托管场景生效，触摸回退标准件已定。体积为本机实测。全文见 [assets/research-export-html.md](assets/research-export-html.md)。
 
 ## Not yet specified

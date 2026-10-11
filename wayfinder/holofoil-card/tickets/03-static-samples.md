@@ -1,8 +1,8 @@
 ---
 title: 样张票——静态线程样张（边缘/分区/点选粗 demo）
 labels: [wayfinder:prototype]
-status: open
-assignee:
+status: closed
+assignee: wayfinder 主会话（2026-10-11 认领）
 blocked-by: [01-partition-research]
 ---
 
@@ -15,3 +15,22 @@ blocked-by: [01-partition-research]
 3. **点选开关面粗 demo**：分区结果可视化 + 点区块切换加箔与否（粗版即可，重点是让用户亲手点一次再裁决——这是对旧「手摆蒙版」裁决的正面对照）。
 
 样张页参数可调（?img= 等 query 形式），图片真实渲染（不做程序化源图，吸取上批三条教训）。产出落 `../assets/sampler-static/`，拍板门输入。
+
+## Resolution
+
+**2026-10-11 样张完成**，产出 [assets/sampler-static/](../assets/sampler-static/)：sampler.html（自包含样张页，基座=app 版 holofoil.frag 逐行照搬+选择性扩展）+ car/scene2 两素材各 13 张渲染归档（s1 边缘 7 张 / s2 分区 6 张）+ 3 张 debug 场 + verify.mjs（18 断言，18/18 过）。**边缘与分区在两张真实照片上均成立，视觉复核四项通过（烫印描边质感/山脊等高线美感/分区边界柔和/车头局部放大贴合）**。拍板门直接消费。
+
+**票 01 方案的实测修正（重要）**：
+
+1. **边缘检测从「方案 A+B」升级为「A+B+滞后阈值近似」**。首版纯 smoothstep 阈值在高纹理照片上失败——debug 场实测 car 图一阶梯度 46.6%、Laplacian 48.3% 像素超阈，边缘响应弥漫 31% 画面（视觉复核确认车门/光晕大面积金属化）。三层修正后响应收敛至 1.3% 且轮廓连贯：
+   - **Laplacian 门控**（smoothstep(0.012,0.08,|lap|)）：滤柔和渐变（光晕/暗角一阶梯度够但二阶≈0）；
+   - **滞后核心**：强阶跃（lo+0.25 起）才成核心，弱响应只在核心 dilate 邻域（uEdgeWidth）内保留软带——弥漫纹理弱响应因无核心邻接被剔除，即单 pass Canny 滞后近似；
+   - **双尺度一致** mag=min(±2px 中心差分, Sobel×0.6)：孤立高频尖峰长基线下被平滑剔除（盐椒噪点清除，视觉复核确认）。
+   - 阈值映射 t→lo=0.15+t*0.5。**代价**：demo 版 ~150 fetch/px（正式版 2048² 预算超研究票 30-60 估算，执行票须优化：响应缓存/两 pass 幅度纹理——renderMultiPass 架构现成）。真 Canny 议题就此闭合（滞后近似已够）。
+2. **分区参数定夺（研究票遗留点 3 落定）**：默认 **k=4 / xyw=0.5**（参数扫描：car top3 62.5%/14 区、scene2 70.3%/19 区两图综合最优；k=5/6 在山景把大区分裂成 3-6% 长尾带）。k-means++ 用 mulberry32(42) 固定 seed。分区耗时 73-94ms（Edge headless 含 UI，与 <50ms 桌面预算同量级，正式版真机复核）。
+3. **小区并入实现修正**：逐小区迭代改为每轮单扫收集全部邻接关系、整批合并（首版在照片上留 2000+ 碎区且 Uint8Array 区号截断——教训：k-means 标签空间交错是常态，合并必须批量收敛；regionIds 用 Uint16Array）。
+4. **研究票未覆盖的裁决点已摆上样张**：选择性加箔的两种语义——「仅烫箔」（mix 原图，烫印观感）vs「光谱流彩」（金属底全图+彩虹局部，全卡箔材质）。s1/s2 各含一档对照，拍板门裁决默认语义（也可两种都做成选项）。
+
+**点选粗 demo**：活 canvas 点击区块 toggle 加箔/原图（label grid O(1) 查表实测毫秒级）+ 徽章开关 + 全选/全不选，断言过（14→13 徽章切换、画布重渲）。羽化带 3×3 众数容差未做（粗版约定），留票 06。
+
+**样张页使用**：`?img=car.png|scene2.png` 换图；`?edgeThresh=&edgeWidth=&maskMode=&k=&xyw=&zones=&texture=&strength=` 等全参可调；`?debug=edge|grad|lap` 输出检测中间场（正式版执行票的调试基建）。验收重跑：`node wayfinder/holofoil-card/assets/sampler-static/verify.mjs`（内嵌静态 server + Edge headless，18 断言含点选交互）。

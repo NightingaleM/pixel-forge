@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>全息箔 · 选择性加箔样张（边缘/分区/点选）</title>
+<style>
+  :root { --bg:#101218; --panel:#181b23; --line:#262a35; --text:#d7dae2; --dim:#8a8f9c; --accent:#6ea8fe; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--text); font:13px/1.6 system-ui,"Segoe UI","Microsoft YaHei",sans-serif; padding:24px; }
+  h1 { font-size:18px; margin-bottom:4px; }
+  .sub { color:var(--dim); margin-bottom:20px; }
+  .sub code { color:var(--accent); font:12px ui-monospace,Consolas,monospace; }
+  section { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px 18px; margin-bottom:18px; }
+  section h2 { font-size:15px; font-weight:600; }
+  section h2 small { color:var(--dim); font-weight:400; font-size:12px; margin-left:8px; }
+  .hint { color:var(--accent); font-size:12px; margin:6px 0 10px; }
+  .grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:12px; }
+  .grid figure { min-width:0; }
+  .grid figcaption { color:var(--dim); font-size:11px; margin-bottom:4px; }
+  .grid figcaption b { color:var(--text); font-weight:600; }
+  .grid img, .grid canvas { width:100%; display:block; border:1px solid var(--line); border-radius:6px; background:#000; }
+  .meta { color:var(--dim); font-size:12px; margin-top:10px; }
+  .meta table { border-collapse:collapse; }
+  .meta td { padding:2px 10px 2px 0; }
+  .meta td.sw { width:14px; height:14px; border-radius:3px; border:1px solid var(--line); }
+  #err { display:none; background:#3a1d24; color:#ff9aa8; border:1px solid #6e2a38; border-radius:8px; padding:10px 12px; margin-bottom:16px; white-space:pre-wrap; font:12px/1.5 ui-monospace,Consolas,monospace; }
+  .live-wrap { display:flex; gap:14px; }
+  .live-wrap canvas { width:100%; display:block; border:1px solid var(--line); border-radius:6px; background:#000; cursor:crosshair; }
+  .live-main { flex:1; min-width:0; }
+  .live-side { width:230px; flex:none; }
+  .live-side h3 { font-size:12px; color:var(--dim); font-weight:600; margin-bottom:6px; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px; }
+  .chip { border:1px solid var(--line); border-radius:6px; padding:2px 8px; font-size:12px; color:var(--dim); background:#141821; cursor:pointer; user-select:none; }
+  .chip .sw { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:5px; vertical-align:-1px; }
+  .chip.on { color:var(--text); border-color:var(--accent); background:#1b2536; }
+  .btn { border:1px solid var(--line); background:#1b2536; color:var(--text); border-radius:6px; padding:4px 12px; font-size:12px; cursor:pointer; margin-right:6px; }
+  .btn:hover { border-color:var(--accent); }
+  .side-note { color:var(--dim); font-size:11px; margin-top:10px; line-height:1.7; }
+</style>
+</head>
+<body>
+<h1>全息箔 · 选择性加箔样张</h1>
+<p class="sub">
+  基座=<b>app 版 holofoil.frag 原样</b>（碎冰质感,app 默认参数：强度1/密度1/角度22°/底色#1a1a22/碎纹38）,末尾追加选择性扩展。
+  两种掩码语义对照：<b>仅烫箔</b>＝未选区保持原图（烫印观感）；<b>光谱流彩</b>＝整图金属底、彩虹只在选中处流（全卡箔材质观感）。
+  换图 <code>?img=car.png</code> / <code>?img=scene2.png</code>；调参 <code>?edgeThresh=0.5&amp;edgeWidth=2&amp;maskMode=1&amp;k=6&amp;xyw=0.35&amp;zones=0,2</code>。
+</p>
+<div id="err"></div>
+
+<section>
+  <h2>一、边缘加箔<small>Sobel+多基线梯度取max → smoothstep 软阈值 → 环形 dilate 边宽（票01 方案 A+B）</small></h2>
+  <div class="hint">阈值越低贴的边越多；宽度=边缘带像素宽度。最后一格是「光谱流彩」语义对照（其余为「仅烫箔」）。</div>
+  <div class="grid" id="s1grid"></div>
+</section>
+
+<section>
+  <h2>二、自动分区加箔<small>k-means lite（RGB+xy）256² 低清格 + 两遍 union-find 连通域 + 小区并入（票01 方案）</small></h2>
+  <div class="hint" id="s2timing"></div>
+  <div class="grid" id="s2grid"></div>
+  <div class="meta" id="s2meta"></div>
+</section>
+
+<section>
+  <h2>三、点选开关面（粗 demo）<small>点画布任一区块切换 加箔↔原图 —— 与旧「手摆画笔蒙版」的正面手感对照</small></h2>
+  <div class="hint">分区 = 左侧第二节同一次分析（k 与 xy 权重同 query）。初始全部选中。</div>
+  <div class="live-wrap">
+    <div class="live-main"><canvas id="live"></canvas></div>
+    <div class="live-side">
+      <h3>区块（点击画布或此处徽章切换）</h3>
+      <div class="chips" id="chips"></div>
+      <button class="btn" id="btnAll">全选</button>
+      <button class="btn" id="btnNone">全不选</button>
+      <div class="side-note" id="sideNote"></div>
+    </div>
+  </div>
+</section>
+
+<script>
+'use strict';
+/* ============================================================================
+   自动化钩子（puppeteer）：__done=true 表示全部静态项渲染完成；
+   __results = [{name, kind:'png', dataURL} | {name, kind:'timing', ms} ...]
+   ========================================================================== */
+window.__done = false;
+window.__results = [];
+function fail(msg) {
+  const el = document.getElementById('err');
+  el.style.display = 'block';
+  el.textContent = msg;
+  window.__err = msg;
+  console.error(msg);
+}
+window.addEventListener('error', e => fail(e.message + '\n' + (e.error && e.error.stack || '')));
+
+/* ---------- query ---------- */
+const params = new URLSearchParams(location.search);
+const IMG = params.get('img') || 'car.png';
+const IMG_PREFIX = IMG.replace(/\.[^.]+$/, '');
+const Q = {
+  edgeThresh: parseFloat(params.get('edgeThresh') || '0.5'),
+  edgeWidth:  parseFloat(params.get('edgeWidth')  || '2'),
+  maskMode:   parseFloat(params.get('maskMode')   || '1'),   // 1 仅烫箔 / 0 光谱流彩（默认仅烫箔）
+  /* 默认 k=4/xyw=0.5 = 2026-10-11 参数扫描定夺:两素材综合整块度最优
+     (car top3 62.5%/14 区, scene2 top3 70.3%/19 区;k=5/6 在山景把大区分裂成 3-6% 长尾带) */
+  k:          Math.max(2, Math.min(10, parseInt(params.get('k')   || '4', 10))),
+  xyw:        parseFloat(params.get('xyw')   || '0.5'),
+  zones:      (params.get('zones') || '0,2').split(',').map(s => parseInt(s, 10)).filter(n => !isNaN(n)),
+  texture:    parseFloat(params.get('texture')  || '0'),
+  strength:   parseFloat(params.get('strength') || '1'),
+  bandDensity:parseFloat(params.get('bandDensity') || '1'),
+  bandAngle:  parseFloat(params.get('bandAngle') || '22'),
+  crackle:    parseFloat(params.get('crackle')  || '38'),
+  streak:     parseFloat(params.get('streak')   || '14'),
+  sparkle:    parseFloat(params.get('sparkle')  || '1'),
+  foilColor:  params.get('foilColor') || '#1a1a22',
+};
+function hex2rgb(h) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(h);
+  if (!m) return [0.102, 0.102, 0.133];
+  const n = parseInt(m[1], 16);
+  return [(n >> 16 & 255) / 255, (n >> 8 & 255) / 255, (n & 255) / 255];
+}
+
+/* ---------- 分区调色板（可视化用,固定 10 色） ---------- */
+const PALETTE_H = [4, 33, 62, 91, 120, 150, 179, 208, 237, 266];
+const PALETTE = PALETTE_H.map(h => `hsl(${h},72%,55%)`);
+
+/* ============================================================================
+   WebGL
+   ========================================================================== */
+const VS = 'attribute vec2 aPos; varying vec2 vUv; void main(){ vUv = aPos*0.5+0.5; gl_Position = vec4(aPos, 0.0, 1.0); }';
+
+/* 基座 = src/shaders/holofoil.frag 逐行照搬（含三质感分支）；
+   末尾「选择性扩展」块 = 本图新代码（票01 掩膜整合设计 + 边缘方案 A+B）。
+   正式版整合时：uScope 0/1/2 由「应用范围」select 派生，
+   uZoneEnabled 由 uScope 派生（缺参走 GLSL 默认 0 → 全图,旧码逐字节等价）。 */
+const FS = `
+precision highp float;
+
+varying vec2 vUv;
+
+uniform sampler2D uImage;
+uniform vec2 uResolution;
+uniform float uTexture;
+uniform float uStrength;
+uniform float uBandDensity;
+uniform float uBandAngle;
+uniform float uFoilColorR;
+uniform float uFoilColorG;
+uniform float uFoilColorB;
+uniform float uCrackleDensity;
+uniform float uStreakDensity;
+uniform float uSparkleDensity;
+/* ---- 选择性扩展（本图新增） ---- */
+uniform float uScope;          // 0 全图 / 1 边缘 / 2 分区
+uniform float uEdgeThreshold;  // 0..1, 默认 0.5
+uniform float uEdgeWidth;      // 1..4, 默认 2
+uniform float uMaskMode;       // 1 仅烫箔(未选=原图) / 0 光谱流彩(金属底全图)
+uniform sampler2D uZoneMask;
+uniform float uZoneEnabled;    // 0 默认=全图,旧码安全
+
+float hash(vec2 p) {
+  p = fract(p * vec2(123.34, 456.21));
+  p += dot(p, p + 45.32);
+  return fract(p.x * p.y);
+}
+float vnoise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x),
+             mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);
+}
+float luma(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
+vec3 hsv2rgb(vec3 c) {
+  vec3 p = abs(fract(c.xxx + vec3(0.0, 2.0 / 3.0, 1.0 / 3.0)) * 6.0 - 3.0);
+  return c.z * mix(vec3(1.0), clamp(p - 1.0, 0.0, 1.0), c.y);
+}
+
+/* --- 边缘检测（票01 方案 A+B + 样张阶段升级:单 pass 滞后阈值近似） ---
+   首版纯 smoothstep 阈值在高纹理照片上一阶/二阶导大面积过阈(2026-10-11 实测:
+   car 图梯度场 46.6%、Laplacian 场 48.3% 像素超阈,边缘响应弥漫 31% 画面)。
+   两层修正:① Laplacian 门控滤柔和渐变(光晕/暗角,一阶梯度够但二阶≈0);
+   ② 滞后核心——强阶跃才成核心,弱响应只在核心的 dilate 邻域内保留为软带,
+   弥漫纹理弱响应因无核心邻接被剔除。真 Canny 仍出局,此为单 pass 近似。 */
+float sobelMag(vec2 uv) {
+  vec2 px = 1.0 / uResolution;
+  float l00 = luma(texture2D(uImage, uv + px * vec2(-1.0, -1.0)).rgb);
+  float l10 = luma(texture2D(uImage, uv + px * vec2( 0.0, -1.0)).rgb);
+  float l20 = luma(texture2D(uImage, uv + px * vec2( 1.0, -1.0)).rgb);
+  float l01 = luma(texture2D(uImage, uv + px * vec2(-1.0,  0.0)).rgb);
+  float l21 = luma(texture2D(uImage, uv + px * vec2( 1.0,  0.0)).rgb);
+  float l02 = luma(texture2D(uImage, uv + px * vec2(-1.0,  1.0)).rgb);
+  float l12 = luma(texture2D(uImage, uv + px * vec2( 0.0,  1.0)).rgb);
+  float l22 = luma(texture2D(uImage, uv + px * vec2( 1.0,  1.0)).rgb);
+  float gx = (l20 + 2.0 * l21 + l22) - (l00 + 2.0 * l01 + l02);
+  float gy = (l02 + 2.0 * l12 + l22) - (l00 + 2.0 * l10 + l20);
+  return length(vec2(gx, gy));
+}
+float gradMag(vec2 uv) {
+  vec2 px = 1.0 / uResolution;
+  float lx = luma(texture2D(uImage, uv + vec2(px.x * 2.0, 0.0)).rgb)
+           - luma(texture2D(uImage, uv - vec2(px.x * 2.0, 0.0)).rgb);
+  float ly = luma(texture2D(uImage, uv + vec2(0.0, px.y * 2.0)).rgb)
+           - luma(texture2D(uImage, uv - vec2(0.0, px.y * 2.0)).rgb);
+  return length(vec2(lx, ly));
+}
+float lapMag(vec2 uv) {
+  vec2 px = 1.0 / uResolution;
+  float l0 = luma(texture2D(uImage, uv).rgb);
+  float lap = luma(texture2D(uImage, uv + vec2(px.x, 0.0)).rgb) + luma(texture2D(uImage, uv - vec2(px.x, 0.0)).rgb)
+            + luma(texture2D(uImage, uv + vec2(0.0, px.y)).rgb) + luma(texture2D(uImage, uv - vec2(0.0, px.y)).rgb)
+            - 4.0 * l0;
+  return abs(lap);
+}
+/* 返回 (核心响应, 软带响应);阈值窗口随 uEdgeThreshold 0..1 线性映射到 0.15..0.65+
+   mag 取双尺度一致(min):真实阶跃在 ±1px Sobel 与 ±2px 中心差分下都强;
+   孤立高频尖峰(盐椒噪声)长基线下被平滑 → min 拉低剔除(2026-10-11 debug 场实测验证) */
+vec2 edgePair(vec2 uv) {
+  float t = uEdgeThreshold;
+  float lo = 0.15 + t * 0.5;
+  float mag = min(gradMag(uv), sobelMag(uv) * 0.6);
+  float gate = smoothstep(0.012, 0.08, lapMag(uv));
+  float core = smoothstep(lo + 0.25, lo + 0.40, mag) * gate;
+  float soft = smoothstep(lo, lo + 0.25, mag) * gate;
+  return vec2(core, soft);
+}
+float edgeZone() {
+  vec2 self = edgePair(vUv);
+  /* 核心邻域 dilate:8 方向步进 uEdgeWidth 像素取核心 max —— 软带只在核心附近保留 */
+  float coreNear = self.x;
+  for (int i = 0; i < 8; i++) {
+    float ang = float(i) * 0.7853981633;
+    vec2 o = vec2(cos(ang), sin(ang)) / uResolution * uEdgeWidth;
+    coreNear = max(coreNear, edgePair(vUv + o).x);
+  }
+  return max(self.x, self.y * coreNear);
+}
+
+void main() {
+  vec2 px = 1.0 / uResolution;
+  vec3 base = texture2D(uImage, vUv).rgb;
+  if (uScope > 3.5) {
+    /* debug 可视化(样张页专用): 4=边缘响应场 / 5=一阶梯度场×0.5 / 6=|Laplacian|场×2 */
+    float d;
+    if (uScope < 4.5) d = edgeZone();
+    else if (uScope < 5.5) d = clamp(max(gradMag(vUv), sobelMag(vUv)) * 0.5, 0.0, 1.0);
+    else d = clamp(lapMag(vUv) * 2.0, 0.0, 1.0);
+    gl_FragColor = vec4(d, d, d, 1.0); return;
+  }
+  if (uScope > 2.5) { gl_FragColor = vec4(base, 1.0); return; } // 3=passthrough（样张页专用,正式版无此值）
+  float lC = luma(base);
+
+  /* ---------- app 版主体（照搬） ---------- */
+  float lx = luma(texture2D(uImage, vUv + vec2(px.x * 2.0, 0.0)).rgb)
+           - luma(texture2D(uImage, vUv - vec2(px.x * 2.0, 0.0)).rgb);
+  float ly = luma(texture2D(uImage, vUv + vec2(0.0, px.y * 2.0)).rgb)
+           - luma(texture2D(uImage, vUv - vec2(0.0, px.y * 2.0)).rgb);
+  vec2 grad = vec2(lx, ly);
+
+  float a = radians(uBandAngle);
+  vec2 dir = vec2(cos(a), sin(a));
+
+  float grain;
+  float band;
+  float sat;
+  float sparkleThresh;
+  if (uTexture < 0.5) {
+    grain = vnoise(vUv * uCrackleDensity);
+    band = dot(vUv, dir) * 4.0 * uBandDensity + grad.x * 7.0 + grad.y * 5.0 + grain * 2.4;
+    sat = 0.85;
+    sparkleThresh = 0.985;
+  } else if (uTexture < 1.5) {
+    grain = vnoise(vec2(vUv.x * 1.5, vUv.y * uStreakDensity * 3.0));
+    band = dot(vUv, dir) * 4.0 * uBandDensity + grad.y * 6.0 + grain * 3.0;
+    sat = 0.80;
+    sparkleThresh = 0.99;
+  } else {
+    grain = vnoise(vUv * uCrackleDensity * 0.8);
+    band = dot(vUv, dir) * 4.0 * uBandDensity + grad.x * 4.0 + grad.y * 3.0 + grain * 1.5;
+    sat = 0.45;
+    sparkleThresh = 0.975;
+  }
+
+  vec3 spectrum = hsv2rgb(vec3(fract(band * 0.35), sat, 1.0));
+
+  float edge = length(grad) * 4.0;
+  float mask = smoothstep(0.32, 0.85, lC * 0.75 + edge) * (0.55 + 0.45 * grain);
+
+  vec3 foilBase = mix(vec3(luma(base)), base, 0.35);
+  foilBase = foilBase * 0.45 + vec3(uFoilColorR, uFoilColorG, uFoilColorB) * 0.55;
+
+  vec3 colFull = foilBase + spectrum * mask * 0.95 * uStrength;
+  float sparkle = step(sparkleThresh, hash(floor(vUv * uResolution * 0.5 * uSparkleDensity))) * mask;
+  colFull += sparkle * 0.6;
+
+  /* ---------- 选择性扩展（本图新增;uScope=0 时整块旁路,输出与 app 版逐字节一致） ---------- */
+  vec3 col = colFull;
+  if (uScope > 0.5) {
+    float zone;
+    if (uScope < 1.5) {
+      /* 边缘模式:滞后核心 + dilate 软带(边宽=核心邻域半径) */
+      zone = edgeZone();
+    } else {
+      /* 分区模式:CPU 掩膜纹理,LINEAR 上采样 + smoothstep 羽化 */
+      zone = smoothstep(0.35, 0.65, texture2D(uZoneMask, vUv).r);
+    }
+    zone *= uZoneEnabled;
+    if (uMaskMode < 0.5) {
+      /* 光谱流彩:金属底全图,光谱/闪点只出现在选中处 */
+      col = foilBase + spectrum * mask * zone * 0.95 * uStrength + sparkle * zone * 0.6;
+    } else {
+      /* 仅烫箔:整个效果按 zone 混入,未选区=原图 */
+      col = mix(base, colFull, zone);
+    }
+  }
+
+  gl_FragColor = vec4(col, 1.0);
+}`;
+
+const canvas = document.createElement('canvas');
+const gl = canvas.getContext('webgl', { preserveDrawingBuffer: true, antialias: false });
+if (!gl) fail('WebGL 不可用');
+
+function compile(type, src) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src); gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+  return s;
+}
+const prog = gl.createProgram();
+gl.attachShader(prog, compile(gl.VERTEX_SHADER, VS));
+gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FS));
+gl.linkProgram(prog);
+if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) fail('link: ' + gl.getProgramInfoLog(prog));
+gl.useProgram(prog);
+
+const buf = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+const aPos = gl.getAttribLocation(prog, 'aPos');
+gl.enableVertexAttribArray(aPos);
+gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+const U = {};
+for (const n of ['uResolution','uTexture','uStrength','uBandDensity','uBandAngle',
+  'uFoilColorR','uFoilColorG','uFoilColorB','uCrackleDensity','uStreakDensity','uSparkleDensity',
+  'uScope','uEdgeThreshold','uEdgeWidth','uMaskMode','uZoneEnabled']) U[n] = gl.getUniformLocation(prog, n);
+
+/* 纹理: unit0 = 原图, unit2 = 分区掩膜(照 textraster 图集管线惯例) */
+function makeTex(unit) {
+  const t = gl.createTexture();
+  gl.activeTexture(gl.TEXTURE0 + unit);
+  gl.bindTexture(gl.TEXTURE_2D, t);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  return t;
+}
+const texImage = makeTex(0);
+gl.uniform1i(gl.getUniformLocation(prog, 'uImage'), 0);
+const texZone = makeTex(2);
+gl.uniform1i(gl.getUniformLocation(prog, 'uZoneMask'), 2);
+
+function setBaseUniforms() {
+  const [fr, fg, fb] = hex2rgb(Q.foilColor);
+  gl.uniform2f(U.uResolution, canvas.width, canvas.height);
+  gl.uniform1f(U.uTexture, Q.texture);
+  gl.uniform1f(U.uStrength, Q.strength);
+  gl.uniform1f(U.uBandDensity, Q.bandDensity);
+  gl.uniform1f(U.uBandAngle, Q.bandAngle);
+  gl.uniform1f(U.uFoilColorR, fr);
+  gl.uniform1f(U.uFoilColorG, fg);
+  gl.uniform1f(U.uFoilColorB, fb);
+  gl.uniform1f(U.uCrackleDensity, Q.crackle);
+  gl.uniform1f(U.uStreakDensity, Q.streak);
+  gl.uniform1f(U.uSparkleDensity, Q.sparkle);
+}
+
+/* ============================================================================
+   分区:k-means lite（RGB+xy,k-means++ 固定 seed）+ 两遍 union-find 连通域
+   + <0.5% 小区并入最大邻接区 → regions[]（面积降序编号）
+   ========================================================================== */
+function mulberry32(a) {
+  return function() {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+const S = 256; // 低清格边长
+let regionIds = null;   // Uint16Array(S*S) 最终区块号(面积降序;区数可过百,不可用 Uint8)
+let regions = [];       // [{id, area, mean:[r,g,b], luma, cx, cy}]
+
+function partitionImage(img) {
+  const t0 = performance.now();
+  const c = document.createElement('canvas'); c.width = S; c.height = S;
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(img, 0, 0, S, S);
+  const d = ctx.getImageData(0, 0, S, S).data;
+  const tRead = performance.now();
+
+  /* --- 特征: [r,g,b, x/S*255*xyw, y/S*255*xyw] --- */
+  const N = S * S;
+  const feats = new Float32Array(N * 5);
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const i = y * S + x, j = i * 4, f = i * 5;
+    feats[f] = d[j]; feats[f+1] = d[j+1]; feats[f+2] = d[j+2];
+    feats[f+3] = x / S * 255 * Q.xyw;
+    feats[f+4] = y / S * 255 * Q.xyw;
+  }
+
+  /* --- k-means++ 初始化（mulberry32(42) 固定 seed） --- */
+  const rnd = mulberry32(42);
+  const K = Q.k;
+  const cents = new Float32Array(K * 5);
+  const dist2 = new Float32Array(N).fill(Infinity);
+  let ci = Math.floor(rnd() * N);
+  cents.set(feats.subarray(ci*5, ci*5+5), 0);
+  for (let k = 1; k < K; k++) {
+    let sum = 0;
+    for (let i = 0; i < N; i++) {
+      const f = i * 5;
+      let dd = 0;
+      for (let t = 0; t < 5; t++) { const q = feats[f+t] - cents[(k-1)*5+t]; dd += q*q; }
+      if (dd < dist2[i]) dist2[i] = dd;
+      sum += dist2[i];
+    }
+    let target = rnd() * sum;
+    for (let i = 0; i < N; i++) { target -= dist2[i]; if (target <= 0) { ci = i; break; } }
+    cents.set(feats.subarray(ci*5, ci*5+5), k*5);
+  }
+
+  /* --- Lloyd 迭代（≤10 轮,中心移动<0.5 提前停） --- */
+  const labels = new Uint8Array(N);
+  const acc = new Float64Array(K * 5), cnt = new Float64Array(K);
+  for (let iter = 0; iter < 10; iter++) {
+    let moved = 0;
+    acc.fill(0); cnt.fill(0);
+    for (let i = 0; i < N; i++) {
+      const f = i * 5;
+      let best = 0, bd = Infinity;
+      for (let k = 0; k < K; k++) {
+        let dd = 0;
+        for (let t = 0; t < 5; t++) { const q = feats[f+t] - cents[k*5+t]; dd += q*q; }
+        if (dd < bd) { bd = dd; best = k; }
+      }
+      labels[i] = best; cnt[best]++;
+      for (let t = 0; t < 5; t++) acc[best*5+t] += feats[f+t];
+    }
+    for (let k = 0; k < K; k++) {
+      if (cnt[k] === 0) continue; // 空簇保留旧中心
+      for (let t = 0; t < 5; t++) {
+        const nv = acc[k*5+t] / cnt[k];
+        moved = Math.max(moved, Math.abs(nv - cents[k*5+t]));
+        cents[k*5+t] = nv;
+      }
+    }
+    if (moved < 0.5) break;
+  }
+  const tKm = performance.now();
+
+  /* --- 连通域:第一遍 union-find(4邻接,同 k-means 标签才并) --- */
+  const parent = new Int32Array(N);
+  for (let i = 0; i < N; i++) parent[i] = i;
+  function find(a) { while (parent[a] !== a) { parent[a] = parent[parent[a]]; a = parent[a]; } return a; }
+  function union(a, b) { a = find(a); b = find(b); if (a !== b) parent[a] = b; }
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const i = y * S + x;
+    if (x > 0 && labels[i] === labels[i-1]) union(i, i-1);
+    if (y > 0 && labels[i] === labels[i-S]) union(i, i-S);
+  }
+  /* --- 第二遍:root 压平 + 组件面积/像素收集 --- */
+  const compOf = new Int32Array(N);
+  const compArea = new Map();
+  for (let i = 0; i < N; i++) { const r = find(i); compOf[i] = r; compArea.set(r, (compArea.get(r) || 0) + 1); }
+  const tCc = performance.now();
+
+  /* --- <0.5% 小区并入最大邻接区:每轮单扫收集全部邻接关系,整批合并 ---
+     (首版逐小区迭代在照片上产生 2000+ 碎片区,区数超 Uint8 上限 255 导致截断,教训入票) */
+  const MIN_AREA = Math.max(16, Math.floor(N * 0.005));
+  for (let round = 0; round < 8; round++) {
+    const small = [...compArea.entries()].filter(([, a]) => a < MIN_AREA).map(([r]) => r);
+    if (small.length === 0) break;
+    /* 单扫:收集所有相邻组件对的接触像素数 */
+    const touch = new Map();
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      const i = y * S + x, r1 = compOf[i];
+      for (const [dx, dy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+        const nx = x + dx, ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= S || ny >= S) continue;
+        const r2 = compOf[ny * S + nx];
+        if (r2 === r1) continue;
+        let m = touch.get(r1); if (!m) { m = new Map(); touch.set(r1, m); }
+        m.set(r2, (m.get(r2) || 0) + 1);
+      }
+    }
+    /* 每个小区并入其面积最大的邻接;目标若也是本轮待并入者则留到下轮(防环) */
+    const mergeInto = new Map();
+    for (const sr of small.sort((a, b) => compArea.get(b) - compArea.get(a))) {
+      const m = touch.get(sr);
+      if (!m) continue; // 孤岛,保留
+      let best = -1, bestA = -1;
+      for (const [r2] of m) {
+        const a = compArea.get(r2) || 0;
+        if (a > bestA) { bestA = a; best = r2; }
+      }
+      if (best >= 0 && !mergeInto.has(best)) mergeInto.set(sr, best);
+    }
+    if (mergeInto.size === 0) break;
+    for (let i = 0; i < N; i++) {
+      const t = mergeInto.get(compOf[i]);
+      if (t !== undefined) compOf[i] = t;
+    }
+    compArea.clear();
+    for (let i = 0; i < N; i++) compArea.set(compOf[i], (compArea.get(compOf[i]) || 0) + 1);
+  }
+
+  /* --- 最终编号:按面积降序 0..n-1 --- */
+  const roots = [...compArea.entries()].sort((a, b) => b[1] - a[1]).map(e => e[0]);
+  const idOf = new Map(roots.map((r, i) => [r, i]));
+  regionIds = new Uint16Array(N);
+  for (let i = 0; i < N; i++) regionIds[i] = idOf.get(compOf[i]);
+
+  /* --- 区块元信息（均值色/质心/luma,来自低清格） --- */
+  regions = roots.map((_, idx) => ({ id: idx, area: 0, r: 0, g: 0, b: 0, cx: 0, cy: 0 }));
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const i = y * S + x, rg = regions[regionIds[i]], j = i * 4;
+    rg.area++; rg.r += d[j]; rg.g += d[j+1]; rg.b += d[j+2]; rg.cx += x; rg.cy += y;
+  }
+  for (const rg of regions) {
+    rg.r /= rg.area; rg.g /= rg.area; rg.b /= rg.area;
+    rg.cx = rg.cx / rg.area / S; rg.cy = rg.cy / rg.area / S;
+    rg.luma = (0.299 * rg.r + 0.587 * rg.g + 0.114 * rg.b) / 255;
+    rg.pct = (rg.area / N * 100);
+  }
+  const tEnd = performance.now();
+  return { tRead: tRead - t0, tKm: tKm - tRead, tCc: tEnd - tKm, tTotal: tEnd - t0 };
+}
+
+/* ---------- 掩膜: 选中区块集合 → 256² 白/黑 canvas → unit2 ---------- */
+const maskCanvas = document.createElement('canvas');
+maskCanvas.width = S; maskCanvas.height = S;
+const maskCtx = maskCanvas.getContext('2d');
+function uploadZoneMask(selectedSet) {
+  const img = maskCtx.createImageData(S, S);
+  const px = img.data;
+  for (let i = 0; i < S * S; i++) {
+    const on = selectedSet.has(regionIds[i]) ? 255 : 0;
+    px[i*4] = on; px[i*4+1] = on; px[i*4+2] = on; px[i*4+3] = 255;
+  }
+  maskCtx.putImageData(img, 0, 0);
+  gl.activeTexture(gl.TEXTURE2);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, maskCanvas);
+}
+
+/* ============================================================================
+   渲染项
+   ========================================================================== */
+function renderFrame(p) {
+  /* p: {scope, edgeThresh?, edgeWidth?, maskMode?, zoneEnabled?} */
+  setBaseUniforms();
+  gl.uniform1f(U.uScope, p.scope);
+  gl.uniform1f(U.uEdgeThreshold, p.edgeThresh !== undefined ? p.edgeThresh : Q.edgeThresh);
+  gl.uniform1f(U.uEdgeWidth, p.edgeWidth !== undefined ? p.edgeWidth : Q.edgeWidth);
+  gl.uniform1f(U.uMaskMode, p.maskMode !== undefined ? p.maskMode : Q.maskMode);
+  gl.uniform1f(U.uZoneEnabled, p.zoneEnabled !== undefined ? p.zoneEnabled : 1);
+  gl.viewport(0, 0, canvas.width, canvas.height);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+}
+
+function addFigure(gridEl, name, caption, dataURL) {
+  const fig = document.createElement('figure');
+  const cap = document.createElement('figcaption');
+  cap.innerHTML = caption;
+  const img = document.createElement('img');
+  img.src = dataURL;
+  img.alt = name;
+  fig.appendChild(cap); fig.appendChild(img);
+  gridEl.appendChild(fig);
+  window.__results.push({ name: IMG_PREFIX + '__' + name, kind: 'png', dataURL });
+}
+
+/* ---------- 主流程 ---------- */
+const img = new Image();
+img.onload = boot;
+img.onerror = () => fail('图片加载失败: ' + IMG);
+img.src = IMG;
+
+function boot() {
+  try {
+    canvas.width = 960;
+    canvas.height = Math.round(960 * img.height / img.width);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+
+    /* debug 模式:?debug=edge|grad|lap → 全屏输出对应场(诊断+正式版执行票调试基建) */
+    const DBG = { edge: 4, grad: 5, lap: 6 }[params.get('debug') || ''];
+    if (DBG) {
+      document.body.innerHTML = '';
+      canvas.style.cssText = 'display:block;width:100%;border:1px solid #444';
+      document.body.appendChild(canvas);
+      renderFrame({ scope: DBG });
+      window.__results.push({ name: IMG_PREFIX + '__debug-' + params.get('debug'), kind: 'png', dataURL: canvas.toDataURL('image/png') });
+      window.__done = true;
+      return;
+    }
+
+    /* ============ Section 1: 边缘加箔 ============ */
+    const g1 = document.getElementById('s1grid');
+    const s1 = [
+      { name: 's1-0-orig',      cap: '<b>原图</b>', p: { scope: 3 } },
+      { name: 's1-1-full',      cap: '<b>全图加箔</b> · app 默认（基准）', p: { scope: 0 } },
+      { name: 's1-2-edge-t50-w2', cap: '<b>边缘 t0.50 w2</b> · 仅烫箔', p: { scope: 1, edgeThresh: 0.5,  edgeWidth: 2, maskMode: 1 } },
+      { name: 's1-3-edge-t35-w2', cap: '<b>边缘 t0.35 w2</b> · 仅烫箔（低阈值=更多边）', p: { scope: 1, edgeThresh: 0.35, edgeWidth: 2, maskMode: 1 } },
+      { name: 's1-4-edge-t65-w2', cap: '<b>边缘 t0.65 w2</b> · 仅烫箔（高阈值=只强边）', p: { scope: 1, edgeThresh: 0.65, edgeWidth: 2, maskMode: 1 } },
+      { name: 's1-5-edge-t50-w4', cap: '<b>边缘 t0.50 w4</b> · 仅烫箔（宽边带）', p: { scope: 1, edgeThresh: 0.5,  edgeWidth: 4, maskMode: 1 } },
+      { name: 's1-6-edge-t50-w2-flow', cap: '<b>边缘 t0.50 w2</b> · 光谱流彩（语义对照）', p: { scope: 1, edgeThresh: 0.5, edgeWidth: 2, maskMode: 0 } },
+    ];
+    for (const it of s1) {
+      renderFrame(it.p);
+      addFigure(g1, it.name, it.cap, canvas.toDataURL('image/png'));
+    }
+
+    /* ============ Section 2: 自动分区 ============ */
+    const timing = partitionImage(img);
+    document.getElementById('s2timing').textContent =
+      `分区分析耗时（256² 低清格, k=${Q.k}, xy 权重 ${Q.xyw}）：合计 ${timing.tTotal.toFixed(0)} ms（读取 ${timing.tRead.toFixed(0)} / k-means ${timing.tKm.toFixed(0)} / 连通域+合并 ${timing.tCc.toFixed(0)}），产出 ${regions.length} 个区块`;
+    /* 大块主导指标:≥5% 的大区数量与合计占比(car 四区均衡 21/20/20/19,top3 指标会误判) */
+    const bigs = regions.filter(r => r.pct >= 5);
+    window.__results.push({ name: IMG_PREFIX + '__timing-k' + Q.k, kind: 'timing', ms: timing.tTotal,
+      detail: { read: +timing.tRead.toFixed(1), kmeans: +timing.tKm.toFixed(1), cc: +timing.tCc.toFixed(1),
+        regions: regions.length, bigCount: bigs.length, bigPct: +bigs.reduce((s, r) => s + r.pct, 0).toFixed(1) } });
+
+    /* 分区可视化（低清格放大 + 区号标注） */
+    const vis = document.createElement('canvas');
+    vis.width = canvas.width; vis.height = canvas.height;
+    const vctx = vis.getContext('2d');
+    const low = document.createElement('canvas'); low.width = S; low.height = S;
+    const lctx = low.getContext('2d');
+    const vimg = lctx.createImageData(S, S);
+    /* hsl→rgb 标准公式（s=0.72, l=0.55） */
+    const PAL_RGB = PALETTE_H.map(h => {
+      const a = 0.72 * Math.min(0.55, 0.45);
+      const f = n => { const k = (n + h / 30) % 12; return Math.round((0.55 - a * Math.max(-1, Math.min(k - 3, 9 - k, 1))) * 255); };
+      return [f(0), f(8), f(4)];
+    });
+    for (let i = 0; i < S * S; i++) {
+      const c = PAL_RGB[regionIds[i] % PAL_RGB.length];
+      vimg.data[i*4] = c[0]; vimg.data[i*4+1] = c[1]; vimg.data[i*4+2] = c[2]; vimg.data[i*4+3] = 255;
+    }
+    lctx.putImageData(vimg, 0, 0);
+    vctx.imageSmoothingEnabled = true;
+    vctx.drawImage(low, 0, 0, vis.width, vis.height);
+    /* 区号 + 面积标注 */
+    vctx.textAlign = 'center'; vctx.textBaseline = 'middle';
+    for (const rg of regions) {
+      if (rg.pct < 2) continue;
+      const cx = rg.cx * vis.width, cy = rg.cy * vis.height;
+      vctx.font = 'bold 22px system-ui';
+      vctx.fillStyle = 'rgba(0,0,0,0.75)';
+      vctx.fillText('区' + rg.id, cx + 1.5, cy + 1.5);
+      vctx.fillStyle = '#fff';
+      vctx.fillText('区' + rg.id, cx, cy);
+      vctx.font = '13px system-ui';
+      vctx.fillStyle = 'rgba(0,0,0,0.75)';
+      vctx.fillText(rg.pct.toFixed(0) + '%', cx + 1, cy + 20 + 1);
+      vctx.fillStyle = '#dfe3ea';
+      vctx.fillText(rg.pct.toFixed(0) + '%', cx, cy + 20);
+    }
+    addFigure(document.getElementById('s2grid'), 's2-0-regions',
+      `<b>分区可视化</b> · k=${Q.k} xyw=${Q.xyw} → ${regions.length} 区（按面积编号,标 <2% 略）`,
+      vis.toDataURL('image/png'));
+
+    /* 分区方案渲染 */
+    const byLuma = [...regions].sort((a, b) => b.luma - a.luma);
+    const bright = byLuma.slice(0, 2).map(r => r.id);
+    const dark = byLuma.slice(-2).map(r => r.id);
+    const zoneSets = [
+      { name: 's2-1-all',     cap: '<b>分区 · 全区</b> · 仅烫箔', set: regions.map(r => r.id) },
+      { name: 's2-2-bright',  cap: `<b>分区 · 仅亮区</b>（区${bright.join('/')}）· 仅烫箔`, set: bright },
+      { name: 's2-3-dark',    cap: `<b>分区 · 仅暗区</b>（区${dark.join('/')}）· 仅烫箔`, set: dark },
+      { name: 's2-4-zones',   cap: `<b>分区 · 指定区</b>（?zones=${Q.zones.join(',')}）· 仅烫箔`, set: Q.zones },
+      { name: 's2-5-all-flow',cap: '<b>分区 · 全区</b> · 光谱流彩（语义对照）', set: regions.map(r => r.id), maskMode: 0 },
+    ];
+    for (const z of zoneSets) {
+      uploadZoneMask(new Set(z.set));
+      renderFrame({ scope: 2, maskMode: z.maskMode !== undefined ? z.maskMode : 1 });
+      addFigure(document.getElementById('s2grid'), z.name, z.cap, canvas.toDataURL('image/png'));
+    }
+
+    /* 区块元信息表 */
+    const metaEl = document.getElementById('s2meta');
+    let html = '<table>';
+    for (const rg of [...regions].sort((a, b) => a.id - b.id)) {
+      const sw = `rgb(${rg.r.toFixed(0)},${rg.g.toFixed(0)},${rg.b.toFixed(0)})`;
+      html += `<tr><td>区${rg.id}</td><td class="sw" style="background:${sw}"></td><td>${sw}</td><td>亮度 ${rg.luma.toFixed(2)}</td><td>面积 ${rg.pct.toFixed(1)}%</td></tr>`;
+    }
+    metaEl.innerHTML = html + '</table>';
+
+    /* ============ Section 3: 点选 demo ============ */
+    const live = document.getElementById('live');
+    live.width = canvas.width; live.height = canvas.height;
+    const selected = new Set(regions.map(r => r.id));
+    const lctx2d = live.getContext('2d');
+    function redrawLive() {
+      uploadZoneMask(selected);
+      renderFrame({ scope: 2, maskMode: 1 });
+      lctx2d.drawImage(canvas, 0, 0); // GL 位图转投到活 canvas（2D）
+    }
+    function syncChips() {
+      const el = document.getElementById('chips');
+      el.innerHTML = '';
+      for (const rg of regions) {
+        const chip = document.createElement('span');
+        chip.className = 'chip' + (selected.has(rg.id) ? ' on' : '');
+        chip.innerHTML = `<span class="sw" style="background:${PALETTE[rg.id % PALETTE.length]}"></span>区${rg.id} · ${rg.pct.toFixed(0)}%`;
+        chip.onclick = () => { toggle(rg.id); };
+        el.appendChild(chip);
+      }
+      document.getElementById('sideNote').textContent =
+        `当前加箔 ${selected.size}/${regions.length} 区。掩膜=256² 白/黑 → LINEAR 上采样 → shader smoothstep 羽化。`;
+    }
+    function toggle(rid) {
+      if (selected.has(rid)) selected.delete(rid); else selected.add(rid);
+      syncChips(); redrawLive();
+    }
+    live.addEventListener('click', e => {
+      const r = live.getBoundingClientRect();
+      const u = (e.clientX - r.left) / r.width, v = (e.clientY - r.top) / r.height;
+      const gx = Math.min(S - 1, Math.max(0, Math.floor(u * S)));
+      const gy = Math.min(S - 1, Math.max(0, Math.floor(v * S)));
+      toggle(regionIds[gy * S + gx]);  // 粗版直接查表;正式版按票01 建议 3×3 众数抗羽化带
+    });
+    document.getElementById('btnAll').onclick = () => { regions.forEach(r => selected.add(r.id)); syncChips(); redrawLive(); };
+    document.getElementById('btnNone').onclick = () => { selected.clear(); syncChips(); redrawLive(); };
+
+    syncChips();
+    redrawLive();
+
+    window.__regionsDump = regions.map(r => r.id + ":" + r.pct.toFixed(1) + "%").join(" ");
+    window.__done = true;
+  } catch (err) {
+    fail(String(err && err.stack || err));
+  }
+}
+</script>
+</body>
+</html>
