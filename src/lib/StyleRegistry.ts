@@ -351,6 +351,54 @@ export const styles: StyleDefinition[] = [
       { name: 'style.glassdistort.peelEnv',     uniform: 'uPeelEnv',     min: 0,    max: 1,   step: 0.01, default: 0.12, description: 'style.glassdistort.peelEnvDesc',     visibleWhen: (v) => v.uGlassType === 2 },
     ],
   },
+
+  // ---------------------------------------------------------------------------
+  // Holographic Foil (gradient-driven spectrum mapping, single pass)
+  // 三种箔面质感 visibleWhen 条件显隐(值保留,切质感不丢);
+  // 碎冰基准=样张定稿(wayfinder/2d-new-effects/tickets/04)
+  // ---------------------------------------------------------------------------
+  {
+    id: 'holofoil',
+    label: 'style.holofoil.label',
+    description: 'style.holofoil.desc',
+    shaderImports: [() => import('../shaders/holofoil.frag?raw').then(m => m.default)],
+    params: [
+      { name: 'style.holofoil.texture', uniform: 'uTexture', type: 'select' as const, options: [
+        { label: 'style.holofoil.typeCrackle', value: 0 },
+        { label: 'style.holofoil.typeStreak', value: 1 },
+        { label: 'style.holofoil.typePearl', value: 2 },
+      ], default: 0, description: 'style.holofoil.textureDesc' },
+      { name: 'style.holofoil.strength',      uniform: 'uStrength',      min: 0,   max: 2,   step: 0.01, default: 1,  description: 'style.holofoil.strengthDesc' },
+      { name: 'style.holofoil.bandDensity',   uniform: 'uBandDensity',   min: 0.5, max: 3,   step: 0.01, default: 1,  description: 'style.holofoil.bandDensityDesc' },
+      { name: 'style.holofoil.bandAngle',     uniform: 'uBandAngle',     min: 0,   max: 180, step: 1,    default: 22, description: 'style.holofoil.bandAngleDesc' },
+      { name: 'style.holofoil.foilColor',     uniform: 'uFoilColor',     type: 'color' as const, default: '#1a1a22', description: 'style.holofoil.foilColorDesc' },
+      { name: 'style.holofoil.crackleDensity', uniform: 'uCrackleDensity', min: 15, max: 60, step: 0.5, default: 38, description: 'style.holofoil.crackleDensityDesc', visibleWhen: (v) => v.uTexture === 0 },
+      { name: 'style.holofoil.streakDensity',  uniform: 'uStreakDensity',  min: 5,  max: 40, step: 0.5, default: 14, description: 'style.holofoil.streakDensityDesc',  visibleWhen: (v) => v.uTexture === 1 },
+      { name: 'style.holofoil.sparkleDensity', uniform: 'uSparkleDensity', min: 0.5, max: 3, step: 0.01, default: 1, description: 'style.holofoil.sparkleDensityDesc', visibleWhen: (v) => v.uTexture === 2 },
+    ],
+  },
+
+  // ---------------------------------------------------------------------------
+  // Prism Dispersion (RGB channel separation, single pass)
+  // 对角/紫边模式参数 visibleWhen 条件显隐
+  // (wayfinder/2d-new-effects/tickets/04)
+  // ---------------------------------------------------------------------------
+  {
+    id: 'prism',
+    label: 'style.prism.label',
+    description: 'style.prism.desc',
+    shaderImports: [() => import('../shaders/prism.frag?raw').then(m => m.default)],
+    params: [
+      { name: 'style.prism.mode', uniform: 'uMode', type: 'select' as const, options: [
+        { label: 'style.prism.modeRadial', value: 0 },
+        { label: 'style.prism.modeDiagonal', value: 1 },
+        { label: 'style.prism.modePurple', value: 2 },
+      ], default: 0, description: 'style.prism.modeDesc' },
+      { name: 'style.prism.amount', uniform: 'uAmount', min: 0, max: 1, step: 0.01, default: 0.5, description: 'style.prism.amountDesc' },
+      { name: 'style.prism.angle', uniform: 'uAngle', min: 0, max: 180, step: 1, default: 45, description: 'style.prism.angleDesc', visibleWhen: (v) => v.uMode === 1 },
+      { name: 'style.prism.edgeThreshold', uniform: 'uEdgeThreshold', min: 0, max: 1, step: 0.01, default: 0.5, description: 'style.prism.edgeThresholdDesc', visibleWhen: (v) => v.uMode === 2 },
+    ],
+  },
 ]
 
 /**

@@ -59,8 +59,8 @@ describe('defaultParams / defaultTextParams', () => {
 })
 
 describe('glassdistort', () => {
-  it('占据 styles 数组末位(种子码按序号入码,插入中间会废掉旧码)', () => {
-    expect(styles[styles.length - 1]?.id).toBe('glassdistort')
+  it('追加序不变:末三位 = glassdistort → holofoil → prism(种子码按序号入码,插入中间会废掉旧码)', () => {
+    expect(styles.slice(-3).map(s => s.id)).toEqual(['glassdistort', 'holofoil', 'prism'])
   })
 
   it('默认参数 = 试验台定稿值(玻璃类型大波浪 + 强度 100% + 三组气质默认)', () => {
@@ -79,5 +79,37 @@ describe('glassdistort', () => {
     expect(visibleAt(0)).toEqual(['uGlassType', 'uStrengthScale', 'uWaveScale', 'uWaveGain', 'uWaveStretch'])
     expect(visibleAt(1)).toEqual(['uGlassType', 'uStrengthScale', 'uGridCells', 'uGridJitter', 'uGridLens', 'uGridFlip', 'uGridSeam'])
     expect(visibleAt(2)).toEqual(['uGlassType', 'uStrengthScale', 'uPeelDensity', 'uPeelFlow', 'uPeelWarp', 'uPeelEnv'])
+  })
+})
+
+describe('holofoil / prism (第二批新风格, tickets/04 规格)', () => {
+  it('holofoil 默认参数 = 规格票定稿值(碎冰镭射 + 强度 100% + 样张基准)', () => {
+    expect(defaultParams('holofoil')).toEqual({
+      uTexture: 0, uStrength: 1, uBandDensity: 1, uBandAngle: 22,
+      uCrackleDensity: 38, uStreakDensity: 14, uSparkleDensity: 1,
+    })
+  })
+
+  it('holofoil visibleWhen 分组:各质感只显示本组参数,公共参数恒显(底色 color 恒在面板)', () => {
+    const def = styles.find(s => s.id === 'holofoil')!
+    const visibleAt = (t: number) =>
+      def.params.filter(p => !p.visibleWhen || p.visibleWhen({ ...defaultParams('holofoil'), uTexture: t })).map(p => p.uniform)
+    const common = ['uTexture', 'uStrength', 'uBandDensity', 'uBandAngle', 'uFoilColor']
+    expect(visibleAt(0)).toEqual([...common, 'uCrackleDensity'])
+    expect(visibleAt(1)).toEqual([...common, 'uStreakDensity'])
+    expect(visibleAt(2)).toEqual([...common, 'uSparkleDensity'])
+  })
+
+  it('prism 默认参数 = 规格票定稿值(径向色差 + 色散量 50%)', () => {
+    expect(defaultParams('prism')).toEqual({ uMode: 0, uAmount: 0.5, uAngle: 45, uEdgeThreshold: 0.5 })
+  })
+
+  it('prism visibleWhen 分组:径向只显模式与色散量,对角显方向角,紫边显边缘阈值', () => {
+    const def = styles.find(s => s.id === 'prism')!
+    const visibleAt = (m: number) =>
+      def.params.filter(p => !p.visibleWhen || p.visibleWhen({ ...defaultParams('prism'), uMode: m })).map(p => p.uniform)
+    expect(visibleAt(0)).toEqual(['uMode', 'uAmount'])
+    expect(visibleAt(1)).toEqual(['uMode', 'uAmount', 'uAngle'])
+    expect(visibleAt(2)).toEqual(['uMode', 'uAmount', 'uEdgeThreshold'])
   })
 })

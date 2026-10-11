@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>2D 新风格候选 · 实渲染样张</title>
+<style>
+  :root { --bg:#101218; --panel:#181b23; --line:#262a35; --text:#d7dae2; --dim:#8a8f9c; --accent:#6ea8fe; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--text); font:13px/1.6 system-ui,"Segoe UI","Microsoft YaHei",sans-serif; padding:24px; }
+  h1 { font-size:18px; margin-bottom:4px; }
+  .sub { color:var(--dim); margin-bottom:20px; }
+  section { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px 18px; margin-bottom:18px; }
+  section h2 { font-size:15px; font-weight:600; }
+  section h2 small { color:var(--dim); font-weight:400; font-size:12px; margin-left:8px; }
+  .hint { color:var(--accent); font-size:12px; margin:6px 0 10px; }
+  .pair { display:flex; gap:10px; }
+  .pair figure { flex:1; min-width:0; }
+  .pair figcaption { color:var(--dim); font-size:11px; margin-bottom:4px; }
+  .pair img { width:100%; display:block; border:1px solid var(--line); border-radius:6px; background:#000; }
+  #err { display:none; background:#3a1d24; color:#ff9aa8; border:1px solid #6e2a38; border-radius:8px; padding:10px 12px; margin-bottom:16px; white-space:pre-wrap; font:12px/1.5 ui-monospace,Consolas,monospace; }
+</style>
+</head>
+<body>
+<h1>2D 新风格候选 · 实渲染样张</h1>
+<p class="sub">同一张原图（local_test_pic/car.jpg）× 5 个候选效果的<b>粗 shader</b> 渲染——只求看出气质，不求参数完备；正式版参数空间会大得多。</p>
+<div id="err"></div>
+<div id="blocks"></div>
+
+<script>
+'use strict';
+window.__done = false;
+window.__results = [];
+function fail(msg) {
+  const el = document.getElementById('err');
+  el.style.display = 'block';
+  el.textContent = msg;
+  window.__err = msg;
+  console.error(msg);
+}
+
+const params = new URLSearchParams(location.search);
+const W = 960; let H = 640;
+const IMG = params.get('img') || '../local_test_pic/car.jpg';
+const BAND_Y = parseFloat(params.get('bandY') || '0.50');
+const BAND_TILT = parseFloat(params.get('bandTilt') || '0.10');
+const canvas = document.createElement('canvas');
+canvas.width = W; canvas.height = H;
+const gl = canvas.getContext('webgl', { preserveDrawingBuffer: true, antialias: false });
+if (!gl) fail('WebGL 不可用');
+
+const VS = 'attribute vec2 aPos; varying vec2 vUv; void main(){ vUv = aPos*0.5+0.5; gl_Position = vec4(aPos, 0.0, 1.0); }';
+
+const COMMON = `
+float luma(vec3 c){ return dot(c, vec3(0.299, 0.587, 0.114)); }
+float hash(vec2 p){ p = fract(p*vec2(123.34, 456.21)); p += dot(p, p+45.32); return fract(p.x*p.y); }
+float vnoise(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);
+  return mix(mix(hash(i),hash(i+vec2(1.0,0.0)),f.x), mix(hash(i+vec2(0.0,1.0)),hash(i+vec2(1.0,1.0)),f.x), f.y); }
+vec3 hsv2rgb(vec3 c){ vec3 p = abs(fract(c.xxx + vec3(0.0,2.0/3.0,1.0/3.0))*6.0-3.0);
+  return c.z*mix(vec3(1.0), clamp(p-1.0, 0.0, 1.0), c.y); }
+`;
+
+const FRAG = {
+  passthrough: `precision highp float; varying vec2 vUv; uniform sampler2D uTex;
+void main(){ gl_FragColor = texture2D(uTex, vUv); }`,
+
+  halationBright: `precision highp float; varying vec2 vUv; uniform sampler2D uTex; ${COMMON}
+void main(){
+  vec3 c = texture2D(uTex, vUv).rgb;
+  float b = smoothstep(0.65, 0.98, luma(c));
+  gl_FragColor = vec4(c*b, 1.0);
+}`,
+
+  blur: `precision highp float; varying vec2 vUv; uniform sampler2D uTex; uniform vec2 uDir;
+void main(){
+  float w0=0.227027, w1=0.1945946, w2=0.1216216, w3=0.054054, w4=0.016216;
+  vec3 sum = texture2D(uTex, vUv).rgb*w0;
+  for(int i=1;i<5;i++){
+    vec2 o = uDir*(float(i)*3.0);
+    sum += texture2D(uTex, vUv+o).rgb*(i==1?w1:(i==2?w2:(i==3?w3:w4)));
+    sum += texture2D(uTex, vUv-o).rgb*(i==1?w1:(i==2?w2:(i==3?w3:w4)));
+  }
+  gl_FragColor = vec4(sum, 1.0);
+}`,
+
+  halationComposite: `precision highp float; varying vec2 vUv; uniform sampler2D uTex; uniform sampler2D uHalo; uniform vec2 uRes; ${COMMON}
+void main(){
+  vec3 base = texture2D(uTex, vUv).rgb;
+  vec3 halo = texture2D(uHalo, vUv).rgb;
+  vec3 haloCol = vec3(1.0, 0.30, 0.18);              /* Cinestill 红橙 */
+  vec3 col = base + halo*haloCol*1.0;
+  float l = luma(base);                              /* 银盐颗粒: 中间调最强 */
+  float grainAmt = 0.10 * sqrt(max(l*(1.0-l), 0.0)) * 2.2;
+  float g = hash(vUv*uRes*0.9 + 17.0);
+  col += (g-0.5)*grainAmt;
+  float prof = 0.5+0.5*sin(vUv.y*9.0+2.0);           /* 两条低调划痕 */
+  float s1 = smoothstep(0.0016, 0.0, abs(vUv.x-0.23))*prof;
+  float s2 = smoothstep(0.0010, 0.0, abs(vUv.x-0.71))*(0.4+0.6*sin(vUv.y*13.0));
+  col += (s1*0.10+s2*0.06)*vec3(1.0, 0.9, 0.8);
+  col = col*vec3(1.03, 0.995, 0.955);                /* 轻微暖调 */
+  col = pow(max(col, 0.0), vec3(0.96));
+  gl_FragColor = vec4(col, 1.0);
+}`,
+
+  holofoil: `precision highp float; varying vec2 vUv; uniform sampler2D uTex; uniform vec2 uRes; ${COMMON}
+void main(){
+  vec2 px = 1.0/uRes;
+  vec3 base = texture2D(uTex, vUv).rgb;
+  float lC = luma(base);
+  float lx = luma(texture2D(uTex, vUv+vec2(px.x*2.0, 0.0)).rgb) - luma(texture2D(uTex, vUv-vec2(px.x*2.0, 0.0)).rgb);
+  float ly = luma(texture2D(uTex, vUv+vec2(0.0, px.y*2.0)).rgb) - luma(texture2D(uTex, vUv-vec2(0.0, px.y*2.0)).rgb);
+  vec2 grad = vec2(lx, ly);
+  float crackle = vnoise(vUv*38.0);
+  float band = vUv.x*4.0 + vUv.y*1.6 + grad.x*7.0 + grad.y*5.0 + crackle*2.4;
+  vec3 spectrum = hsv2rgb(vec3(fract(band*0.35), 0.85, 1.0));
+  float edge = length(grad)*4.0;
+  float mask = smoothstep(0.32, 0.85, lC*0.75 + edge) * (0.55+0.45*crackle);
+  vec3 foilBase = mix(vec3(luma(base)), base, 0.35)*0.55;
+  vec3 col = foilBase + spectrum*mask*0.95;
+  float sparkle = step(0.985, hash(floor(vUv*uRes*0.5)))*mask;   /* 细碎闪点 */
+  col += sparkle*0.6;
+  gl_FragColor = vec4(col, 1.0);
+}`,
+
+  prism: `precision highp float; varying vec2 vUv; uniform sampler2D uTex;
+void main(){
+  vec2 d = (vUv-0.5)*vec2(1.5, 1.0);
+  float amt = 0.006 + length(d)*0.016;
+  float r = texture2D(uTex, vUv + d*amt).r;
+  float g = texture2D(uTex, vUv).g;
+  float b = texture2D(uTex, vUv - d*amt).b;
+  gl_FragColor = vec4(r, g, b, 1.0);
+}`,
+
+  littleplanet: `precision highp float; varying vec2 vUv; uniform sampler2D uTex;
+void main(){
+  vec2 p = vUv-0.5;
+  float r = length(p)*2.0;
+  float th = atan(p.y, p.x)+0.9;
+  float rr = pow(min(r, 1.0), 2.1);
+  vec2 nuv = vec2(0.5)+vec2(cos(th), sin(th))*rr*0.5;
+  vec3 col = texture2D(uTex, clamp(nuv, 0.001, 0.999)).rgb;
+  float sh = 1.0 - 0.42*smoothstep(0.45, 1.0, r*0.72);   /* 球体明暗 */
+  gl_FragColor = vec4(col*sh, 1.0);
+}`,
+
+  tiltshift: `precision highp float; varying vec2 vUv; uniform sampler2D uTex; uniform sampler2D uBlur; uniform vec2 uBand; ${COMMON}
+void main(){
+  float band = (vUv.y-uBand.x) + (vUv.x-0.5)*uBand.y; /* 斜置焦带, 过画面主体 */
+  float db = abs(band);
+  float blurAmt = smoothstep(0.03, 0.28, db);          /* 焦带外快速进入重虚化 */
+  vec3 sharp = texture2D(uTex, vUv).rgb;
+  vec3 blur = texture2D(uBlur, vUv).rgb;
+  vec3 col = mix(sharp, blur, blurAmt);
+  float l = luma(col);                                 /* 饱和增益: 微缩感关键, 清晰区稍强 */
+  col = mix(vec3(l), col, 1.5 - 0.1*blurAmt);
+  col = pow(max(col, 0.0), vec3(0.92))*1.05;
+  gl_FragColor = vec4(col, 1.0);
+}`,
+};
+
+/* ---------- WebGL harness ---------- */
+function compile(type, src) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src); gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error('shader: ' + gl.getShaderInfoLog(s) + '\n' + src.slice(0, 120));
+  return s;
+}
+function program(fsSrc) {
+  const p = gl.createProgram();
+  gl.attachShader(p, compile(gl.VERTEX_SHADER, VS));
+  gl.attachShader(p, compile(gl.FRAGMENT_SHADER, fsSrc));
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error('link: ' + gl.getProgramInfoLog(p));
+  return p;
+}
+const quad = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+function drawQuad(prog) {
+  gl.useProgram(prog);
+  const loc = gl.getAttribLocation(prog, 'aPos');
+  gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+  gl.enableVertexAttribArray(loc);
+  gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+}
+function makeFBO() {
+  const tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, W, H, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  const fb = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  return { tex, fb };
+}
+function bindTex(prog, name, tex, unit) {
+  gl.activeTexture(gl.TEXTURE0 + unit);
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.uniform1i(gl.getUniformLocation(prog, name), unit);
+}
+
+/* ---------- 效果渲染 ---------- */
+const progs = {};
+for (const k of Object.keys(FRAG)) progs[k] = program(FRAG[k]);
+let fboA, fboB;
+
+function renderTo(canvasTarget, progName, textures) {
+  gl.bindFramebuffer(gl.FRAMEBUFFER, canvasTarget === null ? null : canvasTarget.fb);
+  gl.viewport(0, 0, W, H);
+  const prog = progs[progName];
+  for (const [name, tex, unit] of textures) bindTex(prog, name, tex, unit);
+  const ur = gl.getUniformLocation(prog, 'uRes');
+  if (ur) gl.uniform2f(ur, W, H);
+  drawQuad(prog);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+}
+
+function blurPass(srcTex, dst, dx, dy) {
+  gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fb);
+  gl.viewport(0, 0, W, H);
+  gl.useProgram(progs.blur);
+  bindTex(progs.blur, 'uTex', srcTex, 0);
+  gl.uniform2f(gl.getUniformLocation(progs.blur, 'uDir'), dx, dy);
+  drawQuad(progs.blur);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+}
+
+function renderHalation(srcTex) {
+  renderTo(fboA, 'halationBright', [['uTex', srcTex, 0]]);
+  for (let i = 0; i < 3; i++) {                      /* 3 轮 H/V 累计大半径: A→B 横, B→A 竖 */
+    blurPass(fboA.tex, fboB, 3.0, 0.0);
+    blurPass(fboB.tex, fboA, 0.0, 3.0);
+  }
+  renderTo(null, 'halationComposite', [['uTex', srcTex, 0], ['uHalo', fboA.tex, 1]]);
+  return canvas.toDataURL('image/png');
+}
+
+function renderTiltshift(srcTex) {
+  renderTo(fboA, 'passthrough', [['uTex', srcTex, 0]]); /* 重虚化底图: 5 轮 H/V 累计 σ≈20px */
+  for (let i = 0; i < 5; i++) {
+    blurPass(fboA.tex, fboB, 3.0, 0.0);
+    blurPass(fboB.tex, fboA, 0.0, 3.0);
+  }
+  renderTo(null, 'tiltshift', [['uTex', srcTex, 0], ['uBlur', fboA.tex, 1]]);
+  gl.uniform2f(gl.getUniformLocation(progs.tiltshift, 'uBand'), BAND_Y, BAND_TILT);
+  drawQuad(progs.tiltshift);
+  return canvas.toDataURL('image/png');
+}
+
+const EFFECTS = [
+  { id: '01-orig', name: '原图', en: 'baseline', hint: '对比基准：同一渲染管线直出，无任何处理。',
+    run: (tex) => { renderTo(null, 'passthrough', [['uTex', tex, 0]]); return canvas.toDataURL('image/png'); } },
+  { id: '02-halation', name: '胶片晕光颗粒', en: 'halation', hint: '看什么：车身反光与天空亮部四周的「红橙色渗出」、全画面细颗粒、一两条竖向划痕。白天图晕光偏含蓄——夜景/灯光人像上会浓得多。',
+    run: renderHalation },
+  { id: '03-holofoil', name: '全息箔', en: 'holofoil', hint: '看什么：彩虹色带沿车身轮廓与亮度流动、暗部压成金属底、细碎闪点。深色/简洁照片上是主场，这张彩色场景属「压力测试」。',
+    run: (tex) => { renderTo(null, 'holofoil', [['uTex', tex, 0]]); return canvas.toDataURL('image/png'); } },
+  { id: '04-prism', name: '棱镜彩虹色散', en: 'prism', hint: '看什么：车身与建筑边缘的彩虹镶边（红一侧、蓝另一侧），离画面中心越远越明显。',
+    run: (tex) => { renderTo(null, 'prism', [['uTex', tex, 0]]); return canvas.toDataURL('image/png'); } },
+  { id: '05-littleplanet', name: '小星球', en: 'little planet', hint: '看什么：整图卷成一颗星球（图中心=星球中心，图边缘绕成球面）。横幅全景图效果最佳，此图仅为气质示意。',
+    run: (tex) => { renderTo(null, 'littleplanet', [['uTex', tex, 0]]); return canvas.toDataURL('image/png'); } },
+  { id: '06-tiltshift', name: '移轴微缩（修复版）', en: 'tilt-shift', hint: '看什么：中间斜置焦带保持清晰，上下迅速进入「重虚化」（FBO 多轮大模糊）+ 颜色更艳 = 「玩具小人国」。首版 7px 轻糊是错的，虚化量必须够重才成立。',
+    run: renderTiltshift },
+];
+
+/* ---------- 主流程 ---------- */
+const img = new Image();
+img.onload = () => {
+  try {
+    H = Math.round(W * img.height / img.width);       /* 画布/FBO 按图比例自适应 */
+    canvas.width = W; canvas.height = H;
+    fboA = makeFBO(); fboB = makeFBO();
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+    const tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+    const blocks = document.getElementById('blocks');
+    for (const e of EFFECTS) {
+      const url = e.run(tex);
+      window.__results.push({ id: e.id, name: e.name, dataUrl: url });
+      const sec = document.createElement('section');
+      sec.innerHTML = '<h2>' + e.name + ' <small>' + e.en + '</small></h2>'
+        + '<div class="hint">▸ ' + e.hint + '</div>'
+        + '<div class="pair"><figure><figcaption>原图</figcaption><img src="' + window.__results[0].dataUrl + '"></figure>'
+        + '<figure><figcaption>处理后</figcaption><img src="' + url + '"></figure></div>';
+      blocks.appendChild(sec);
+    }
+    window.__done = true;
+  } catch (err) { fail(String(err && err.stack || err)); }
+};
+img.onerror = () => fail('样片加载失败: ' + img.src);
+img.src = IMG;
+</script>
+</body>
+</html>
