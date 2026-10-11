@@ -255,8 +255,9 @@ function ParamPanel({ title, description, params, values, textValues, onChange, 
   const { ref: panelRef, pos, onHeaderMouseDown } = useDraggable(defaultPos, storageKey, { enabled: !embedded })
   const [collapsed, setCollapsed] = useState(defaultCollapsed ?? false)
 
-  // 参数控件本体：embedded 与桌面两外壳共用同一 JSX 块（不复制渲染代码）
-  const controls = children ?? params?.map((p) => renderParam(
+  // 参数控件本体：embedded 与桌面两外壳共用同一 JSX 块（不复制渲染代码）。
+  // visibleWhen 条件显隐只作用于渲染:隐藏参数的值仍保留在 values/种子码中
+  const controls = children ?? params?.filter((p) => !p.visibleWhen || p.visibleWhen(values ?? {})).map((p) => renderParam(
     p,
     values ?? {},
     textValues ?? {},

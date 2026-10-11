@@ -9,6 +9,8 @@ export interface NumberParamDef {
   step: number
   default: number
   description?: string  // 参数详细描述
+  /** 条件显隐:按当前数值参数快照决定该控件是否渲染;隐藏时值仍保留在状态与种子码中 */
+  visibleWhen?: (values: Record<string, number>) => boolean
 }
 
 export interface TextParamDef {
@@ -25,6 +27,7 @@ export interface ToggleParamDef {
   uniform: string
   default: number  // 0 or 1
   description?: string
+  visibleWhen?: (values: Record<string, number>) => boolean
 }
 
 export interface ColorParamDef {
@@ -42,6 +45,7 @@ export interface SelectParamDef {
   options: { label: string; value: number }[]
   default: number
   description?: string
+  visibleWhen?: (values: Record<string, number>) => boolean
 }
 
 export interface FontParamDef {

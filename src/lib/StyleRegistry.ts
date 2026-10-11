@@ -319,6 +319,8 @@ export const styles: StyleDefinition[] = [
 
   // ---------------------------------------------------------------------------
   // Glass Distort (noise displacement field, single pass)
+  // 气质参数按玻璃类型 visibleWhen 条件显隐(值保留,切回不丢);
+  // 值域与默认值=试验台定稿(wayfinder/assets/glass-lab.html)
   // ---------------------------------------------------------------------------
   {
     id: 'glassdistort',
@@ -331,11 +333,22 @@ export const styles: StyleDefinition[] = [
         { label: 'style.glassdistort.typeGrid', value: 1 },
         { label: 'style.glassdistort.typePeel', value: 2 },
       ], default: 0, description: 'style.glassdistort.glassTypeDesc' },
-      { name: 'style.glassdistort.strength', uniform: 'uStrengthLevel', type: 'select' as const, options: [
-        { label: 'style.glassdistort.strengthSubtle',   value: 0 },
-        { label: 'style.glassdistort.strengthStandard', value: 1 },
-        { label: 'style.glassdistort.strengthStrong',   value: 2 },
-      ], default: 1, description: 'style.glassdistort.strengthDesc' },
+      { name: 'style.glassdistort.strength',  uniform: 'uStrengthScale', min: 0,    max: 2,   step: 0.01, default: 1,    description: 'style.glassdistort.strengthDesc' },
+      // 大波浪(0.73/0.52/1.37 = 试验台定稿)
+      { name: 'style.glassdistort.waveScale',   uniform: 'uWaveScale',   min: 0.5,  max: 2.2, step: 0.01, default: 0.73, description: 'style.glassdistort.waveScaleDesc',   visibleWhen: (v) => v.uGlassType === 0 },
+      { name: 'style.glassdistort.waveGain',    uniform: 'uWaveGain',    min: 0.15, max: 0.8, step: 0.01, default: 0.52, description: 'style.glassdistort.waveGainDesc',    visibleWhen: (v) => v.uGlassType === 0 },
+      { name: 'style.glassdistort.waveStretch', uniform: 'uWaveStretch', min: 1.0,  max: 2.6, step: 0.01, default: 1.37, description: 'style.glassdistort.waveStretchDesc', visibleWhen: (v) => v.uGlassType === 0 },
+      // 方格压花(20.5/0.52/0.32/0.16 + 缝亮脊)
+      { name: 'style.glassdistort.gridCells',  uniform: 'uGridCells',  min: 5,    max: 22,  step: 0.5,  default: 20.5, description: 'style.glassdistort.gridCellsDesc',  visibleWhen: (v) => v.uGlassType === 1 },
+      { name: 'style.glassdistort.gridJitter', uniform: 'uGridJitter', min: 0,    max: 0.8, step: 0.01, default: 0.52, description: 'style.glassdistort.gridJitterDesc', visibleWhen: (v) => v.uGlassType === 1 },
+      { name: 'style.glassdistort.gridLens',   uniform: 'uGridLens',   min: 0,    max: 1.4, step: 0.01, default: 0.32, description: 'style.glassdistort.gridLensDesc',   visibleWhen: (v) => v.uGlassType === 1 },
+      { name: 'style.glassdistort.gridFlip',   uniform: 'uGridFlip',   min: 0,    max: 0.5, step: 0.01, default: 0.16, description: 'style.glassdistort.gridFlipDesc',   visibleWhen: (v) => v.uGlassType === 1 },
+      { name: 'style.glassdistort.gridSeam',   uniform: 'uGridSeam',   type: 'toggle' as const, default: 1, description: 'style.glassdistort.gridSeamDesc', visibleWhen: (v) => v.uGlassType === 1 },
+      // 橘皮(26/0.25/0.12/0.12)
+      { name: 'style.glassdistort.peelDensity', uniform: 'uPeelDensity', min: 10,   max: 40,  step: 0.5,  default: 26,   description: 'style.glassdistort.peelDensityDesc', visibleWhen: (v) => v.uGlassType === 2 },
+      { name: 'style.glassdistort.peelFlow',    uniform: 'uPeelFlow',    min: 0,    max: 1,   step: 0.01, default: 0.25, description: 'style.glassdistort.peelFlowDesc',    visibleWhen: (v) => v.uGlassType === 2 },
+      { name: 'style.glassdistort.peelWarp',    uniform: 'uPeelWarp',    min: 0,    max: 0.4, step: 0.01, default: 0.12, description: 'style.glassdistort.peelWarpDesc',    visibleWhen: (v) => v.uGlassType === 2 },
+      { name: 'style.glassdistort.peelEnv',     uniform: 'uPeelEnv',     min: 0,    max: 1,   step: 0.01, default: 0.12, description: 'style.glassdistort.peelEnvDesc',     visibleWhen: (v) => v.uGlassType === 2 },
     ],
   },
 ]

@@ -1,16 +1,41 @@
 precision highp float;
 
 // 玻璃扭曲:噪声位移场全幅重映射采样坐标,做出"隔着非平滑玻璃看图"的质感。
-// 三种玻璃类型共用一支 shader,常量与位移曲线均为用户定稿值
-// (迭代过程与定稿表见 wayfinder/tickets/01-glass-prototype.md 及试验台
-//  wayfinder/assets/glass-lab.html,默认值即定稿值)。
+// 三种玻璃类型共用一支 shader,全部气质参数对用户开放(试验台自由度的生产化,
+// 值域与默认值=wayfinder/tickets/01 定稿,即 wayfinder/assets/glass-lab.html 默认值)。
+// 强度为"相对该类型标准强度的比例":strength = BASE[type] * uStrengthScale,
+// 100% 恒等于当前类型的定稿基准,切类型无需重置(clamp 0.95 为验收过的绝对上限)。
 
 varying vec2 vUv;
 
 uniform sampler2D uImage;
 uniform vec2 uResolution;
 uniform float uGlassType;      // 0 大波浪 / 1 方格压花 / 2 橘皮(select 档位)
-uniform float uStrengthLevel;  // 0 轻微 / 1 标准 / 2 强烈(select 档位)
+uniform float uStrengthScale;  // 强度比例,1.0 = 该类型标准强度
+
+/* 大波浪 */
+uniform float uWaveScale;    // 波长尺度 0.5..2.2,默认 0.73(小=更绵长)
+uniform float uWaveGain;     // 倍频粗糙度 0.15..0.8,默认 0.52(过高会碎屑)
+uniform float uWaveStretch;  // 方向拉伸 1.0..2.6,默认 1.37(y 向密)
+
+/* 方格压花 */
+uniform float uGridCells;    // 格数 N 5..22,默认 20.5(每画宽)
+uniform float uGridJitter;   // 逐格错位 0..0.8,默认 0.52(格单位)
+uniform float uGridLens;     // 透镜鼓包 0..1.4,默认 0.32
+uniform float uGridFlip;     // 翻转概率 0..0.5,默认 0.16
+uniform float uGridSeam;     // 缝亮脊 + 逐格曝光,toggle,默认开
+
+/* 橘皮 */
+uniform float uPeelDensity;  // 鼓包基频 10..40,默认 26
+uniform float uPeelFlow;     // 低频流动 0..1,默认 0.25
+uniform float uPeelWarp;     // domain warp 0..0.4,默认 0.12
+uniform float uPeelEnv;      // 疏密包络 0..1,默认 0.12
+
+/* 各类型定稿基准强度(票1 用户拍板) */
+const float BASE_WAVE = 0.78;
+const float BASE_GRID = 0.51;
+const float BASE_PEEL = 0.34;
+const float STRENGTH_MAX = 0.95;   // 大波浪强档"贴顶"验收过的绝对上限
 
 /* ---------- 基础噪声:hash + value noise,quintic 平滑保 C2(透镜面光滑) ---------- */
 
@@ -31,55 +56,52 @@ float vnoise(vec2 p) {
   return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
 }
 
-/* ---------- 高度场:三套玻璃各一,常量即票1 定稿参数 ---------- */
+/* ---------- 高度场:三套玻璃各一 ---------- */
 
-/* 大波浪:3 octave fBm,连绵起伏。
-   波长尺度 0.73 / 倍频增益 0.52 / y 向拉伸 1.37 */
+/* 大波浪:3 octave fBm,连绵起伏 */
 float heightWave(vec2 p) {
-  vec2 q = vec2(p.x, p.y * 1.37);
-  float f = 1.8 / 0.73;
+  vec2 q = vec2(p.x, p.y * uWaveStretch);
+  float f = 1.8 / uWaveScale;
   float a = 1.0;
   float norm = 0.0;
   float h = 0.0;
   for (int i = 0; i < 3; i++) {
     h += a * vnoise(q * f + float(i) * 17.0);
-    norm += a; a *= 0.52; f *= 2.1;
+    norm += a; a *= uWaveGain; f *= 2.1;
   }
   return h / norm;
 }
 
 /* 橘皮:4 octave fBm + domain warp + 疏密包络 + 低频流动。
-   鼓包基频 26 / 低频流动 0.25 / domain warp 0.12 / 疏密包络 0.12。
    铁律:gain 0.35 x lacunarity 1.95 = 0.68/octave < 1,高频 octave 的
    位移/波长比逐级衰减,抑制采样折叠碎屑(高频只留圆润棱线感) */
 float heightPeel(vec2 p) {
   vec2 w = vec2(vnoise(p * 3.1 + 7.3), vnoise(p * 3.1 + 3.7)) - 0.5;
-  vec2 q = p + 0.12 * w;
-  float env = 1.0 - 0.12 * 0.5 + 0.12 * vnoise(p * 6.0 + 11.0);
-  float a = 1.0, f = 26.0, norm = 0.0, h = 0.0;
+  vec2 q = p + uPeelWarp * w;
+  float env = 1.0 - uPeelEnv * 0.5 + uPeelEnv * vnoise(p * 6.0 + 11.0);
+  float a = 1.0, f = uPeelDensity, norm = 0.0, h = 0.0;
   for (int i = 0; i < 4; i++) {
     h += a * vnoise(q * f);
     norm += a; a *= 0.35; f *= 1.95;
   }
   h = h / norm - 0.5;
   float low = vnoise(p * 1.6 + 5.0) - 0.5;
-  return h * env + 0.25 * 0.6 * low;
+  return h * env + uPeelFlow * 0.6 * low;
 }
 
 /* ---------- 方格压花:格点透镜阵(结构化场,不走 fBm) ---------- */
-/* 格数 20.5 / 逐格错位 0.52 / 透镜鼓包 0.32 / 翻转概率 0.16 */
 vec2 latticeDisp(vec2 p, out vec2 cellOut) {
-  float N = 20.5;
+  float N = uGridCells;
   vec2 g = p * N;
   vec2 cell = floor(g);
   vec2 f = fract(g) - 0.5;
-  float flip = hash(cell + 91.3) < 0.16 ? -1.0 : 1.0;
+  float flip = hash(cell + 91.3) < uGridFlip ? -1.0 : 1.0;
   /* 逐格随机错位:跨缝不连续的关键(连续正弦场做不出) */
-  vec2 jit = (vec2(hash(cell), hash(cell + 37.7)) - 0.5) * 2.0 * 0.52;
+  vec2 jit = (vec2(hash(cell), hash(cell + 37.7)) - 0.5) * 2.0 * uGridJitter;
   /* 透镜包络:中心 0、边缘大(钟形,t 空间保证非负)→ 枕形鼓包 + 拖尾 */
   vec2 t = f + 0.5;
   float bell = 16.0 * t.x * t.y * (1.0 - t.x) * (1.0 - t.y);
-  vec2 lens = f * bell * 0.32 * flip;
+  vec2 lens = f * bell * uGridLens * flip;
   cellOut = cell;
   return (jit * flip + lens) / N;
 }
@@ -88,22 +110,6 @@ vec2 latticeDisp(vec2 p, out vec2 cellOut) {
 vec2 mirrorWrap(vec2 uv) {
   vec2 u = mod(uv, 2.0);
   return min(u, 2.0 - u);
-}
-
-/* ---------- 强度锚点矩阵(票2 规格:比例外推,行=玻璃类型,列=弱/中/强) ---------- */
-float anchorStrength(float type, float level) {
-  if (type < 0.5) {
-    if (level < 0.5) return 0.47;   // 大波浪
-    if (level < 1.5) return 0.78;
-    return 0.95;
-  } else if (type < 1.5) {
-    if (level < 0.5) return 0.31;   // 方格压花
-    if (level < 1.5) return 0.51;
-    return 0.64;
-  }
-  if (level < 0.5) return 0.20;     // 橘皮
-  if (level < 1.5) return 0.34;
-  return 0.43;
 }
 
 /* 数值梯度(差分步长 0.004 抗高频走样),只服务于波浪/橘皮 */
@@ -118,7 +124,10 @@ vec2 gradAt(vec2 p, float e) {
 }
 
 void main() {
-  float strength = anchorStrength(uGlassType, uStrengthLevel);
+  float base = uGlassType < 0.5 ? BASE_WAVE
+             : uGlassType < 1.5 ? BASE_GRID
+             : BASE_PEEL;
+  float strength = min(base * uStrengthScale, STRENGTH_MAX);
   float s = pow(strength, 1.5);   // 位移包络曲线:弱档细腻、强档猛
   vec2 uv = vUv;
   vec2 disp;
@@ -137,9 +146,9 @@ void main() {
 
   vec3 col = texture2D(uImage, mirrorWrap(uv + disp)).rgb;
 
-  /* 方格压花:缝亮脊 + 逐格曝光(玻璃自身光学层,固定开;采样后叠加,非独立 pass) */
-  if (uGlassType > 0.5 && uGlassType < 1.5) {
-    float N = 20.5;
+  /* 方格压花:缝亮脊 + 逐格曝光(玻璃自身光学层,可关;采样后叠加,非独立 pass) */
+  if (uGlassType > 0.5 && uGlassType < 1.5 && uGridSeam > 0.5) {
+    float N = uGridCells;
     vec2 g2 = uv * N;
     vec2 f2 = fract(g2) - 0.5;
     vec2 cell2 = floor(g2);

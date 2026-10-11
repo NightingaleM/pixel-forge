@@ -63,7 +63,21 @@ describe('glassdistort', () => {
     expect(styles[styles.length - 1]?.id).toBe('glassdistort')
   })
 
-  it('默认参数:大波浪 + 标准强度,且仅此两个参数', () => {
-    expect(defaultParams('glassdistort')).toEqual({ uGlassType: 0, uStrengthLevel: 1 })
+  it('默认参数 = 试验台定稿值(玻璃类型大波浪 + 强度 100% + 三组气质默认)', () => {
+    expect(defaultParams('glassdistort')).toEqual({
+      uGlassType: 0, uStrengthScale: 1,
+      uWaveScale: 0.73, uWaveGain: 0.52, uWaveStretch: 1.37,
+      uGridCells: 20.5, uGridJitter: 0.52, uGridLens: 0.32, uGridFlip: 0.16, uGridSeam: 1,
+      uPeelDensity: 26, uPeelFlow: 0.25, uPeelWarp: 0.12, uPeelEnv: 0.12,
+    })
+  })
+
+  it('visibleWhen 分组:各玻璃类型只显示本组气质参数,类型/强度恒显', () => {
+    const def = styles.find(s => s.id === 'glassdistort')!
+    const visibleAt = (type: number) =>
+      def.params.filter(p => !p.visibleWhen || p.visibleWhen({ ...defaultParams('glassdistort'), uGlassType: type })).map(p => p.uniform)
+    expect(visibleAt(0)).toEqual(['uGlassType', 'uStrengthScale', 'uWaveScale', 'uWaveGain', 'uWaveStretch'])
+    expect(visibleAt(1)).toEqual(['uGlassType', 'uStrengthScale', 'uGridCells', 'uGridJitter', 'uGridLens', 'uGridFlip', 'uGridSeam'])
+    expect(visibleAt(2)).toEqual(['uGlassType', 'uStrengthScale', 'uPeelDensity', 'uPeelFlow', 'uPeelWarp', 'uPeelEnv'])
   })
 })
