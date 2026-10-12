@@ -63,7 +63,54 @@ describe('randomizeParams', () => {
   })
 })
 
+describe('randomizeParams locked（参数锁死）', () => {
+  it('locked 内的 number/select/color 全类型保留现值', () => {
+    const base = { uCellSize: 20, uCaseMode: 1, uCharScale: 1.2 }
+    const locked = new Set(['uCellSize', 'uCaseMode', 'uCharColor', 'uCharScale'])
+    const { params, textParams } = randomizeParams(
+      ascii, base, { uCharColor: '#123456' }, () => 0.999, locked,
+    )
+    expect(params.uCellSize).toBe(20)
+    expect(params.uCaseMode).toBe(1)
+    expect(params.uCharScale).toBe(1.2)
+    expect(textParams.uCharColor).toBe('#123456')
+  })
+
+  it('locked 外的参数照常随机', () => {
+    const base = { uCellSize: 20, uBgFilter: 0.07 }
+    const { params } = randomizeParams(ascii, base, {}, () => 0.999, new Set(['uCellSize']))
+    // rand=0.999：uBgFilter(0..0.5,step 0.01) → 0.5 ≠ 0.07，证明未锁参数仍随机
+    expect(params.uBgFilter).toBe(0.5)
+    expect(params.uCellSize).toBe(20)
+  })
+
+  it('locked 含 text/toggle/font 时无副作用（本就不随机，锁死为幂等豁免）', () => {
+    const { params, textParams } = randomizeParams(
+      ascii, { uShowBg: 1 }, { uCharset: 'AB' }, () => 0.999,
+      new Set(['uCharset', 'uShowBg', 'uFont']),
+    )
+    expect(params.uShowBg).toBe(1)
+    expect(textParams.uCharset).toBe('AB')
+  })
+
+  it('locked 不入 SKIP 名单时二者独立叠加（SKIP 依然生效）', () => {
+    // uAngle 在 SKIP 名单：不锁也不随机
+    const base = { uAngle: 45, uCellSize: 20 }
+    const { params } = randomizeParams(halftone, base, {}, () => 0.999, new Set(['uCellSize']))
+    expect(params.uAngle).toBe(45)
+  })
+})
+
 describe('randomSeed', () => {
+  it('locked 透传：锁死的 number/color 值随码往返', () => {
+    const seed = randomSeed(
+      ascii, { uCellSize: 20 }, { uCharColor: '#123456' }, () => 0,
+      new Set(['uCellSize', 'uCharColor']),
+    )
+    const decoded = decodeSeed(seed)!
+    expect(decoded.params.uCellSize).toBe(20)
+    expect(decoded.colorParams.uCharColor).toBe('#123456')
+  })
   it('产出可 decode 回同一风格的合法种子', () => {
     const seed = randomSeed(halftone, { uCellSize: 5 }, {}, () => 0.42)
     const decoded = decodeSeed(seed)

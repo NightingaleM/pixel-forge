@@ -141,6 +141,17 @@ describe('randomizeRowSeed', () => {
     const r = randomizeRowSeed(makeRow(), def, base)
     expect(decodeSeed(r.seed!)).not.toBeNull()
   })
+  it('locked 透传:锁死的 uniform 不被行骰子改写(经 loadWorking 往返校验)', () => {
+    // ascii 覆盖 number(uCellSize)/select(uCaseMode)/color(uCharColor) 三类锁死
+    const asciiDef = getStyle('ascii')!
+    const asciiBase: BatchBase = { params: { uCellSize: 20, uCaseMode: 1 }, textParams: { uCharColor: '#123456' } }
+    const locked = new Set(['uCellSize', 'uCaseMode', 'uCharColor'])
+    const r = randomizeRowSeed(makeRow(), asciiDef, asciiBase, () => 0.999, locked)
+    const w = loadWorking(r, asciiBase, asciiDef)
+    expect(w.params.uCellSize).toBe(20)
+    expect(w.params.uCaseMode).toBe(1)
+    expect(w.textParams.uCharColor).toBe('#123456')
+  })
 })
 
 describe('assembleProcessingTasks', () => {

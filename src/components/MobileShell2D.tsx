@@ -33,6 +33,10 @@ export interface MobileParamPanelProps {
   onFontChange: (uniform: string, font: FontFace | null) => void
   onRandom: () => void
   onReset: () => void
+  /** 参数级锁死/重置(与桌面 ParamPanel 同构,embedded 内逐行渲染) */
+  lockedUniforms?: Set<string>
+  onToggleLock?: (uniform: string) => void
+  onResetParam?: (uniform: string) => void
   top: ReactNode
 }
 
@@ -230,6 +234,9 @@ function MobileShell2D(props: MobileShell2DProps) {
             onTextChange={p.onTextChange}
             fontValues={p.fontValues}
             onFontChange={p.onFontChange}
+            lockedUniforms={p.lockedUniforms}
+            onToggleLock={p.onToggleLock}
+            onResetParam={p.onResetParam}
           />
         </BottomSheet>
       )}

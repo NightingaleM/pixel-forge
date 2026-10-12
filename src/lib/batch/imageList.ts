@@ -75,14 +75,16 @@ export function loadWorking(
   return mergeWithDefaults(def, decoded.params, decoded.colorParams)
 }
 
-/** 重骰单行:以基线为底随机(toggle/select/text 保留基线值),返回新对象。 */
+/** 重骰单行:以基线为底随机(toggle/select/text 保留基线值),返回新对象。
+ *  locked=面板锁死的 uniform 集合,透传 randomSeed(锁死参数保留基线值)。 */
 export function randomizeRowSeed(
   img: BatchImage,
   def: StyleDefinition,
   base: BatchBase,
   rand?: () => number,
+  locked?: Set<string>,
 ): BatchImage {
-  return { ...img, seed: randomSeed(def, base.params, base.textParams, rand) }
+  return { ...img, seed: randomSeed(def, base.params, base.textParams, rand, locked) }
 }
 
 /** drain 单轮任务组装:对给定行「此刻」逐行取生效种子(id/image 顺序保留)。

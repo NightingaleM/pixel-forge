@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { useDraggable } from '../lib/useDraggable'
 import { snapToStep } from '../lib/paramValue'
+import { SKIP_RANDOM_UNIFORMS } from '../lib/randomSeed'
 import type { ParamDef } from '../types'
 
 interface ParamPanelProps {
@@ -26,6 +27,11 @@ interface ParamPanelProps {
   /** sheet 内嵌模式：不渲染 .param-panel 拖拽定位壳/关闭钮/折叠头，填满父容器(宽 100%)。
    *  标题/描述/随机由宿主(BottomSheet + m-params-actions)承担；参数控件本体两模式共用。 */
   embedded?: boolean
+  /** 锁死的 uniform 集合：骰子(单骰/批量全部/行重骰)不改写这些参数。会话态，不入种子码 */
+  lockedUniforms?: Set<string>
+  onToggleLock?: (uniform: string) => void
+  /** 单参数重置：number/select/toggle 回 default，color/text 回默认文本，font 清除上传 */
+  onResetParam?: (uniform: string) => void
 }
 
 function formatValue(value: number, step?: number): string {
@@ -166,6 +172,72 @@ function ParamValueInput({ value, min, max, step, name, onCommit }: {
   )
 }
 
+/** 行内工具组：锁死(仅可随机类型 number/select/color) + 重置(全类型)。
+ *  放属性名后方。SKIP_RANDOM_UNIFORMS(系统级豁免)预置为锁死态且禁用——
+ *  视觉语义一致：锁亮=不会被随机；不可点是「本来就如此」。
+ *  preventDefault/stopPropagation：toggle 行内点击不触发勾选(与 tooltip ? 同款)。 */
+function ParamTools({ param, locked, onToggleLock, onResetParam }: {
+  param: ParamDef
+  locked?: boolean
+  onToggleLock?: (uniform: string) => void
+  onResetParam?: (uniform: string) => void
+}) {
+  const { t } = useTranslation()
+  const canRandom = param.type !== 'text' && param.type !== 'toggle' && param.type !== 'font'
+  const skip = canRandom && SKIP_RANDOM_UNIFORMS.includes(param.uniform)
+  const isLocked = skip || locked === true
+  const lockTitle = skip ? t('common.paramLockSkip') : locked ? t('common.paramUnlock') : t('common.paramLock')
+  return (
+    <span className="param-tools">
+      {canRandom && onToggleLock && (
+        <button
+          type="button"
+          className={`param-tool-btn${isLocked ? ' param-tool-btn--locked' : ''}`}
+          disabled={skip}
+          aria-pressed={locked === true}
+          title={`${param.name} · ${lockTitle}`}
+          aria-label={`${param.name} · ${lockTitle}`}
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            onToggleLock(param.uniform)
+          }}
+        >
+          {isLocked ? (
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="5" y="11" width="14" height="9" rx="2" />
+              <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+            </svg>
+          ) : (
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="5" y="11" width="14" height="9" rx="2" />
+              <path d="M8 11V7a4 4 0 0 1 7.6-1.7" />
+            </svg>
+          )}
+        </button>
+      )}
+      {onResetParam && (
+        <button
+          type="button"
+          className="param-tool-btn"
+          title={`${param.name} · ${t('common.paramReset')}`}
+          aria-label={`${param.name} · ${t('common.paramReset')}`}
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            onResetParam(param.uniform)
+          }}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M3.5 12a8.5 8.5 0 1 0 2.5-6" />
+            <polyline points="3.5 3.5 3.5 8.5 8.5 8.5" />
+          </svg>
+        </button>
+      )}
+    </span>
+  )
+}
+
 function renderParam(
   param: ParamDef,
   values: Record<string, number>,
@@ -174,13 +246,31 @@ function renderParam(
   onTextChange: (u: string, v: string) => void,
   onFontChange: (u: string, f: FontFace | null) => void,
   fontValues: Record<string, FontFace | null | undefined>,
+  tools?: { locked?: Set<string>; onToggleLock?: (uniform: string) => void; onResetParam?: (uniform: string) => void },
 ) {
+  const renderTools = tools && (tools.onToggleLock || tools.onResetParam) ? (
+    <ParamTools
+      param={param}
+      locked={tools.locked?.has(param.uniform)}
+      onToggleLock={tools.onToggleLock}
+      onResetParam={tools.onResetParam}
+    />
+  ) : null
+  // 名字+工具组共居 header 左侧(与右端值输入对 space-between)；toggle 行原无
+  // header，包一层保持六类行的名字起始位置一致
+  const headerLeft = (label: ReactNode) => (
+    <div className="param-header">
+      <div className="param-header-left">
+        {label}
+        {renderTools}
+      </div>
+    </div>
+  )
+
   if (param.type === 'text') {
     return (
       <div key={param.uniform} className="param-row">
-        <div className="param-header">
-          <ParamLabel name={param.name} description={param.description} />
-        </div>
+        {headerLeft(<ParamLabel name={param.name} description={param.description} />)}
         <input
           type="text"
           className="param-text-input"
@@ -196,14 +286,16 @@ function renderParam(
   if (param.type === 'toggle') {
     return (
       <div key={param.uniform} className="param-row">
-        <label className="param-toggle">
-          <input
-            type="checkbox"
-            checked={(values[param.uniform] ?? param.default) === 1}
-            onChange={(e) => onChange(param.uniform, e.target.checked ? 1 : 0)}
-          />
-          <ParamLabel name={param.name} description={param.description} />
-        </label>
+        {headerLeft(
+          <label className="param-toggle">
+            <input
+              type="checkbox"
+              checked={(values[param.uniform] ?? param.default) === 1}
+              onChange={(e) => onChange(param.uniform, e.target.checked ? 1 : 0)}
+            />
+            <ParamLabel name={param.name} description={param.description} />
+          </label>,
+        )}
       </div>
     )
   }
@@ -211,9 +303,7 @@ function renderParam(
   if (param.type === 'color') {
     return (
       <div key={param.uniform} className="param-row">
-        <div className="param-header">
-          <ParamLabel name={param.name} description={param.description} />
-        </div>
+        {headerLeft(<ParamLabel name={param.name} description={param.description} />)}
         <input
           type="color"
           className="param-color-input"
@@ -229,9 +319,7 @@ function renderParam(
   if (param.type === 'select') {
     return (
       <div key={param.uniform} className="param-row">
-        <div className="param-header">
-          <ParamLabel name={param.name} description={param.description} />
-        </div>
+        {headerLeft(<ParamLabel name={param.name} description={param.description} />)}
         <select
           className="param-select"
           value={values[param.uniform] ?? param.default}
@@ -264,9 +352,7 @@ function renderParam(
     }
     return (
       <div key={param.uniform} className="param-row">
-        <div className="param-header">
-          <ParamLabel name={param.name} description={param.description} />
-        </div>
+        {headerLeft(<ParamLabel name={param.name} description={param.description} />)}
         <label className="param-font-upload">
           <input type="file" accept=".ttf,.otf,.woff,.woff2" onChange={handleFile} />
           <span className="param-font-name">{current ? current.family : ''}</span>
@@ -279,7 +365,10 @@ function renderParam(
   return (
     <div key={param.uniform} className="param-row">
       <div className="param-header">
-        <ParamLabel name={param.name} description={param.description} />
+        <div className="param-header-left">
+          <ParamLabel name={param.name} description={param.description} />
+          {renderTools}
+        </div>
         <ParamValueInput
           value={values[param.uniform] ?? param.default}
           min={param.min}
@@ -304,7 +393,7 @@ function renderParam(
   )
 }
 
-function ParamPanel({ title, description, params, values, textValues, onChange, onTextChange, fontValues, onFontChange, onRandom, onClose, defaultPos, storageKey, children, top, defaultCollapsed, embedded }: ParamPanelProps) {
+function ParamPanel({ title, description, params, values, textValues, onChange, onTextChange, fontValues, onFontChange, onRandom, onClose, defaultPos, storageKey, children, top, defaultCollapsed, embedded, lockedUniforms, onToggleLock, onResetParam }: ParamPanelProps) {
   const { t } = useTranslation()
   // embedded 下禁用拖拽(hook 恒调以满足规则，enabled=false 不绑事件不定位)
   const { ref: panelRef, pos, onHeaderMouseDown } = useDraggable(defaultPos, storageKey, { enabled: !embedded })
@@ -320,6 +409,7 @@ function ParamPanel({ title, description, params, values, textValues, onChange, 
     onTextChange ?? (() => {}),
     onFontChange ?? (() => {}),
     fontValues ?? {},
+    { locked: lockedUniforms, onToggleLock, onResetParam },
   ))
 
   if (embedded) {

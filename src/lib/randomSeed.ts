@@ -6,17 +6,21 @@ import { snapToStep } from './paramValue'
 export const SKIP_RANDOM_UNIFORMS = ['uCenterX', 'uCenterY', 'uRotation', 'uAngle']
 
 /** 以 base 为底随机 seedable 参数（select 均匀随机一档，color 均匀随机；
- *  toggle/text/font 保留现值——开关类不随机，棱镜默认关等定稿不受骰子干扰）。 */
+ *  toggle/text/font 保留现值——开关类不随机，棱镜默认关等定稿不受骰子干扰）。
+ *  locked=用户在面板锁死的 uniform 集合：锁死的参数保留现值不参与随机
+ *  （与 SKIP_RANDOM_UNIFORMS 系统级豁免独立叠加，不入种子码）。 */
 export function randomizeParams(
   def: StyleDefinition,
   baseParams: Record<string, number>,
   baseTextParams: Record<string, string>,
   rand: () => number = Math.random,
+  locked?: Set<string>,
 ): { params: Record<string, number>; textParams: Record<string, string> } {
   const params = { ...baseParams }
   const textParams = { ...baseTextParams }
   for (const p of def.params) {
     if (p.type === 'text' || p.type === 'toggle' || p.type === 'font') continue
+    if (locked?.has(p.uniform)) continue
     if (p.type === 'select') {
       // select 参与随机（v1 种子布局同步）：rand()*n ∈ [0,n) 天然不越界
       params[p.uniform] = p.options[Math.floor(rand() * p.options.length)].value
@@ -41,7 +45,8 @@ export function randomSeed(
   baseParams: Record<string, number>,
   baseTextParams: Record<string, string>,
   rand: () => number = Math.random,
+  locked?: Set<string>,
 ): string {
-  const r = randomizeParams(def, baseParams, baseTextParams, rand)
+  const r = randomizeParams(def, baseParams, baseTextParams, rand, locked)
   return encodeSeed(def.id, r.params, def, r.textParams)
 }

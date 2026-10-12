@@ -197,6 +197,9 @@ function App2D() {
   const asciiCanvasRef = useRef<HTMLCanvasElement>(null)
   const asciiRendererRef = useRef<AsciiCanvasRenderer | null>(null)
   const [fontParams, setFontParams] = useState<Record<string, FontFace | null>>({})
+  // 参数锁死集合(会话态,不入种子码):骰子(单骰/批量全部/行重骰)不改写锁内
+  // uniform。按 uniform 名存,不同风格 uniform 名天然隔离,切风格不清空
+  const [lockedUniforms, setLockedUniforms] = useState<Set<string>>(() => new Set())
   // 会话级风格记忆：每个风格最后一次离开时的参数/字体状态（刷新即失，不持久化）。
   // fontParams 可选——seed/预设写入的记忆不含字体，语义为"字体不随种子/预设携带"
   const styleMemoryRef = useRef<Partial<Record<StyleId, {
@@ -571,19 +574,20 @@ function App2D() {
   }, [params, textParams])
 
   // 全部随机(面板回调):统一=randomizeParams 同步 base+工作副本;
-  // 独立=每行以基线为底重骰,选中行同步载入工作副本(主画布/SeedBar 跟上)
+  // 独立=每行以基线为底重骰,选中行同步载入工作副本(主画布/SeedBar 跟上)。
+  // 两分支均传锁死集合(lockedUniforms)
   const handleRandomizeAll = useCallback(() => {
     const def = getStyle(activeStyle)
     if (!def || images.length === 0) return
     if (seedMode === 'unified') {
-      const r = randomizeParams(def, params, textParams)
+      const r = randomizeParams(def, params, textParams, Math.random, lockedUniforms)
       setParams(r.params)
       setTextParams(r.textParams)
       setBaseParams(r.params)
       setBaseTextParams(r.textParams)
       return
     }
-    const next = images.map((row) => randomizeRowSeed(row, def, batchBase))
+    const next = images.map((row) => randomizeRowSeed(row, def, batchBase, undefined, lockedUniforms))
     setImages(next)
     const cur = next[selectedIndex]
     if (cur) {
@@ -591,7 +595,7 @@ function App2D() {
       setParams(w.params)
       setTextParams(w.textParams)
     }
-  }, [activeStyle, images, seedMode, params, textParams, batchBase, selectedIndex])
+  }, [activeStyle, images, seedMode, params, textParams, batchBase, selectedIndex, lockedUniforms])
 
   // 重试:failed 行回 pending 再 drain(循环只认 pending,不 patch 永不再跑)
   const handleRetryRow = useCallback((id: string) => {
@@ -606,7 +610,7 @@ function App2D() {
     const row = images.find((r) => r.id === id)
     if (!def || !row) return
     if (row.objectUrl) URL.revokeObjectURL(row.objectUrl)
-    const next = { ...randomizeRowSeed(row, def, batchBase), status: 'pending' as const, blob: null, objectUrl: null, error: null }
+    const next = { ...randomizeRowSeed(row, def, batchBase, undefined, lockedUniforms), status: 'pending' as const, blob: null, objectUrl: null, error: null }
     setImages((prev) => prev.map((r) => (r.id === id ? next : r)))
     if (seedMode === 'perImage' && images[selectedIndex]?.id === id) {
       const w = loadWorking(next, batchBase, def)
@@ -614,7 +618,7 @@ function App2D() {
       setTextParams(w.textParams)
     }
     if (!batchRunningRef.current) void drain()
-  }, [activeStyle, images, batchBase, seedMode, selectedIndex, drain])
+  }, [activeStyle, images, batchBase, seedMode, selectedIndex, drain, lockedUniforms])
 
   // 单张/ZIP 下载 handler 定义在 downloadBlob 之后(微信/移动分流引用它,且其
   // deps 数组在渲染期求值不能前向引用);命名与种子快照语义见彼处注释
@@ -1162,6 +1166,28 @@ function App2D() {
     setFontParams((prev) => ({ ...prev, [uniform]: font }))
   }, [])
 
+  // 参数级锁死切换(不可变更新,面板按钮 aria-pressed 依赖引用变化重渲)
+  const handleToggleLock = useCallback((uniform: string) => {
+    setLockedUniforms((prev) => {
+      const next = new Set(prev)
+      if (next.has(uniform)) next.delete(uniform)
+      else next.add(uniform)
+      return next
+    })
+  }, [])
+
+  // 单参数重置:分派回既有类型感知通道(handleParamChange/handleTextChange 的
+  // 双写基线、种子码更新由此自动正确)。与全局 handleReset 的差异:text 单参数
+  // 重置也回 textDefault(点行内按钮意图明确,不受全局"保护用户内容"豁免约束)
+  const handleResetParam = useCallback((uniform: string) => {
+    const p = getStyle(activeStyle)?.params.find((q) => q.uniform === uniform)
+    if (!p) return
+    if (p.type === 'text') handleTextChange(uniform, p.textDefault)
+    else if (p.type === 'font') handleFontChange(uniform, null)
+    else if (p.type === 'color') handleTextChange(uniform, p.default)
+    else handleParamChange(uniform, p.default)
+  }, [activeStyle, handleParamChange, handleTextChange, handleFontChange])
+
   const handleReset = useCallback(() => {
     const nextParams = defaultParams(activeStyle)
     // color 参数走 textParams 数据流，重置时一并恢复默认色；
@@ -1183,7 +1209,7 @@ function App2D() {
   const handleRandom = useCallback(() => {
     const styleDef = getStyle(activeStyle)
     if (!styleDef) return
-    const r = randomizeParams(styleDef, params, textParams)
+    const r = randomizeParams(styleDef, params, textParams, Math.random, lockedUniforms)
     setParams(r.params)
     setTextParams(r.textParams)
     // 独立模式骰子 = randomizeParams 写工作副本(切换选中行/开始处理时再同步回行)
@@ -1192,7 +1218,7 @@ function App2D() {
       setBaseParams(r.params)
       setBaseTextParams(r.textParams)
     }
-  }, [activeStyle, params, textParams, seedMode, resetZoneSelection])
+  }, [activeStyle, params, textParams, seedMode, resetZoneSelection, lockedUniforms])
 
   // 风格定义与当前种子码:导出 handler(水印文本带种子码)与渲染/种子视图共用,
   // 声明在 handler 之前(useCallback 引用不能前向)
@@ -1749,6 +1775,9 @@ function App2D() {
       onFontChange: handleFontChange,
       onRandom: handleRandom,
       onReset: handleReset,
+      lockedUniforms,
+      onToggleLock: handleToggleLock,
+      onResetParam: handleResetParam,
       top: (
         <>
           <SeedBar seed={seed} onApply={handleApplySeed} presets={presets} onApplyPreset={handleApplyPreset} />
@@ -1921,6 +1950,9 @@ function App2D() {
           fontValues={fontParams}
           onFontChange={handleFontChange}
           onRandom={handleRandom}
+          lockedUniforms={lockedUniforms}
+          onToggleLock={handleToggleLock}
+          onResetParam={handleResetParam}
           top={
             <>
               <SeedBar seed={seed} onApply={handleApplySeed} presets={presets} onApplyPreset={handleApplyPreset} />

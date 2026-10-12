@@ -457,6 +457,60 @@ body {
   justify-content: space-between;
 }
 
+/* 名字+行内工具组(锁死/重置)共居 header 左侧,右端留给值输入(space-between) */
+.param-header-left {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+/* --- Parameter row tools (lock / reset) --- */
+
+.param-tools {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 2px;
+}
+
+.param-tool-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #b8b8b8;
+  cursor: pointer;
+  transition: color 0.15s, background-color 0.15s;
+}
+
+.param-tool-btn:hover {
+  color: #333;
+  background: rgba(0, 0, 0, 0.06);
+}
+
+/* 锁死态:点亮 + 轻底 chip,一眼可辨哪些参数被钉住 */
+.param-tool-btn--locked {
+  color: #111;
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.param-tool-btn--locked:hover {
+  color: #000;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+/* SKIP 名单(系统级不随机)预置锁死态且禁用:可视为常亮指示 */
+.param-tool-btn:disabled {
+  cursor: default;
+  color: #999;
+  background: transparent;
+}
+
 /* --- Parameter Label --- */
 
 .param-label {
