@@ -67,7 +67,22 @@ function CompareSlider({
     return () => ro.disconnect()
   }, [renderMode, asciiCanvasRef, canvasRef])
 
-  const { viewport, pointerHandlers, setZoom, reset, isPanning } = useViewport(containerRef)
+  const { viewport, pointerHandlers, setZoom, applyViewport, reset, isPanning } = useViewport(containerRef)
+
+  // 转卡开档:卡片内容区化(aspect-ratio 生效后 flex 居中)再复位到 75% 居中——
+  // 缩放以 scaler 左上为原点(transform-origin 0 0),pan=w*(1-zoom)/2 补偿回中,
+  // 舞台留出投影/倾转余量;关档复位 {1,0,0}(scaler 回全區,pan 语义同步归零)。
+  // scaler 尺寸同帧可量:effect 时 React 已 commit,inline aspectRatio 与 CSS
+  // 布局同步生效,offsetWidth 无需等 ResizeObserver。
+  useEffect(() => {
+    if (!cardMode) {
+      reset()
+      return
+    }
+    const scaler = containerRef.current?.querySelector<HTMLElement>('.canvas-scaler')
+    if (!scaler) return
+    applyViewport({ zoom: 0.75, panX: scaler.offsetWidth * 0.125, panY: scaler.offsetHeight * 0.125 })
+  }, [cardMode, applyViewport, reset])
 
   // compare 分割线位置 = canvas 内容坐标比例 [0,1]（非视口比例），这样放大后分割线/
   // clipPath（在缩放的 canvas-scaler 内）仍与鼠标对齐。读本地 ref + state，普通函数即可。
@@ -215,6 +230,12 @@ function CompareSlider({
           style={{
             transform: `translate(${viewport.panX}px, ${viewport.panY}px) scale(${viewport.zoom})`,
             transformOrigin: '0 0',
+            // 转卡档:盒=图片比例(--card 样式下 width/height auto + max 约束),
+            // canvas fill 无 letterbox——object-fit: contain 的白边不复存在
+            aspectRatio:
+              cardMode && originalImage?.naturalWidth && originalImage?.naturalHeight
+                ? `${originalImage.naturalWidth} / ${originalImage.naturalHeight}`
+                : undefined,
           }}
         >
           {/* 转卡 3D 容器:恒挂载(canvas 的 WebGL 上下文绑定在元素上,重挂载即重建

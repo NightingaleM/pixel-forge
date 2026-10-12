@@ -104,6 +104,9 @@ export class CardTiltEngine {
 
   start(): void {
     if (this.raf) return
+    // 开档视为一次交互:lastPointer 刷新,静止 2.5s 后自摆才接管(否则引擎是
+    // 页面加载时创建的,lastPointer 早过期,开转卡立即自摆)
+    this.state.lastPointer = performance.now()
     const loop = (t: number) => {
       this.raf = requestAnimationFrame(loop)
       this.step(t)

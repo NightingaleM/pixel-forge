@@ -83,26 +83,23 @@ describe('glassdistort', () => {
 })
 
 describe('holofoil / prism (第二批新风格, tickets/04 规格)', () => {
-  it('holofoil 默认参数 = 规格票定稿值(碎冰镭射 + 强度 100% + 样张基准 + 票06 选择性加箔)', () => {
+  it('holofoil 默认参数 = 规格票定稿值(碎冰镭射 + 强度 100% + 样张基准;应用范围暂撤恒全图)', () => {
     expect(defaultParams('holofoil')).toEqual({
       uTexture: 0, uStrength: 1, uBandDensity: 1, uBandAngle: 22,
       uCrackleDensity: 38, uStreakDensity: 14, uSparkleDensity: 1,
-      // 选择性加箔(wayfinder/holofoil-card 票06):uScope=0 全图 = 旧码等价
-      uScope: 0, uEdgeThreshold: 0.5, uEdgeWidth: 2, uEdgeSoftBand: 1.5, uEdgeHysteresis: 0.15, uZoneBoost: 0,
     })
   })
 
-  it('holofoil visibleWhen 分组:各质感只显示本组参数,公共参数恒显(底色 color + 应用范围恒在面板)', () => {
+  it('holofoil visibleWhen 分组:各质感只显示本组参数,公共参数恒显(应用范围暂撤:面板无 uScope 系)', () => {
     const def = styles.find(s => s.id === 'holofoil')!
     const visibleAt = (over: Record<string, number>) =>
       def.params.filter(p => !p.visibleWhen || p.visibleWhen({ ...defaultParams('holofoil'), ...over })).map(p => p.uniform)
     const common = ['uTexture', 'uStrength', 'uBandDensity', 'uBandAngle', 'uFoilColor']
-    expect(visibleAt({ uTexture: 0 })).toEqual([...common, 'uCrackleDensity', 'uScope'])
-    expect(visibleAt({ uTexture: 1 })).toEqual([...common, 'uStreakDensity', 'uScope'])
-    expect(visibleAt({ uTexture: 2 })).toEqual([...common, 'uSparkleDensity', 'uScope'])
-    // 票06 三档显隐:边缘档显 4 滑杆(质感子参照常按质感显隐),分区档显 uZoneBoost
-    expect(visibleAt({ uTexture: 0, uScope: 1 })).toEqual([...common, 'uCrackleDensity', 'uScope', 'uEdgeThreshold', 'uEdgeWidth', 'uEdgeSoftBand', 'uEdgeHysteresis'])
-    expect(visibleAt({ uTexture: 0, uScope: 2 })).toEqual([...common, 'uCrackleDensity', 'uScope', 'uZoneBoost'])
+    expect(visibleAt({ uTexture: 0 })).toEqual([...common, 'uCrackleDensity'])
+    expect(visibleAt({ uTexture: 1 })).toEqual([...common, 'uStreakDensity'])
+    expect(visibleAt({ uTexture: 2 })).toEqual([...common, 'uSparkleDensity'])
+    // 应用范围(全图/边缘/分区)暂撤:参数表不再注册 uScope/边缘滑杆/uZoneBoost,
+    // shader 的 zone/edge 逻辑保留(uScope 恒缺省 0=全图等价),恢复注册即回
   })
 
   it('prism 默认参数 = 规格票定稿值(径向色差 + 色散量 50%)', () => {

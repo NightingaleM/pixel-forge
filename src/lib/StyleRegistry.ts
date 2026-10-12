@@ -375,17 +375,9 @@ export const styles: StyleDefinition[] = [
       { name: 'style.holofoil.crackleDensity', uniform: 'uCrackleDensity', min: 15, max: 60, step: 0.5, default: 38, description: 'style.holofoil.crackleDensityDesc', visibleWhen: (v) => v.uTexture === 0 },
       { name: 'style.holofoil.streakDensity',  uniform: 'uStreakDensity',  min: 5,  max: 40, step: 0.5, default: 14, description: 'style.holofoil.streakDensityDesc',  visibleWhen: (v) => v.uTexture === 1 },
       { name: 'style.holofoil.sparkleDensity', uniform: 'uSparkleDensity', min: 0.5, max: 3, step: 0.01, default: 1, description: 'style.holofoil.sparkleDensityDesc', visibleWhen: (v) => v.uTexture === 2 },
-      // 选择性加箔(wayfinder/holofoil-card 票06 定稿):末位追加,旧码缺参走默认 uScope=0=全图等价
-      { name: 'style.holofoil.scope', uniform: 'uScope', type: 'select' as const, options: [
-        { label: 'style.holofoil.scopeFull', value: 0 },
-        { label: 'style.holofoil.scopeEdge', value: 1 },
-        { label: 'style.holofoil.scopeZone', value: 2 },
-      ], default: 0, description: 'style.holofoil.scopeDesc' },
-      { name: 'style.holofoil.edgeThreshold', uniform: 'uEdgeThreshold', min: 0.1, max: 0.9, step: 0.05, default: 0.5, description: 'style.holofoil.edgeThresholdDesc', visibleWhen: (v) => v.uScope === 1 },
-      { name: 'style.holofoil.edgeWidth',     uniform: 'uEdgeWidth',     min: 1,   max: 6,   step: 0.5,  default: 2,   description: 'style.holofoil.edgeWidthDesc', visibleWhen: (v) => v.uScope === 1 },
-      { name: 'style.holofoil.edgeSoftBand',  uniform: 'uEdgeSoftBand',  min: 0.5, max: 3,   step: 0.5,  default: 1.5, description: 'style.holofoil.edgeSoftBandDesc', visibleWhen: (v) => v.uScope === 1 },
-      { name: 'style.holofoil.edgeHysteresis', uniform: 'uEdgeHysteresis', min: 0, max: 0.4, step: 0.05, default: 0.15, description: 'style.holofoil.edgeHysteresisDesc', visibleWhen: (v) => v.uScope === 1 },
-      { name: 'style.holofoil.zoneBoost', uniform: 'uZoneBoost', type: 'toggle' as const, default: 0, description: 'style.holofoil.zoneBoostDesc', visibleWhen: (v) => v.uScope === 2 },
+      // 选择性加箔(票06 uScope/边缘滑杆/uZoneBoost)暂撤:效果不达预期恒全图。
+      // shader 的 zone/edge 逻辑保留(uScope 恒缺省 0=全图,renderImage/cardHtml
+      // 均有 ?? 0 兜底),恢复本注册块即可回滚;v2 未发布,旧 v2 码失效可接受
     ],
   },
 

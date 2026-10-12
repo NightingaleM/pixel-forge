@@ -773,8 +773,27 @@ body {
 /* --- Card Tilt(转卡模式,wayfinder/holofoil-card 票06)--- */
 
 .canvas-wrapper--card {
-  /* 3D 舞台:卡片在视平面外的倾转由 perspective 呈现 */
-  perspective: 1100px;
+  /* 转卡舞台:卡片内容区化(scaler=图片比例盒居中),canvas 无 object-fit
+     letterbox 白边。透视不挂这里——中间隔着带 transform 的 .canvas-scaler
+     (flat),CSS perspective 只作用直接子元素;由引擎在 card-tilt 的
+     transform 内写 perspective(1100px) 承担(与导出闪卡 HTML 等价观感) */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 转卡档 scaler:宽高交由 aspect-ratio(CompareSlider 按原图比例 inline 提供)
+   + max 约束解出,正好包住图片显示区 */
+.canvas-wrapper--card .canvas-scaler {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+/* 盒=图片比例,fill 无变形(letterbox 白边不复存在) */
+.canvas-wrapper--card canvas {
+  object-fit: fill;
 }
 
 /* 转卡 3D 容器:恒挂载(canvas 的 WebGL 上下文绑定在元素上,重挂载即重建上下文);

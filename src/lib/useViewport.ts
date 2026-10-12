@@ -71,6 +71,8 @@ export interface UseViewportResult {
   pointerHandlers: { onPointerDown: (e: React.PointerEvent) => void }
   /** 供 ZoomControl 按钮：以视口中心为锚点缩放。 */
   setZoom: (z: number) => void
+  /** 直接写视口（调用方自管 pan 语义；转卡开档 75% 居中复位用）。 */
+  applyViewport: (v: Viewport) => void
   /** 复位到 {1,0,0}（双击调用）。 */
   reset: () => void
   /** 是否正在拖动平移（供光标 grabbing）。 */
@@ -226,5 +228,9 @@ export function useViewport(
     commitViewport({ zoom: 1, panX: 0, panY: 0 })
   }, [commitViewport])
 
-  return { viewport, pointerHandlers: { onPointerDown }, setZoom, reset, isPanning }
+  const applyViewport = useCallback((v: Viewport) => {
+    commitViewport(v)
+  }, [commitViewport])
+
+  return { viewport, pointerHandlers: { onPointerDown }, setZoom, applyViewport, reset, isPanning }
 }

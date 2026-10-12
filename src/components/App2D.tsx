@@ -700,7 +700,11 @@ function App2D() {
     }
     const { tilt, gloss, vignette } = tiltElsRef.current
     if (tilt) {
-      tilt.style.transform = `rotateX(${f.rx.toFixed(2)}deg) rotateY(${f.ry.toFixed(2)}deg)`
+      // perspective() 前缀(最左,顺序铁律):card-tilt 与带 transform 的
+      // canvas-scaler 之间隔着一层,CSS perspective 属性只作用直接子元素——
+      // 透视写进自身 transform 才不被隔断(否则 ±amp 正交投影视觉相同,
+      // 对角手感失真;与导出闪卡 HTML 的 stage perspective 等价)
+      tilt.style.transform = `perspective(1100px) rotateX(${f.rx.toFixed(2)}deg) rotateY(${f.ry.toFixed(2)}deg)`
       const light = cardEngine.feel.light
       if (light) {
         if (gloss) gloss.style.backgroundPosition = `${((0.5 - f.cx * 0.5) * 100).toFixed(1)}% 0`

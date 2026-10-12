@@ -129,18 +129,24 @@ describe('encodeSeed / decodeSeed', () => {
     expect(decodeSeed('00njY7e')).not.toBeNull()   // v0 旧码
   })
 
-  it('holofoil 选择性加箔参数入码往返(票06:uScope select + 边缘4滑杆 + uZoneBoost toggle)', () => {
+  it('holofoil 应用范围已撤(恒全图):uScope 系外键被编码忽略,decoded 不带出', () => {
     const def = getStyle('holofoil')!
     const p = {
       ...numericParams(def, (q) => q.default),
-      uTexture: 0,   // select 随码携带,decoded.params 会带出——对齐键集
+      // 撤参后调用方残留的旧键(renderImage 兜底 ?? 0)不进码也不解出
       uScope: 2, uEdgeThreshold: 0.35, uEdgeWidth: 4.5, uEdgeSoftBand: 2.5, uEdgeHysteresis: 0.4, uZoneBoost: 1,
     }
     const code = encodeSeed('holofoil', p, def)
-    expect(code.length).toBeLessThanOrEqual(21)   // 全 max 亦 17(手算档积 log62≈14.3),上限不动
+    expect(code.length).toBeLessThanOrEqual(21)
     const decoded = decodeSeed(code)
     expect(decoded).not.toBeNull()
-    expect(decoded!.params).toEqual(p)
+    expect(decoded!.params).not.toHaveProperty('uScope')
+    expect(decoded!.params).not.toHaveProperty('uZoneBoost')
+    // 键集对齐默认态(select 离散档随码携带带出)
+    expect(decoded!.params).toEqual({
+      ...numericParams(def, (q) => q.default),
+      ...discreteParams(def, defaultOf),
+    })
   })
 
   it('默认值往返（每个特效）', () => {
