@@ -470,7 +470,6 @@ body {
 /* --- Parameter Tooltip --- */
 
 .param-tooltip-wrap {
-  position: relative;
   display: inline-flex;
   align-items: center;
 }
@@ -496,12 +495,12 @@ body {
   border-color: #000;
 }
 
+/* fixed + portal 挂 body：left/top 由 ParamLabel 按图标视口坐标 inline 提供，
+   不进入 .param-panel-body 的 scrollable overflow（旧 absolute 版右缘恒溢出出横向滚动条） */
 .param-tooltip-text {
-  display: none;
-  position: absolute;
-  bottom: calc(100% + 6px);
-  left: -10px;
+  position: fixed;
   width: 224px;
+  max-width: calc(100vw - 16px);
   background: #000;
   color: #FFF;
   font-size: 11px;
@@ -509,12 +508,13 @@ body {
   line-height: 1.4;
   padding: 6px 10px;
   white-space: normal;
-  z-index: 100;
+  z-index: 1000;
   pointer-events: none;
 }
 
-.param-tooltip-wrap:hover .param-tooltip-text {
-  display: block;
+/* 高度实测定稿前不闪现（两段式摆位的第一段） */
+.param-tooltip-text[data-placed='false'] {
+  visibility: hidden;
 }
 
 /* --- Parameter Value --- */

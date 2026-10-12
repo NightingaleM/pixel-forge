@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { useDraggable } from '../lib/useDraggable'
 import { snapToStep } from '../lib/paramValue'
@@ -33,15 +34,69 @@ function formatValue(value: number, step?: number): string {
   return value.toFixed(precision)
 }
 
-/** 参数名 + 可选「?」描述 tooltip。preventDefault 防止在 label 内（toggle 分支）点击图标触发勾选。 */
+/** 参数名 + 可选「?」描述 tooltip。preventDefault 防止在 label 内（toggle 分支）点击图标触发勾选。
+ *  tooltip 经 portal 挂 body + fixed 定位：浮层若留在 .param-panel-body(overflow 滚动容器)内，
+ *  固定 224px 宽锚行内图标会使右缘恒溢出内容宽——横向滚动条 + 超出部分被裁且滚不过去。 */
 function ParamLabel({ name, description }: { name: string; description?: string }) {
+  const wrapRef = useRef<HTMLSpanElement>(null)
+  const tipRef = useRef<HTMLSpanElement>(null)
+  /** 非 null 即显示；值为 tooltip 左缘视口坐标 */
+  const [tipLeft, setTipLeft] = useState<number | null>(null)
+
+  const showTip = () => {
+    const icon = wrapRef.current?.getBoundingClientRect()
+    if (!icon) return
+    const width = Math.min(224, window.innerWidth - 16)
+    setTipLeft(Math.min(Math.max(8, icon.left + icon.width / 2 - width / 2), window.innerWidth - width - 8))
+  }
+
+  // 垂直摆位直接同步到 portal 节点(paint 前,无闪烁):上方放得下贴上方,否则翻到图标下方。
+  // 只动 DOM 不进 state,避免 setState-in-effect 级联渲染。
+  useLayoutEffect(() => {
+    if (tipLeft == null || !tipRef.current || !wrapRef.current) return
+    const el = tipRef.current
+    const icon = wrapRef.current.getBoundingClientRect()
+    const h = el.offsetHeight
+    const above = icon.top - 6 - h >= 8
+    el.style.top = `${above ? icon.top - 6 - h : icon.bottom + 6}px`
+    el.dataset.placed = 'true'
+  }, [tipLeft])
+
+  // 滚动/resize 后图标已移位，直接关闭（capture 捕获 overflow 容器不冒泡的 scroll）
+  useEffect(() => {
+    if (tipLeft == null) return
+    const close = () => setTipLeft(null)
+    window.addEventListener('scroll', close, true)
+    window.addEventListener('resize', close)
+    return () => {
+      window.removeEventListener('scroll', close, true)
+      window.removeEventListener('resize', close)
+    }
+  }, [tipLeft])
+
   return (
     <span className="param-label">
       {name}
       {description && (
-        <span className="param-tooltip-wrap" onClick={(e) => e.preventDefault()}>
+        <span
+          ref={wrapRef}
+          className="param-tooltip-wrap"
+          onMouseEnter={showTip}
+          onMouseLeave={() => setTipLeft(null)}
+          onClick={(e) => e.preventDefault()}
+        >
           <span className="param-tooltip-icon">?</span>
-          <span className="param-tooltip-text">{description}</span>
+          {tipLeft != null && createPortal(
+            <span
+              ref={tipRef}
+              className="param-tooltip-text"
+              style={{ left: tipLeft }}
+              data-placed="false"
+            >
+              {description}
+            </span>,
+            document.body,
+          )}
         </span>
       )}
     </span>
