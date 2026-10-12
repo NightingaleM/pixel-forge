@@ -1,6 +1,7 @@
 // src/lib/license/testKey.ts
-// 开发自测密钥对(仅用于本地造码验证,与生产密钥无关;生产公钥见 verify.ts)。
-// 测试私钥唯一源:scripts/ 下三个涉钥脚本统一经 scripts/read-test-key.mjs 读本文件,
-// 换钥只改这里(私钥与公钥两行一起换)。
-export const TEST_PRIVATE_KEY_HEX = '585a87b0a5f2c4304597fcd18bd78368851de086b1ab126830bb961fc7fc2ff3'
-export const TEST_PUBLIC_KEY_HEX = '711858903ef7f1a8b6751ae99f9f333df56b77c6b9eb772c8d0c964a4b58796c'
+// 测试密钥对:当前镜像后端联调环境的签发钥(2026-10-13 填入)——本地造码与后台
+// 签的码同源可互验。⚠️ 页面运行时验签不读本文件,读 verify.ts 硬编码公钥;
+// 后台再换钥须两处同步:本文件(私钥+公钥两行)+ verify.ts 公钥。
+// 测试私钥唯一源:scripts/ 下三个涉钥脚本统一经 scripts/read-test-key.mjs 读本文件。
+export const TEST_PRIVATE_KEY_HEX = 'f14d6f02f8eab066165074fecdec864f64cb5eeb9f363d40f2dfd3fdc0ed906e'
+export const TEST_PUBLIC_KEY_HEX = '6bc88195c75c5b4c05a539e340ef29254decdebd8b5772d949fb26ab201dba6f'
