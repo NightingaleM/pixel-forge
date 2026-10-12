@@ -67,22 +67,26 @@ function CompareSlider({
     return () => ro.disconnect()
   }, [renderMode, asciiCanvasRef, canvasRef])
 
-  const { viewport, pointerHandlers, setZoom, applyViewport, reset, isPanning } = useViewport(containerRef)
+  const { viewport, pointerHandlers, setZoom, animateViewport, cancelViewportAnim, reset, isPanning } = useViewport(containerRef)
 
-  // 转卡开档:卡片内容区化(aspect-ratio 生效后 flex 居中)再复位到 75% 居中——
-  // 缩放以 scaler 左上为原点(transform-origin 0 0),pan=w*(1-zoom)/2 补偿回中,
-  // 舞台留出投影/倾转余量;关档复位 {1,0,0}(scaler 回全區,pan 语义同步归零)。
-  // scaler 尺寸同帧可量:effect 时 React 已 commit,inline aspectRatio 与 CSS
-  // 布局同步生效,offsetWidth 无需等 ResizeObserver。
+  // 转卡开/关档:视口复位走 350ms rAF 渐变(useViewport.animateViewport,bezierEase
+  // 插值——CSS transition 与 React 渲染时序耦合,可能不启动或被打断,弃用)。
+  // 开档复位 75% 居中:缩放以 scaler 左上为原点(transform-origin 0 0),
+  // pan=w*(1-zoom)/2 补偿回中,舞台留出投影/倾转余量;关档复位 {1,0,0} 并清引擎
+  // 残留的倾角/阴影 inline(卡片回正,缩放动画干净)。pinch/滚轮接管时动画自动
+  // 中断(onCardPointerMove 双指分支显式 cancel)。scaler 尺寸同帧可量:effect 时
+  // React 已 commit,inline aspectRatio 与 CSS 布局同步生效,无需等 ResizeObserver。
   useEffect(() => {
-    if (!cardMode) {
-      reset()
-      return
-    }
     const scaler = containerRef.current?.querySelector<HTMLElement>('.canvas-scaler')
     if (!scaler) return
-    applyViewport({ zoom: 0.75, panX: scaler.offsetWidth * 0.125, panY: scaler.offsetHeight * 0.125 })
-  }, [cardMode, applyViewport, reset])
+    if (cardMode) {
+      animateViewport({ zoom: 0.75, panX: scaler.offsetWidth * 0.125, panY: scaler.offsetHeight * 0.125 })
+    } else {
+      animateViewport({ zoom: 1, panX: 0, panY: 0 })
+      tiltRef?.current?.style.removeProperty('transform')
+      tiltRef?.current?.style.removeProperty('box-shadow')
+    }
+  }, [cardMode, animateViewport, tiltRef])
 
   // compare 分割线位置 = canvas 内容坐标比例 [0,1]（非视口比例），这样放大后分割线/
   // clipPath（在缩放的 canvas-scaler 内）仍与鼠标对齐。读本地 ref + state，普通函数即可。
@@ -176,7 +180,10 @@ function CompareSlider({
     } else if (cardPtrs.current.size >= 2) {
       const pts = [...cardPtrs.current.values()].slice(0, 2)
       const d = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y)
-      if (cardDist.current > 1 && d > 1) setZoom(viewport.zoom * (d / cardDist.current))
+      if (cardDist.current > 1 && d > 1) {
+        cancelViewportAnim() // pinch 接管缩放:中断开/关档渐变
+        setZoom(viewport.zoom * (d / cardDist.current))
+      }
       cardDist.current = d
     }
   }

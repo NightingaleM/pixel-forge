@@ -65,14 +65,38 @@ export function pinchInfo(prev: [Point, Point], next: [Point, Point]): { scale: 
   }
 }
 
+/** cubic-bezier(0.4, 0, 0.2, 1)(Material standard)的进度求值:对 x(t)=t 逆求
+ *  参数 s(二分 24 次,帧精度足够)再取 y(s)。转卡开/关档的视口缩放渐变用。 */
+export function bezierEase(t: number): number {
+  const k = Math.min(1, Math.max(0, t))
+  if (k <= 0) return 0
+  if (k >= 1) return 1
+  const bx = (s: number) => 3 * s * (1 - s) ** 2 * 0.4 + 3 * s * s * (1 - s) * 0.2 + s ** 3
+  const by = (s: number) => 3 * s * s * (1 - s) + s ** 3
+  let lo = 0
+  let hi = 1
+  for (let i = 0; i < 24; i++) {
+    const mid = (lo + hi) / 2
+    if (bx(mid) < k) lo = mid
+    else hi = mid
+  }
+  return by((lo + hi) / 2)
+}
+
 export interface UseViewportResult {
   viewport: Viewport
   /** 仅在非 compare 模式挂到 wrapper 的 onPointerDown（单指/鼠标=平移，双指=pinch）。 */
   pointerHandlers: { onPointerDown: (e: React.PointerEvent) => void }
   /** 供 ZoomControl 按钮：以视口中心为锚点缩放。 */
   setZoom: (z: number) => void
-  /** 直接写视口（调用方自管 pan 语义；转卡开档 75% 居中复位用）。 */
+  /** 直接写视口（调用方自管 pan 语义）。 */
   applyViewport: (v: Viewport) => void
+  /** 视口渐变：当前值 → target,rAF 每帧 bezierEase 插值(350ms 默认)。
+   *  转卡开/关档的缩放复位用——不走 CSS transition(挂类/改值与 React 渲染
+   *  时序耦合,过渡可能不启动或被后续 re-render 打断,行为不确定)。 */
+  animateViewport: (target: Viewport, durationMs?: number) => void
+  /** 中断渐变(pinch/滚轮等用户接管缩放时调用)。 */
+  cancelViewportAnim: () => void
   /** 复位到 {1,0,0}（双击调用）。 */
   reset: () => void
   /** 是否正在拖动平移（供光标 grabbing）。 */
@@ -111,6 +135,39 @@ export function useViewport(
     elRef.current = viewportEl.current
   })
 
+  // --- 视口渐变（须在 wheel effect/onPointerDown 前定义——它们的依赖数组在
+  //     渲染期求值,引用 cancelViewportAnim,靠后定义会 TDZ）：当前值快照 →
+  //     target 每帧 bezierEase 插值。任何直接写 viewport 的路径（wheel/pinch/
+  //     双击）先 cancel，动画与用户操作互不覆盖 ---
+  const animRafRef = useRef(0)
+  const cancelViewportAnim = useCallback(() => {
+    if (animRafRef.current) cancelAnimationFrame(animRafRef.current)
+    animRafRef.current = 0
+  }, [])
+  const animateViewport = useCallback((target: Viewport, durationMs = 350) => {
+    cancelViewportAnim()
+    const from = viewportRef.current
+    const t0 = performance.now()
+    const step = (now: number) => {
+      animRafRef.current = 0
+      const k = (now - t0) / durationMs
+      if (k >= 1) {
+        // 结束帧写精确终点:e(1) 的浮点残差会让 pan 残留 1e-13 量级
+        commitViewport({ ...target })
+        return
+      }
+      const e = bezierEase(k)
+      commitViewport({
+        zoom: from.zoom + (target.zoom - from.zoom) * e,
+        panX: from.panX + (target.panX - from.panX) * e,
+        panY: from.panY + (target.panY - from.panY) * e,
+      })
+      animRafRef.current = requestAnimationFrame(step)
+    }
+    animRafRef.current = requestAnimationFrame(step)
+  }, [cancelViewportAnim, commitViewport])
+  useEffect(() => () => cancelAnimationFrame(animRafRef.current), [])
+
   // --- 滚轮缩放：原生非 passive 以便 preventDefault ---
   // 注：el 在 effect 运行时读取（containerRef 是静态 div，不会运行时替换）。
   useEffect(() => {
@@ -118,6 +175,7 @@ export function useViewport(
     if (!el) return
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault()
+      cancelViewportAnim()
       const rect = el.getBoundingClientRect()
       const anchor: Point = { x: e.clientX - rect.left, y: e.clientY - rect.top }
       const cur = viewportRef.current
@@ -126,7 +184,7 @@ export function useViewport(
     }
     el.addEventListener('wheel', handleWheel, { passive: false })
     return () => el.removeEventListener('wheel', handleWheel)
-  }, [min, max, commitViewport])
+  }, [min, max, commitViewport, cancelViewportAnim])
 
   // --- 统一指针：单指/鼠标=平移，双指=pinch 缩放+平移，wheel 保留 ---
   // 指针状态：pointerId → 上帧位置。el 内坐标（相对 getBoundingClientRect）。
@@ -137,6 +195,7 @@ export function useViewport(
   const onPointerDown = useCallback((e: React.PointerEvent) => {
     if (e.button !== 0 && e.pointerType === 'mouse') return
     e.preventDefault()
+    cancelViewportAnim()
     const rect = e.currentTarget.getBoundingClientRect()
     pointers.current.set(e.pointerId, { x: e.clientX - rect.left, y: e.clientY - rect.top })
     if (pointers.current.size === 1) {
@@ -150,7 +209,7 @@ export function useViewport(
       setIsPanning(false)
     }
     ;(e.target as Element).setPointerCapture?.(e.pointerId)
-  }, [])
+  }, [cancelViewportAnim])
 
   useEffect(() => {
     const handleMove = (e: PointerEvent) => {
@@ -232,5 +291,5 @@ export function useViewport(
     commitViewport(v)
   }, [commitViewport])
 
-  return { viewport, pointerHandlers: { onPointerDown }, setZoom, applyViewport, reset, isPanning }
+  return { viewport, pointerHandlers: { onPointerDown }, setZoom, applyViewport, animateViewport, cancelViewportAnim, reset, isPanning }
 }

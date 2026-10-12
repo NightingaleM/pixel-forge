@@ -90,7 +90,22 @@ const cardBtn = await page.evaluateHandle(() =>
   Array.from(document.querySelectorAll('button')).find((e) => e.textContent?.includes('转卡')))
 if (!(await cardBtn.asElement())) throw new Error('未找到转卡按钮')
 await cardBtn.asElement().click()
-await sleep(400) // 视口复位 + 引擎启动
+// C5a 开档渐变:100ms 时 inline scale 应在起点(1=未启动)与终点(0.75=瞬变)
+// 之间(无 CSS transition 参与,inline 即实时值);headless rAF 冻结时复测一次
+await sleep(100)
+let animOpen = await page.evaluate(() => {
+  const m = /scale\(([\d.]+)\)/.exec(document.querySelector('.canvas-scaler').style.transform)
+  return m ? +m[1] : null
+})
+if (animOpen === 1 || animOpen === 0.75) {
+  await sleep(300)
+  animOpen = await page.evaluate(() => {
+    const m = /scale\(([\d.]+)\)/.exec(document.querySelector('.canvas-scaler').style.transform)
+    return m ? +m[1] : null
+  })
+}
+check('C5a 开档缩放有渐变(中途态,非瞬变)',
+  animOpen !== null && animOpen > 0.75 && animOpen < 1, `scale=${animOpen}`)
 
 // 静止态:鼠标移到画布中心(倾角目标≈0 且刷新 lastPointer),等阻尼收敛——
 // 开档即自摆/残余倾角会让 boundingRect 虚胖,几何测量必须静止态做
@@ -180,9 +195,39 @@ const shotAt = async (nx, ny, file) => {
 await shotAt(1, -1, 'tilt-topright.png')
 await shotAt(-1, 1, 'tilt-bottomleft.png')
 
-// --- C4 关档复位 ---
+// --- C4 关档复位(带渐变) ---
+const beforeClose = await page.evaluate(() => ({
+  computed: getComputedStyle(document.querySelector('.canvas-scaler')).transform.slice(0, 44),
+  cls: document.querySelector('.canvas-scaler').className,
+}))
+console.log(`  [diag C4-before] cls="${beforeClose.cls}" computed=${beforeClose.computed}`)
 await cardBtn.asElement().click()
-await sleep(600)
+// C5b 关档渐变:headless 对无活跃动画的页面会冻结 rAF(实测首段 7ms/帧后停
+// 529ms,真实前台浏览器无此现象)——时间点断言不可靠,改为「非瞬变」判定:
+// 200ms 时既未停在起点(0.750=未启动)也未到终点(≥0.999=瞬变);极端冻结
+// 时复测一次
+await sleep(200)
+let animClose = await page.evaluate(() => {
+  const m = /scale\(([\d.]+)\)/.exec(document.querySelector('.canvas-scaler').style.transform)
+  return m ? +m[1] : null
+})
+if (animClose === 0.75 || (animClose !== null && animClose >= 0.999)) {
+  await sleep(300)
+  animClose = await page.evaluate(() => {
+    const m = /scale\(([\d.]+)\)/.exec(document.querySelector('.canvas-scaler').style.transform)
+    return m ? +m[1] : null
+  })
+}
+check('C5b 关档缩放有渐变(中途态,非瞬变)',
+  animClose !== null && animClose > 0.75 && animClose < 0.999, `scale=${animClose}`)
+// C4 终态:轮询等动画自然收尾(结束帧写精确终点;轮询 evaluate 兼可唤醒被
+// headless 冻结的 rAF)
+const tEnd = Date.now()
+for (;;) {
+  const done = await page.evaluate(() => document.querySelector('.canvas-scaler').style.transform === 'translate(0px, 0px) scale(1)')
+  if (done || Date.now() - tEnd > 3000) break
+  await sleep(60)
+}
 const m4 = await measure()
 check('C4 关转卡 scaler 复位 translate(0px, 0px) scale(1)',
   m4.scalerTransform.includes('translate(0px, 0px)') && m4.scalerTransform.includes('scale(1)'),

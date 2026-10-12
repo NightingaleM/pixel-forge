@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { clampZoom, zoomAtCursor, pinchInfo, type Point } from './useViewport'
+import { clampZoom, zoomAtCursor, pinchInfo, bezierEase, type Point } from './useViewport'
 
 describe('clampZoom', () => {
   it('returns value inside range unchanged', () => {
@@ -39,6 +39,26 @@ describe('zoomAtCursor', () => {
   it('clamps newZoom to [min, max]', () => {
     const next = zoomAtCursor({ zoom: 1, panX: 0, panY: 0 }, { x: 0, y: 0 }, 999)
     expect(next.zoom).toBe(16)
+  })
+})
+
+describe('bezierEase(cubic-bezier(0.4, 0, 0.2, 1) 求值)', () => {
+  it('端点:ease(0)=0, ease(1)=1', () => {
+    expect(bezierEase(0)).toBe(0)
+    expect(bezierEase(1)).toBe(1)
+  })
+  it('单调不减(缓动不回跳)', () => {
+    let prev = 0
+    for (let i = 1; i <= 40; i++) {
+      const v = bezierEase(i / 40)
+      expect(v).toBeGreaterThanOrEqual(prev)
+      prev = v
+    }
+  })
+  it('中点进度约 0.78(ease-out 前快后慢)', () => {
+    const v = bezierEase(0.5)
+    expect(v).toBeGreaterThan(0.7)
+    expect(v).toBeLessThan(0.9)
   })
 })
 
