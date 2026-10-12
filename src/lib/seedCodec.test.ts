@@ -129,6 +129,20 @@ describe('encodeSeed / decodeSeed', () => {
     expect(decodeSeed('00njY7e')).not.toBeNull()   // v0 旧码
   })
 
+  it('holofoil 选择性加箔参数入码往返(票06:uScope select + 边缘4滑杆 + uZoneBoost toggle)', () => {
+    const def = getStyle('holofoil')!
+    const p = {
+      ...numericParams(def, (q) => q.default),
+      uTexture: 0,   // select 随码携带,decoded.params 会带出——对齐键集
+      uScope: 2, uEdgeThreshold: 0.35, uEdgeWidth: 4.5, uEdgeSoftBand: 2.5, uEdgeHysteresis: 0.4, uZoneBoost: 1,
+    }
+    const code = encodeSeed('holofoil', p, def)
+    expect(code.length).toBeLessThanOrEqual(21)   // 全 max 亦 17(手算档积 log62≈14.3),上限不动
+    const decoded = decodeSeed(code)
+    expect(decoded).not.toBeNull()
+    expect(decoded!.params).toEqual(p)
+  })
+
   it('默认值往返（每个特效）', () => {
     for (const def of styles) {
       const defaults = numericParams(def, (p) => p.default)

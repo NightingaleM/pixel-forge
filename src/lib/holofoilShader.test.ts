@@ -230,4 +230,32 @@ describe('Holographic foil spectrum mapping', () => {
     const vertical = await renderMetrics(browser, { uBandAngle: 90 })
     expect(thumbMaxDiff(horizontal.thumb, vertical.thumb)).toBeGreaterThan(10)
   }, 30_000)
+
+  // ---- 选择性加箔 + 转卡(wayfinder/holofoil-card 票06)----
+
+  it('uScope 缺省=0 与显式 0 逐字节一致;分区档无掩膜(uZoneEnabled 缺省 0)=全图等价', async () => {
+    // 灰源图本身是柔和波纹(无强阶跃),全图模式输出即基准
+    const implicit = await renderMetrics(browser, {})
+    const explicitZero = await renderMetrics(browser, { uScope: 0 })
+    const zoneNoMask = await renderMetrics(browser, { uScope: 2 })
+    expect(thumbMaxDiff(implicit.thumb, explicitZero.thumb)).toBe(0)
+    expect(thumbMaxDiff(implicit.thumb, zoneNoMask.thumb)).toBe(0)
+  }, 30_000)
+
+  it('边缘档:柔和波纹源无强阶跃 → 光谱几乎为零(回原图),远弱于全图', async () => {
+    // 灰源波纹的梯度平缓,Laplacian 门控+滞后核心应滤掉绝大部分——边缘档近乎纯原图
+    const edge = await renderMetrics(browser, { uScope: 1, uZoneEnabled: 1, uTexSize: [96, 96] })
+    const full = await renderMetrics(browser, { uTexSize: [96, 96] })
+    expect(edge.meanSaturation).toBeLessThan(0.05)
+    expect(edge.meanSaturation).toBeLessThan(full.meanSaturation * 0.5)
+  }, 30_000)
+
+  it('转卡倾角驱动色带流动:uTiltX 0 vs 1 渲染互不相同(uTilt 缺省 0 无影响)', async () => {
+    const neutral = await renderMetrics(browser, { uTexSize: [96, 96] })
+    const tilted = await renderMetrics(browser, { uTiltX: 1, uTexSize: [96, 96] })
+    expect(thumbMaxDiff(neutral.thumb, tilted.thumb)).toBeGreaterThan(10)
+    // 缺省路径(uTilt 未设,GLSL 默认 0)与显式 0 一致——旧码等价性
+    const explicit = await renderMetrics(browser, { uTiltX: 0, uTiltY: 0 })
+    expect(thumbMaxDiff(neutral.thumb, explicit.thumb)).toBe(0)
+  }, 30_000)
 })

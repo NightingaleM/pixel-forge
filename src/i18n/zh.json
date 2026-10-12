@@ -100,6 +100,19 @@
     "compareOn": "对比已开启",
     "compare": "对比"
   },
+  "card": {
+    "toggle": "转卡",
+    "hint": "移动鼠标或手指转卡 · 停下 2.5 秒进入自摆",
+    "settings": "转卡手感",
+    "amplitude": "倾斜幅度",
+    "amplitudeDesc": "转卡的最大倾角。",
+    "flow": "箔色流动",
+    "flowDesc": "关＝只转卡不变色",
+    "idle": "闲置自摆",
+    "idleDesc": "无操作 2.5 秒后轻摆",
+    "shine": "阴影/高光微动",
+    "shineDesc": "立体感来源"
+  },
   "style": {
     "halftone": {
       "label": "半色调",
@@ -420,7 +433,24 @@
       "streakDensity": "拉丝密度",
       "streakDensityDesc": "竖向光柱丝的密度。",
       "sparkleDensity": "闪点密度",
-      "sparkleDensityDesc": "珠光闪点的疏密。"
+      "sparkleDensityDesc": "珠光闪点的疏密。",
+      "scope": "应用范围",
+      "scopeDesc": "烫箔覆盖的画面区域：全图、只贴轮廓边缘、或自动分区后点选。",
+      "scopeFull": "全图",
+      "scopeEdge": "边缘",
+      "scopeZone": "自动分区",
+      "edgeThreshold": "边缘阈值",
+      "edgeThresholdDesc": "判定轮廓的灵敏度：越低贴的边越多。",
+      "edgeWidth": "边缘宽度",
+      "edgeWidthDesc": "沿轮廓烫箔的边带宽度。",
+      "edgeSoftBand": "软带羽化",
+      "edgeSoftBandDesc": "边带往内侧的渐变柔和程度。",
+      "edgeHysteresis": "滞后容差",
+      "edgeHysteresisDesc": "抑制高纹理照片的弥漫响应：越大只保留越强的轮廓。",
+      "edgeHint": "边缘模式更适合卡通/插画",
+      "zoneBoost": "选中区效果增强",
+      "zoneBoostDesc": "关＝仅烫箔（未选区保持原图）；开＝整图金属底、彩虹只在选中处流动。",
+      "zonePickHint": "点击画面选择/取消加箔区域"
     },
     "prism": {
       "label": "棱镜色散",
@@ -573,7 +603,9 @@
   "export": {
     "png": "PNG",
     "jpg": "JPG",
-    "svg": "SVG"
+    "svg": "SVG",
+    "cardHtml": "闪卡 HTML",
+    "cardHtmlDone": "闪卡已导出：电脑或 Android 浏览器打开即可转卡；iPhone 需上传到线上后再打开"
   },
   "batch": {
     "title": "批量处理",
@@ -680,6 +712,7 @@
   "license": {
     "toastCorner": "今日无水印额度已用完,本次导出带水印",
     "batchBanner": "免费版批量导出带水印",
+    "cardHtmlOnly": "HTML 导出为会员专属",
     "panelTitle": "会员",
     "freeTitle": "免费版",
     "memberTitle": "会员",

@@ -52,6 +52,15 @@ export interface MobileShell2DProps {
   compareMode: boolean
   onToggleCompare: () => void
   onClose: () => void
+  // 转卡模式(holofoil 专属,与 compare 互斥):App2D 引擎接线经此透传给
+  // CompareSlider(手势/拾取逻辑都在那边);tiltRef 直达 3D 容器供引擎写 transform
+  cardMode: boolean
+  onToggleCard?: () => void
+  onCardTilt?: (nx: number, ny: number) => void
+  onCardRelease?: () => void
+  onZonePick?: (u: number, v: number) => void
+  tiltRef?: RefObject<HTMLDivElement | null>
+  onOpenCardSettings?: () => void
   /** 上传页回调(ImageUploader):App2D handleImagesLoad 直通 */
   onImagesLoad: (images: HTMLImageElement[], names: string[]) => void
   // 图片条(类型直接取自 ImageStrip 的 Props)
@@ -77,6 +86,8 @@ export interface MobileShell2DProps {
   onDownloadPng: () => void
   onDownloadJpg: () => void
   onDownloadSvg: () => void
+  /** 闪卡 HTML 导出(holofoil 专属,会员格式);缺省不渲染按钮 */
+  onDownloadCardHtml?: () => void
   onRandom: () => void
   onOpenBatch: () => void
   imageInfo: { width: number; height: number; size: string } | null
@@ -128,6 +139,13 @@ function MobileShell2D(props: MobileShell2DProps) {
             compareMode={props.compareMode}
             onToggleCompare={props.onToggleCompare}
             onClose={props.onClose}
+            cardMode={props.cardMode}
+            onToggleCard={props.onToggleCard}
+            onCardTilt={props.onCardTilt}
+            onCardRelease={props.onCardRelease}
+            onZonePick={props.onZonePick}
+            tiltRef={props.tiltRef}
+            onOpenCardSettings={props.onOpenCardSettings}
           />
         ) : (
           <ImageUploader onImagesLoad={props.onImagesLoad} />
@@ -155,7 +173,20 @@ function MobileShell2D(props: MobileShell2DProps) {
             <button className="m-dock-btn m-dock-btn--primary" onClick={props.onDownloadSvg}>{t('export.svg')}</button>
           </>
         ) : (
-          <button className="m-dock-btn m-dock-btn--primary" onClick={props.onDownloadPng}>{t('common.download')}</button>
+          <>
+            <button className="m-dock-btn m-dock-btn--primary" onClick={props.onDownloadPng}>{t('common.download')}</button>
+            {/* 闪卡 HTML(holofoil 专属,会员格式,与桌面 ActionBar 并列同语义) */}
+            {props.onDownloadCardHtml && (
+              <button className="m-dock-btn" onClick={props.onDownloadCardHtml}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  {/* 卡片微倾示意(与桌面转卡钮同语义):平行四边形卡面 */}
+                  <path d="M7 4l13 3-3 13L4 17z" />
+                  <path d="M7 4l3 13" opacity="0.55" />
+                </svg>
+                <span>{t('export.cardHtml')}</span>
+              </button>
+            )}
+          </>
         )}
         {/* 无图时 paramPanel 为 null:sheet 不置位,否则传图后 p 变非空、参数 sheet 自己弹出 */}
         <button className="m-dock-btn" onClick={() => { if (p) setSheet('params') }}>

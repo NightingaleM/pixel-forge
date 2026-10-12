@@ -100,6 +100,19 @@
     "compareOn": "Compare ON",
     "compare": "Compare"
   },
+  "card": {
+    "toggle": "Tilt",
+    "hint": "Move mouse or finger to tilt · idle 2.5s starts a gentle sway",
+    "settings": "Tilt Feel",
+    "amplitude": "Amplitude",
+    "amplitudeDesc": "Maximum tilt angle.",
+    "flow": "Foil Flow",
+    "flowDesc": "Off = tilts without color shift",
+    "idle": "Idle Sway",
+    "idleDesc": "Gentle sway after 2.5s idle",
+    "shine": "Shading Micro-motion",
+    "shineDesc": "Source of depth"
+  },
   "style": {
     "halftone": {
       "label": "Halftone",
@@ -420,7 +433,24 @@
       "streakDensity": "Streak Density",
       "streakDensityDesc": "Density of the vertical light streaks.",
       "sparkleDensity": "Sparkle Density",
-      "sparkleDensityDesc": "Density of the pearl sparkles."
+      "sparkleDensityDesc": "Density of the pearl sparkles.",
+      "scope": "Apply Range",
+      "scopeDesc": "Where the foil lands: the whole image, contour edges only, or auto zones you pick.",
+      "scopeFull": "Full image",
+      "scopeEdge": "Edges",
+      "scopeZone": "Auto zones",
+      "edgeThreshold": "Edge Threshold",
+      "edgeThresholdDesc": "Sensitivity for detecting contours: lower picks up more edges.",
+      "edgeWidth": "Edge Width",
+      "edgeWidthDesc": "Width of the foil band along contours.",
+      "edgeSoftBand": "Soft Band",
+      "edgeSoftBandDesc": "How softly the band fades inward.",
+      "edgeHysteresis": "Hysteresis",
+      "edgeHysteresisDesc": "Suppresses diffuse responses on busy textures: higher keeps only strong contours.",
+      "edgeHint": "Edge mode works best on cartoons/illustrations",
+      "zoneBoost": "Boost Selected Zones",
+      "zoneBoostDesc": "Off = foil only (unselected stays original); on = metallic base overall, rainbow flows only on selected zones.",
+      "zonePickHint": "Tap the image to select/deselect zones"
     },
     "prism": {
       "label": "Prism Dispersion",
@@ -573,7 +603,9 @@
   "export": {
     "png": "PNG",
     "jpg": "JPG",
-    "svg": "SVG"
+    "svg": "SVG",
+    "cardHtml": "Card HTML",
+    "cardHtmlDone": "Card exported: open it in a browser on desktop or Android to tilt; on iPhone it needs to be hosted online first"
   },
   "batch": {
     "title": "Batch",
@@ -680,6 +712,7 @@
   "license": {
     "toastCorner": "Watermark-free quota used up today; exports now carry a watermark",
     "batchBanner": "Free batch exports are watermarked",
+    "cardHtmlOnly": "HTML export is member-only",
     "panelTitle": "Membership",
     "freeTitle": "Free",
     "memberTitle": "Member",

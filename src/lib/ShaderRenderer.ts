@@ -36,6 +36,10 @@ export class ShaderRenderer {
   private maxTextureSize: number;
   private imageWidth: number = 0;
   private imageHeight: number = 0;
+  // 已上传源纹理的实际分辨率(texImage2D 直接吃原始尺寸,与 fitted canvas 尺寸
+  // 解耦)。holofoil 边缘检测的采样步进按纹理像素走(uTexSize),从这里读。
+  private texWidth: number = 0;
+  private texHeight: number = 0;
 
   // Cached uniform locations for current program
   private uniformCache: Map<string, WebGLUniformLocation> = new Map();
@@ -103,6 +107,8 @@ export class ShaderRenderer {
 
     this.imageWidth = width;
     this.imageHeight = height;
+    this.texWidth = image.naturalWidth || image.width;
+    this.texHeight = image.naturalHeight || image.height;
 
     // Resize the canvas to match
     this.canvas.width = width;
@@ -455,6 +461,11 @@ export class ShaderRenderer {
    */
   getGl(): WebGLRenderingContext {
     return this.gl
+  }
+
+  /** 已上传源纹理的实际分辨率(非 canvas 尺寸);holofoil 检测步进用。 */
+  getImageSize(): [number, number] {
+    return [this.texWidth, this.texHeight]
   }
 
   /**

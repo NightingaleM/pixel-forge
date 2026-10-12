@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { signCredential } from './emit'
 import { getOrCreateDeviceId, setLicenseStorage, setLicensePublicKey } from './verify'
 import { FREE_DAILY_NO_WATERMARK, setQuotaStorage } from './quota'
-import { decideSingleExport, decideBatchExport } from './gating'
+import { decideSingleExport, decideBatchExport, decideExportCardHTML } from './gating'
 import { TEST_PRIVATE_KEY_HEX, TEST_PUBLIC_KEY_HEX } from './testKey'
 
 class MemStorage {
@@ -62,3 +62,28 @@ describe('decideBatchExport', () => {
     expect(decideBatchExport(NOW).mode).toBe('none')
   })
 })
+
+describe('decideExportCardHTML(wayfinder/holofoil-card 票06:首个格式拒绝型)', () => {
+  it('免费=deny(格式拒绝先于额度判定,不消耗免费每日额度)', () => {
+    expect(decideExportCardHTML(NOW).mode).toBe('deny')
+    // 拒绝不该消耗额度:紧随其后的单图导出仍是免费第 1 次 none
+    expect(decideSingleExport(NOW).mode).toBe('none')
+  })
+
+  it('会员=allow;过期会员回落 deny', () => {
+    becomeMember(100)
+    expect(decideExportCardHTML(NOW).mode).toBe('allow')
+    const mem = new MemStorage()
+    setLicenseStorage(mem)
+    setQuotaStorage(mem)
+    becomeMember2(mem, -1)
+    expect(decideExportCardHTML(NOW).mode).toBe('deny')
+  })
+})
+
+/** 第二存储区的会员模拟(隔离上例已消耗的额度/凭证状态)。 */
+function becomeMember2(mem: MemStorage, expOffsetSec: number) {
+  const did = getOrCreateDeviceId()
+  const cred = signCredential({ v: 2, cid: 'abcdef0123456790', exp: Math.floor(NOW / 1000) + expOffsetSec, did }, TEST_PRIVATE_KEY_HEX)
+  mem.setItem('pixel-forge.license.v2', cred)
+}

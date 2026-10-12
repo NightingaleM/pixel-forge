@@ -1,7 +1,7 @@
 ---
 title: 全息箔闪卡——选择性加箔 + 3D 转卡交互与导出
 labels: [wayfinder:map]
-status: open
+status: closed
 tracker: local-markdown
 ---
 
@@ -39,10 +39,11 @@ tracker: local-markdown
 - [样张票——转卡交互 demo（手感三参数可调）](tickets/04-card-tilt-demo.md): [assets/card-demo/](assets/card-demo/) 交付（单文件 base64 内嵌，file:// 双击即用，即导出 HTML 方案雏形）——幅度滑杆 5–20° 默认 12、三开关（箔色流动 band+=dot(tilt,dir)*2.6 / 闲置自摆 2.5s / 阴影高光微动）、质感三档+素材三选+实时读数；verify 13/13＋视觉复核五项过。**实测修正（执行票必带）**：纹理上传必须 `UNPACK_FLIP_Y_WEBGL=true`（漏设=卡面倒置，app 先例 ShaderRenderer.ts:119）；拉丝高饱和观感会被 vision 模型误判为 bug（与 app 用户认可定稿同观感）。拍板门定稿四问：幅度默认值/自摆默认/阴影默认/流动增益 2.6。
 - [拍板门——线程砍留与手感定稿](tickets/05-gate-grilling.md): **双线程全保留**；iPhone 现实接受+三分法文案口径；点选面**做**；掩码**双语义选项、默认仅烫箔**；分区 k=4/xyw=0.5 照准；**手感四值定稿**（幅度 12°/自摆做且默认开/阴影微动做且默认开/流动增益 2.6，产品常量不入码）；分区算法+导出 HTML 方案（WebGL 实时+降级链+陀螺仪内置）照准；**H5 预览陀螺仪彩蛋裁决不做**。
 - [规格收口与设计确认](tickets/06-spec-lock.md): **全规格锁定，设计确认门过（Q1–Q13）**——参数表 8→13：uScope 三档 select（默认全图保旧码）+边缘 4 滑杆（阈值/宽度/软带羽化/滞后容差，均入码+随机，改判开放）+分区 uZoneBoost toggle（默认仅烫箔）；k/xyw 固定常量；**选中集合不入码**（恢复=全选）；转卡=工具条按钮+compare 互斥+桌面 hover 跟随/H5 单指转卡双指缩放+手感悬浮窗（幅度+三开关，不入码，改判开窗）；HTML 导出= ActionBar/H5 并列按钮+gating 首个格式拒绝型（非会员开 LicensePanel+toast，会员无水印）+票 02 模板照抄；**静态 PNG 角度序列砍掉**（改判）；验收=341 只增+模板 verify 自检+码长上限 23。全文见票内 Resolution，执行票 07 照抄。
+- [执行交付——三端验收本地合入](tickets/07-execute.md): **图走完（2026-10-12）**——三线程全量落地本地 main（不 push）：选择性加箔（边缘=票03 算法+uTexSize 铁律；分区=k-means TS 化+点选 3×3 众数；批量=全选语义自然成立）、转卡（cardTilt 引擎+CompareSlider 手势互斥+手感浮窗+H5 pinch 保留）、HTML 导出（格式拒绝 gating+单文件模板 0.53MB+降级链+陀螺仪三分支+verify 钩子）。验收：测试 367/367（+26）/lint=基线 11 零警告/tsc 0；e2e 30/30（桌面 18/H5 6/模板 6）；shader 与样张**翻转后逐像素等价**（样张页缺 FLIP_Y 属样张自身翻转，app 方向正确）；实测修正样张乘法 bug（`zone*=uZoneEnabled`→`mix`）；码长实测 17（≤21 断言不动）；微信内 HTML 恒走 anchor（lightbox 对 text/html 无意义）。验证归档 [assets/verify-exec/](assets/verify-exec/)。
 
 ## Not yet specified
 
-（无——规格已锁，全部雾项毕业或裁决；前沿＝票 07 执行交付。）
+（无——票 01–07 全关，路线走完，图关闭。）
 
 ## Out of scope
 

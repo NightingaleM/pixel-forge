@@ -8,8 +8,12 @@ import { encodeSeed, decodeSeed } from '../lib/seedCodec'
 import { findBrightestPoint } from '../lib/brightPoint'
 import { randomizeParams } from '../lib/randomSeed'
 import { renderImage, exportCanvasBlob, compositeOnBlack } from '../lib/renderImage'
-import { decideSingleExport } from '../lib/license/gating'
+import { decideSingleExport, decideExportCardHTML } from '../lib/license/gating'
 import { getLicenseStatus } from '../lib/license/verify'
+import { hexToRgb } from '../lib/paramValue'
+import { analyzeZones, drawZoneMask, pickZone, type ZoneAnalysis } from '../lib/holofoilZones'
+import { CardTiltEngine, DEFAULT_CARD_TILT_FEEL, type CardTiltFeel, type CardTiltFrame } from '../lib/cardTilt'
+import { buildCardHtml, encodeImageForCard, encodeFallbackForCard } from '../lib/cardHtml'
 import { exportWatermarked, injectSvgWatermark } from '../lib/license/watermark'
 import { loadPresets, savePreset, removePreset, mergeWithDefaults, type PresetEntry } from '../lib/presetStore'
 import { randomId } from '../lib/randomId'
@@ -50,6 +54,7 @@ import { CompareSlider } from './CompareSlider'
 import ConfirmDialog from './ConfirmDialog'
 import BatchPanel, { type BatchSeedMode } from './BatchPanel'
 import LicensePanel from './LicensePanel'
+import CardSettingsPanel from './CardSettingsPanel'
 import MobileShell2D, { type MobileParamPanelProps, type MobileStyleItem } from './MobileShell2D'
 import Lightbox, { type LightboxItem } from './Lightbox'
 
@@ -151,6 +156,26 @@ function App2D() {
   const [params, setParams] = useState<Record<string, number>>(() => defaultParams('halftone'))
   const [textParams, setTextParams] = useState<Record<string, string>>(() => defaultTextParams('halftone'))
   const [compareMode, setCompareMode] = useState(false)
+  // 转卡模式(holofoil 专属,与 compare 互斥:开转卡自动退出对比,反之亦然——票06)
+  const [cardMode, setCardMode] = useState(false)
+  // 手感悬浮窗开合;feel 真值在 CardTiltEngine,cardFeelView 镜像驱动浮窗 UI
+  const [showCardSettings, setShowCardSettings] = useState(false)
+  const [cardFeelView, setCardFeelView] = useState<CardTiltFeel>({ ...DEFAULT_CARD_TILT_FEEL })
+  // 闪卡 HTML:会员 gating 拒绝 toast / 导出成功提示(三分法口径,文案长 5s 自清)
+  const [cardToast, setCardToast] = useState<'deny' | 'done' | null>(null)
+  useEffect(() => {
+    if (!cardToast) return
+    const timer = setTimeout(() => setCardToast(null), 5000)
+    return () => clearTimeout(timer)
+  }, [cardToast])
+  // holofoil 分区档:CPU 分析产物 + 选中面集合。null=全部面选中(默认态);
+  // 点选 toggle 维护集合,掩膜按集合重绘(选中集合不入种子码——票06 裁决)
+  const [zoneAnalysis, setZoneAnalysis] = useState<ZoneAnalysis | null>(null)
+  const [zoneSelected, setZoneSelected] = useState<Set<number> | null>(null)
+  const cardEngineRef = useRef<CardTiltEngine | null>(null)
+  const tiltRef = useRef<HTMLDivElement | null>(null)
+  const tiltElsRef = useRef<{ tilt: HTMLElement | null; gloss: HTMLElement | null; vignette: HTMLElement | null }>({ tilt: null, gloss: null, vignette: null })
+  const zoneMaskCanvasRef = useRef<HTMLCanvasElement | null>(null)
   // 体积光自动光源:图片最亮点的 UV 坐标(检测失败为 null)
   const [brightest, setBrightest] = useState<{ x: number; y: number } | null>(null)
   // 主画布 × 的关闭确认:单图=v1 退出确认;批量=批量会话关闭确认(清全部图片)
@@ -608,6 +633,119 @@ function App2D() {
   }, [isBatchRunning, closeBatchPanel])
 
   // ---------------------------------------------------------------------------
+  // holofoil 分区档(wayfinder/holofoil-card 票06):分析 + 掩膜 + 点选
+  // ---------------------------------------------------------------------------
+
+  const isHolofoilZone = activeStyle === 'holofoil' && (params['uScope'] ?? 0) === 2
+  // 进入分区档/换图时分析一次(256² 低清格,桌面 <50ms/移动 <150ms,票03 实测,
+  // 同步一帧可承受)。分析完成前的帧 zoneMask=null → uZoneEnabled=0 → zone=1
+  // = 全选语义,无错误闪烁;切图/退出分区档即清(选中集合设备本地,不持久)
+  useEffect(() => {
+    if (!isHolofoilZone || !image) {
+      setZoneAnalysis(null)
+      setZoneSelected(null)
+      return
+    }
+    setZoneAnalysis(analyzeZones(image))
+    setZoneSelected(null)
+  }, [isHolofoilZone, image])
+
+  // 掩膜:仅存在「被取消的面」时才绘制上传(全选=不传,zone 恒 1 渲染等价)
+  const zoneMask = useMemo(() => {
+    if (!isHolofoilZone || !zoneAnalysis || !zoneSelected || zoneSelected.size === 0) return null
+    if (zoneSelected.size >= zoneAnalysis.regions.length) return null
+    if (!zoneMaskCanvasRef.current) zoneMaskCanvasRef.current = document.createElement('canvas')
+    return drawZoneMask(zoneAnalysis, zoneSelected, zoneMaskCanvasRef.current)
+  }, [isHolofoilZone, zoneAnalysis, zoneSelected])
+
+  // 点选 toggle:3×3 众数拾取抗羽化带误拾,再点一次该面撤销(无独立撤销栈——票06)
+  const handleZonePick = useCallback((u: number, v: number) => {
+    if (!zoneAnalysis) return
+    const id = pickZone(zoneAnalysis, u, v)
+    setZoneSelected((prev) => {
+      const all = new Set(zoneAnalysis.regions.map((r) => r.id))
+      const next = new Set(prev ?? all)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next.size === all.size ? null : next   // 选满回 null(默认态归一)
+    })
+  }, [zoneAnalysis])
+
+  // 种子码/预设/随机/重置/换风格 = 恢复全部面选中(选中集合不入码——票06)
+  const resetZoneSelection = useCallback(() => setZoneSelected(null), [])
+
+  // ---------------------------------------------------------------------------
+  // 转卡模式(票06):引擎 + onFrame(CSS 3D + 光效微动 + WebGL 按需重渲)
+  // ---------------------------------------------------------------------------
+
+  const cardEngine = useMemo(() => (cardEngineRef.current ??= new CardTiltEngine()), [])
+  useEffect(() => {
+    if (!cardMode || activeStyle !== 'holofoil') {
+      cardEngine.stop()
+      return
+    }
+    cardEngine.start()
+    return () => cardEngine.stop()
+  }, [cardMode, activeStyle, cardEngine])
+
+  // onFrame 每渲染期重挂(读最新渲染管线);tilt 层元素惰性缓存(querySelector
+  // 只在 tiltRef.current 变化时重查一次)
+  cardEngine.onFrame = (f: CardTiltFrame) => {
+    if (tiltRef.current !== tiltElsRef.current.tilt) {
+      tiltElsRef.current = {
+        tilt: tiltRef.current,
+        gloss: tiltRef.current?.querySelector('.card-gloss') ?? null,
+        vignette: tiltRef.current?.querySelector('.card-vignette') ?? null,
+      }
+    }
+    const { tilt, gloss, vignette } = tiltElsRef.current
+    if (tilt) {
+      tilt.style.transform = `rotateX(${f.rx.toFixed(2)}deg) rotateY(${f.ry.toFixed(2)}deg)`
+      const light = cardEngine.feel.light
+      if (light) {
+        if (gloss) gloss.style.backgroundPosition = `${((0.5 - f.cx * 0.5) * 100).toFixed(1)}% 0`
+        if (vignette) vignette.style.opacity = Math.min(0.85, (Math.abs(f.cx) + Math.abs(f.cy)) * 0.55).toFixed(3)
+        tilt.style.boxShadow = `${(-f.cx * 13).toFixed(1)}px ${(16 + f.cy * 9).toFixed(1)}px 44px 3px rgba(5,7,14,0.55)`
+      } else {
+        tilt.style.boxShadow = '0 18px 44px rgba(5,7,14,0.55)'
+      }
+      if (gloss) gloss.style.display = light ? '' : 'none'
+      if (vignette) vignette.style.display = light ? '' : 'none'
+    }
+    // WebGL 按需重渲:流动倾角变化超阈值才重画(非 flow 时仅首帧一次,省电)
+    if (f.redraw && rendererRef.current) {
+      const r = rendererRef.current
+      r.setUniform('uTiltX', f.fx)
+      r.setUniform('uTiltY', f.fy)
+      r.render()
+    }
+  }
+
+  // 互斥开关:开转卡退出对比 / 开对比退出转卡
+  const handleToggleCard = useCallback(() => {
+    setCardMode((v) => {
+      if (!v) setCompareMode(false)
+      return !v
+    })
+  }, [])
+  const handleToggleCompare = useCallback(() => {
+    setCompareMode((prev) => {
+      if (!prev) setCardMode(false)
+      return !prev
+    })
+  }, [])
+  // 指针 → 引擎(CompareSlider 已换算为卡面归一化坐标)
+  const handleCardTilt = useCallback((nx: number, ny: number) => cardEngineRef.current?.pointerTo(nx, ny), [])
+  const handleCardRelease = useCallback(() => cardEngineRef.current?.release(), [])
+  // 手感浮窗调值:写引擎(会话态,刷新回默认),镜像一份驱动 UI
+  const handleCardFeelChange = useCallback((patch: Partial<CardTiltFeel>) => {
+    const engine = cardEngineRef.current
+    if (!engine) return
+    engine.setFeel(patch)
+    setCardFeelView({ ...engine.feel })
+  }, [])
+
+  // ---------------------------------------------------------------------------
   // Render pipeline
   // ---------------------------------------------------------------------------
 
@@ -643,9 +781,13 @@ function App2D() {
         textParams: currentTextParams,
         fontParams: currentFontParams,
         brightest,
+        zoneMask,
       })
+      // useShader 重链接后 uTilt 复位 0:转卡循环下一帧强制重设(renderImage 的
+      // 逐参 setUniform 不含 uTilt——倾角只由转卡引擎管理)
+      cardEngineRef.current?.forceRedraw()
     },
-    [image, brightest],
+    [image, brightest, zoneMask],
   )
 
   // ---------------------------------------------------------------------------
@@ -939,8 +1081,10 @@ function App2D() {
       setBaseParams(nextParams)
       setBaseTextParams(nextTextParams)
       if (id !== activeStyle) clearRowSeeds()
+      // 换风格=种子码态语义:分区选中集合回全部选中(票06:选中集合不入码)
+      resetZoneSelection()
     },
-    [activeStyle, params, textParams, fontParams, clearRowSeeds],
+    [activeStyle, params, textParams, fontParams, clearRowSeeds, resetZoneSelection],
   )
 
   // ---------------------------------------------------------------------------
@@ -1025,11 +1169,12 @@ function App2D() {
     const applyText = (prev: Record<string, string>) => ({ ...prev, ...colorDefaults })
     setParams(nextParams)
     setTextParams(applyText)
+    resetZoneSelection()
     if (seedMode === 'unified') {
       setBaseParams(nextParams)
       setBaseTextParams(applyText)
     }
-  }, [activeStyle, seedMode])
+  }, [activeStyle, seedMode, resetZoneSelection])
 
   const handleRandom = useCallback(() => {
     const styleDef = getStyle(activeStyle)
@@ -1038,11 +1183,12 @@ function App2D() {
     setParams(r.params)
     setTextParams(r.textParams)
     // 独立模式骰子 = randomizeParams 写工作副本(切换选中行/开始处理时再同步回行)
+    resetZoneSelection()
     if (seedMode === 'unified') {
       setBaseParams(r.params)
       setBaseTextParams(r.textParams)
     }
-  }, [activeStyle, params, textParams, seedMode])
+  }, [activeStyle, params, textParams, seedMode, resetZoneSelection])
 
   // 风格定义与当前种子码:导出 handler(水印文本带种子码)与渲染/种子视图共用,
   // 声明在 handler 之前(useCallback 引用不能前向)
@@ -1178,6 +1324,51 @@ function App2D() {
     downloadBlob(new Blob([marked], { type: 'image/svg+xml' }), 'svg')
   }, [fontParams, downloadBlob, seed, isMobile])
 
+  // 闪卡 HTML 导出(票06 §4):gating 首个「格式拒绝」型——非会员=开 LicensePanel
+  // (转化入口)+ toast,不消耗免费每日额度;会员=放行无水印。单文件=冻结参数 +
+  // 源图 JPEG q85(≤2048)+ 静态烘焙帧(当前预览画布快照 ≤1024,降级链)。
+  // 交付恒走 anchor(微信内 img 灯箱显示不了 text/html,长按保存无意义——执行期
+  // 核对项裁决,三分法口径已含在成功 toast)
+  const handleDownloadCardHtml = useCallback(async () => {
+    if (!image) return
+    const d = decideExportCardHTML()
+    if (d.mode === 'deny') {
+      setShowLicensePanel(true)
+      setCardToast('deny')
+      return
+    }
+    const src = getExportCanvas()
+    if (!src) return
+    const [r, g, b] = hexToRgb(textParams['uFoilColor'] ?? '#1a1a22')
+    const html = buildCardHtml({
+      imageDataUrl: encodeImageForCard(image).dataUrl,
+      fallbackDataUrl: encodeFallbackForCard(src),
+      aspect: (image.naturalWidth || image.width) / (image.naturalHeight || image.height),
+      params: {
+        uTexture: params['uTexture'] ?? 0,
+        uStrength: params['uStrength'] ?? 1,
+        uBandDensity: params['uBandDensity'] ?? 1,
+        uBandAngle: params['uBandAngle'] ?? 22,
+        uFoilColorR: r,
+        uFoilColorG: g,
+        uFoilColorB: b,
+        uCrackleDensity: params['uCrackleDensity'] ?? 38,
+        uStreakDensity: params['uStreakDensity'] ?? 14,
+        uSparkleDensity: params['uSparkleDensity'] ?? 1,
+        uScope: params['uScope'] ?? 0,
+        uEdgeThreshold: params['uEdgeThreshold'] ?? 0.5,
+        uEdgeWidth: params['uEdgeWidth'] ?? 2,
+        uEdgeSoftBand: params['uEdgeSoftBand'] ?? 1.5,
+        uEdgeHysteresis: params['uEdgeHysteresis'] ?? 0.15,
+        uZoneBoost: params['uZoneBoost'] ?? 0,
+      },
+      title: `${t(currentStyle?.label ?? '')} · ${t('export.cardHtml')}`,
+      ui: { hint: t('card.hint'), gyroButton: t('card.gyro'), fallbackNote: t('card.fallbackNote') },
+    })
+    downloadBlob(new Blob([html], { type: 'text/html' }), 'html')
+    setCardToast('done')
+  }, [image, params, textParams, getExportCanvas, downloadBlob, t, currentStyle])
+
   // 测试图点击:ImageStrip 只透传 src,由 App2D 按模式分派——
   // 单图(含上传页)= v1 行为加载为唯一图;批量 = 追加为新行(受 20 上限)
   const handleTestImageClick = useCallback(
@@ -1281,8 +1472,10 @@ function App2D() {
       setBaseTextParams(merged.textParams)
     }
     if (decoded.styleId !== activeStyle) clearRowSeeds()
+    // 种子码恢复=全部面选中(选中集合不入码,票06)
+    resetZoneSelection()
     return true
-  }, [image, isBatch, seedMode, activeStyle, clearRowSeeds])
+  }, [image, isBatch, seedMode, activeStyle, clearRowSeeds, resetZoneSelection])
 
   const handleApplyBuiltInPreset = useCallback((preset: BuiltInPresetDefinition) => {
     const def = getStyle(activeStyle)
@@ -1295,7 +1488,8 @@ function App2D() {
     // 预设应用 = 整批快照语义:基线同步(内置预设限定当前风格,行种子不受影响)
     setBaseParams(merged.params)
     setBaseTextParams(merged.textParams)
-  }, [activeStyle])
+    resetZoneSelection()
+  }, [activeStyle, resetZoneSelection])
 
   // ---------------------------------------------------------------------------
   // Preset handlers（localStorage 持久化预设）
@@ -1323,7 +1517,8 @@ function App2D() {
     setBaseParams(merged.params)
     setBaseTextParams(merged.textParams)
     if (entry.styleId !== activeStyle) clearRowSeeds()
-  }, [activeStyle, clearRowSeeds])
+    resetZoneSelection()
+  }, [activeStyle, clearRowSeeds, resetZoneSelection])
 
   const handleDeletePreset = useCallback((id: string) => {
     removePreset(id)
@@ -1463,6 +1658,30 @@ function App2D() {
     </div>
   )
 
+  // 闪卡 HTML toast(两壳共用):gating 拒绝(会员提示)/导出成功(三分法口径),
+  // 5s 自清(文案长于水印 toast)
+  const cardToastNode = cardToast && (
+    <div
+      role="status"
+      className={`wm-toast ${isMobile ? 'wm-toast--m' : ''}`}
+      style={isMobile ? undefined : { position: 'fixed', left: '50%', bottom: '72px', transform: 'translateX(-50%)',
+        background: 'rgba(30,30,30,0.92)', color: '#fff', padding: '8px 14px', borderRadius: 8,
+        fontSize: 13, zIndex: 1000, pointerEvents: 'none' }}
+    >
+      {cardToast === 'deny' ? t('license.cardHtmlOnly') : t('export.cardHtmlDone')}
+    </div>
+  )
+
+  // 转卡手感悬浮窗(两壳共用,可拖拽浮窗底盘——票06「复用 LicensePanel/preset-panel
+  // 浮窗先例」;H5 同形态可调值,拖拽为桌面增强)
+  const cardSettingsNode = cardMode && showCardSettings && (
+    <CardSettingsPanel
+      feel={cardFeelView}
+      onChange={handleCardFeelChange}
+      onClose={() => setShowCardSettings(false)}
+    />
+  )
+
   // 批量面板(两壳共用节点,Task 8):移动端经 MobileShell2D 的 batchPanel prop
   // 挂进 BottomSheet 从底部展开(variant=mobile 卡片流,上传多图自动弹 v3 语义经
   // showBatchPanel 在移动分支同样可达);桌面分支原位渲染(variant=desktop,
@@ -1553,9 +1772,16 @@ function App2D() {
           asciiCanvasRef={asciiCanvasRef}
           renderMode={currentStyle?.renderMode}
           compareMode={compareMode}
-          onToggleCompare={() => setCompareMode((prev) => !prev)}
+          onToggleCompare={handleToggleCompare}
           onClose={() => setCloseDialog(isBatch ? 'batch' : 'single')}
           onImagesLoad={handleImagesLoad}
+          cardMode={cardMode}
+          onToggleCard={activeStyle === 'holofoil' ? handleToggleCard : undefined}
+          onCardTilt={handleCardTilt}
+          onCardRelease={handleCardRelease}
+          onZonePick={isHolofoilZone ? handleZonePick : undefined}
+          tiltRef={tiltRef}
+          onOpenCardSettings={() => setShowCardSettings((v) => !v)}
           images={images}
           seedViews={rowsSeedView}
           selectedIndex={selectedIndex}
@@ -1575,6 +1801,7 @@ function App2D() {
           onDownloadPng={handleDownloadPng}
           onDownloadJpg={handleDownloadJpg}
           onDownloadSvg={handleDownloadSvg}
+          onDownloadCardHtml={activeStyle === 'holofoil' ? handleDownloadCardHtml : undefined}
           onRandom={handleRandom}
           /* Task 8 接管:dock 批量键开面板(有图才动作,与桌面 ActionBar 同语义) */
           onOpenBatch={handleBatchOpen}
@@ -1600,6 +1827,9 @@ function App2D() {
         )}
         {/* 水印降级提示:两壳共用节点,移动端经 wm-toast--m 挂 dock 上方 */}
         {wmToastNode}
+        {/* 闪卡 HTML toast + 转卡手感浮窗(两壳共用) */}
+        {cardToastNode}
+        {cardSettingsNode}
       </>
     )
   }
@@ -1618,8 +1848,15 @@ function App2D() {
             renderMode={currentStyle?.renderMode}
             originalImage={image}
             compareMode={compareMode}
-            onToggleCompare={() => setCompareMode((prev) => !prev)}
+            onToggleCompare={handleToggleCompare}
             onClose={() => setCloseDialog(isBatch ? 'batch' : 'single')}
+            cardMode={cardMode}
+            onToggleCard={activeStyle === 'holofoil' ? handleToggleCard : undefined}
+            onCardTilt={handleCardTilt}
+            onCardRelease={handleCardRelease}
+            onZonePick={isHolofoilZone ? handleZonePick : undefined}
+            tiltRef={tiltRef}
+            onOpenCardSettings={() => setShowCardSettings((v) => !v)}
           />
         ) : (
           <ImageUploader onImagesLoad={handleImagesLoad} />
@@ -1642,6 +1879,7 @@ function App2D() {
         onDownloadPng={handleDownloadPng}
         onDownloadJpg={handleDownloadJpg}
         onDownloadSvg={handleDownloadSvg}
+        onDownloadCardHtml={activeStyle === 'holofoil' ? handleDownloadCardHtml : undefined}
         renderMode={currentStyle?.renderMode}
         onReset={handleReset}
         onRandom={handleRandom}
@@ -1709,6 +1947,9 @@ function App2D() {
       {/* 水印降级一次性提示:两壳共用节点(见 wmToastNode 定义处,桌面内联样式
           分支原样保留;无障碍:纯通知,pointerEvents 关闭不抢焦点) */}
       {wmToastNode}
+      {/* 闪卡 HTML toast + 转卡手感浮窗(两壳共用) */}
+      {cardToastNode}
+      {cardSettingsNode}
     </div>
   )
 }

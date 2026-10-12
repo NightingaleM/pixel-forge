@@ -4,6 +4,8 @@ interface ActionBarProps {
   onDownloadPng: () => void
   onDownloadJpg?: () => void
   onDownloadSvg?: () => void
+  /** 闪卡 HTML 导出(holofoil 专属,会员格式):缺省不渲染按钮 */
+  onDownloadCardHtml?: () => void
   renderMode?: 'shader' | 'canvas2d'
   onReset: () => void
   onRandom: () => void
@@ -14,7 +16,7 @@ interface ActionBarProps {
   imageInfo: { width: number; height: number; size: string } | null
 }
 
-function ActionBar({ onDownloadPng, onDownloadJpg, onDownloadSvg, renderMode, onReset, onRandom, onBatchApply, onOpenLicense, licenseActive, imageInfo }: ActionBarProps) {
+function ActionBar({ onDownloadPng, onDownloadJpg, onDownloadSvg, onDownloadCardHtml, renderMode, onReset, onRandom, onBatchApply, onOpenLicense, licenseActive, imageInfo }: ActionBarProps) {
   const { t } = useTranslation()
   const isCanvas2d = renderMode === 'canvas2d'
 
@@ -30,6 +32,16 @@ function ActionBar({ onDownloadPng, onDownloadJpg, onDownloadSvg, renderMode, on
         <>
           <button className="action-btn" onClick={onDownloadPng}>{t('common.download')}</button>
           <button className="action-btn" onClick={onDownloadJpg}>{t('export.jpg')}</button>
+          {onDownloadCardHtml && (
+            <button className="action-btn" onClick={onDownloadCardHtml}>
+              {/* 卡片微倾示意:平行四边形卡面(手绘 SVG,禁 emoji) */}
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: '-2px', marginRight: 4 }} aria-hidden="true">
+                <path d="M7 4l13 3-3 13L4 17z" />
+                <path d="M7 4l3 13" opacity="0.55" />
+              </svg>
+              {t('export.cardHtml')}
+            </button>
+          )}
         </>
       )}
       <button className="action-btn action-btn--secondary" onClick={onReset}>{t('common.reset')}</button>

@@ -47,6 +47,33 @@ export interface RenderImageOpts {
   textParams: Record<string, string>
   fontParams: Record<string, FontFace | null>
   brightest: BrightestPoint | null
+  /** holofoil 分区档的选中区掩膜(256² 白/黑 canvas)。缺省/批量路径不传:
+   *  shader 的 uZoneEnabled 走 GLSL 默认 0 → zone 恒 1 = 全部面选中语义。 */
+  zoneMask?: HTMLCanvasElement | null
+}
+
+// 分区掩膜纹理缓存:按 renderer 实例复用(纹理对象跨帧存活——转卡 rAF 循环的
+// renderer.render() 重绘时 unit2 上的掩膜仍须有效,不能照文字纹理逐帧建删),
+// 内容每次带 zoneMask 渲染时整张重传(256² 上传 <1ms,参数变化级频率)。
+// renderer 废弃后上下文随 canvas 回收,WeakMap 项自然放行。
+const zoneTexCache = new WeakMap<ShaderRenderer, WebGLTexture>()
+
+function uploadZoneMask(renderer: ShaderRenderer, canvas: HTMLCanvasElement): void {
+  const gl = renderer.getGl()
+  let tex = zoneTexCache.get(renderer)
+  if (!tex) {
+    tex = gl.createTexture()!
+    zoneTexCache.set(renderer, tex)
+  }
+  renderer.bindTexture(tex, 2)
+  // 与原图同向(ShaderRenderer.loadImage 的 FLIP_Y=true 约定),掩膜低清格
+  // y=0 行=图像顶行,翻转后两者对位一致
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true)
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
 }
 
 /** 渲染一张图到给定 canvas(shader)或 asciiCanvas(canvas2d)。与原 renderWithStyle 逐行等价。 */
@@ -95,6 +122,20 @@ export async function renderImage(opts: RenderImageOpts): Promise<void> {
     renderer.bindTexture(textTextures[0], 2)
     mergedParams['uAtlasCount'] = atlasCount
   }
+  // holofoil 选择性加箔开闸:边缘档恒开(zone=edgeZone,无掩膜依赖);分区档
+  // 仅在有掩膜时开(无掩膜=批量/预览分析未完 → uZoneEnabled 缺省 0,zone 恒 1
+  // = 全部面选中,与「种子码恢复/随机/批量=全选」语义一致)。掩膜纹理 unit 2
+  // 与 textraster 图集互斥——holofoil 无 text 参数。
+  const scope = params['uScope'] ?? 0
+  const zoneOn = styleDef.id === 'holofoil' && (scope === 1 || (scope === 2 && !!opts.zoneMask))
+  if (scope === 2 && opts.zoneMask) {
+    uploadZoneMask(renderer, opts.zoneMask)
+  }
+  if (zoneOn) mergedParams['uZoneEnabled'] = 1
+  // 检测步进铁律(票03):按纹理实际分辨率通传 uTexSize;其他风格无此 uniform,
+  // setUniform 静默跳过
+  const [texW, texH] = renderer.getImageSize()
+  if (texW > 0) mergedParams['uTexSize'] = [texW, texH]
 
   const shaderSources = await Promise.all(styleDef.shaderImports.map((fn) => fn()))
 
@@ -108,6 +149,7 @@ export async function renderImage(opts: RenderImageOpts): Promise<void> {
     // 上方 bindTexture(tex, 2) 绑定;每次 useShader 重链接后默认值复位,
     // 故必须逐帧重新赋值。
     if (textTextures.length > 0) renderer.setSampler('uCharAtlas', 2)
+    if (zoneOn) renderer.setSampler('uZoneMask', 2)
     renderer.setUniform('uResolution', [canvas.width, canvas.height])
     for (const [key, val] of Object.entries(mergedParams)) {
       renderer.setUniform(key, val)
