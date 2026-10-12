@@ -13,14 +13,11 @@ const META_KEY = 'pixel-forge.licenseMeta.v2'
 const DEVICE_ID_KEY = 'pixel-forge.deviceId.v1'
 const VOIDED_KEY = 'pixel-forge.licenseVoided.v1'
 
-// ── 后端公钥(2026-10-13 换入后端新钥;上一代 99fba9f2… 于 2026-09-26 交付)。
-//    ⚠️ 若后端再换密钥对,替换本值并重新构建。构建产物硬编码此值,无运行时后门;
-//    仅 dev 模式可经 VITE_LICENSE_PUBKEY 覆盖为测试公钥,供浏览器回归脚本
-//    (scripts/verify-license.mjs)用测试私钥造码走通激活流 ──
-let publicKeyHex = '6bc88195c75c5b4c05a539e340ef29254decdebd8b5772d949fb26ab201dba6f'
-if (import.meta.env.DEV && import.meta.env.VITE_LICENSE_PUBKEY) {
-  publicKeyHex = import.meta.env.VITE_LICENSE_PUBKEY as string
-}
+// ── 后端公钥:vite.config.ts 按 mode define 注入(dev/test=testKey.ts 联调钥派生,
+//    build=生产公钥 PROD_LICENSE_PUBKEY),类型声明在 vite-env.d.ts。后端换钥:
+//    联调改 testKey.ts(私钥+公钥),生产改 vite.config.ts 一行,均须重新起 dev/构建。
+//    无运行时后门;回归脚本(verify-license.mjs)可经 setLicensePublicKey 页内覆盖 ──
+let publicKeyHex = __LICENSE_PUBKEY__
 export function setLicensePublicKey(hex: string): void { publicKeyHex = hex }
 
 // 同 presetStore:localStorage getter 在禁 cookie 环境会抛,模块加载期必须吞掉

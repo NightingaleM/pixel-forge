@@ -1,8 +1,23 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { ed25519 } from '@noble/curves/ed25519'
+import { TEST_PRIVATE_KEY_HEX } from './scripts/read-test-key.mjs'
+
+// ── license 验签公钥按环境注入(define=构建期文本替换,dev/test/build 均可靠,
+//    不经 env 文件——本 vite 8 下 env 注入 dev 的 import.meta.env 不可靠)──
+// dev/test:从 testKey.ts(联调钥唯一源)派生公钥,换联调钥只改 testKey.ts 两行;
+// production:生产公钥,换钥只改下面一行。⚠️ 当前生产值为考古推断(a7e5a69
+// 换入的"后端换钥对"),上线前必须与生产后端配置核对,错则生产码全验不过。
+const PROD_LICENSE_PUBKEY = '99fba9f2714f8c84597d97ecef10dbc7d10f9c71b49679de4d957cf5991269ae'
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
+  define: {
+    __LICENSE_PUBKEY__: JSON.stringify(
+      mode === 'production' ? PROD_LICENSE_PUBKEY
+        : Buffer.from(ed25519.getPublicKey(TEST_PRIVATE_KEY_HEX)).toString('hex'),
+    ),
+  },
   server: {
     port: 5177,
     // /api 同源代理到后端网关(docker compose 宿主 7002):浏览器视为同源请求,
@@ -17,4 +32,4 @@ export default defineConfig({
     },
   },
   plugins: [react()],
-})
+}))
