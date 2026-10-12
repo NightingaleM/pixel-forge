@@ -9,13 +9,12 @@
 // 状态机:未使用码 × 无凭证 → 建链成身份码(绑设备,次数-1);未使用码 × 带凭证 →
 //   消耗为补充包(链 exp+=时长,次数+1);身份码重输 → 幂等重签(已知设备 0 次)。
 // 不验签(mock 简化):信任请求里的码,按其 payload 处理——真后端必须验签。
-// 测试密钥对与 src/lib/license/testKey.ts 是同一对(换钥两处同步)——仅 dev 回归用。
+// 测试私钥唯一源 testKey.ts,经 read-test-key.mjs 读取(换钥只改那一处)——仅 dev 回归用。
 // 用法: node scripts/mock-redeem.mjs [port=3999]
 import http from 'node:http'
 import crypto from 'node:crypto'
 import { ed25519 } from '@noble/curves/ed25519'
-
-const TEST_PRIVATE_KEY_HEX = '585a87b0a5f2c4304597fcd18bd78368851de086b1ab126830bb961fc7fc2ff3'
+import { TEST_PRIVATE_KEY_HEX } from './read-test-key.mjs'
 const DURATIONS = { day: 86400, week: 604800, month: 2592000, year: 31536000, lifetime: 4102444800 }
 const INITIAL_COUNT = 5
 const PORT = Number(process.argv[2] || 3999)

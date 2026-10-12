@@ -1,10 +1,10 @@
 // scripts/genLicense.mjs
 // 开发自测造码工具:只产未兑换码 {v:1,tier,iat}(链式方案;凭证 {v:2,...} 由 redeem 换得)。
-// 测试密钥对与 src/lib/license/testKey.ts 是同一对(换钥两处同步)。
+// 测试私钥唯一源 testKey.ts,经 read-test-key.mjs 读取(换钥只改那一处)。
 // 生产签发在后端(micro_server_nest_ai),本脚本不接触生产私钥。
 // 用法: node scripts/genLicense.mjs --tier day [--count 5]
 import { ed25519 } from '@noble/curves/ed25519'
-const TEST_PRIVATE_KEY_HEX = '585a87b0a5f2c4304597fcd18bd78368851de086b1ab126830bb961fc7fc2ff3'
+import { TEST_PRIVATE_KEY_HEX } from './read-test-key.mjs'
 const TIERS = ['day', 'week', 'month', 'year', 'lifetime']
 
 const args = process.argv.slice(2)

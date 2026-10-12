@@ -23,8 +23,8 @@ const BASE = `http://localhost:${PORT}`
 const OUT = path.resolve('artifacts/license-verify')
 fs.mkdirSync(OUT, { recursive: true })
 
-// 测试私钥自签未兑换码,公钥派生注入页面(与 src/lib/license/testKey.ts 同一对,换钥两处同步)
-const TEST_PRIVATE_KEY_HEX = '585a87b0a5f2c4304597fcd18bd78368851de086b1ab126830bb961fc7fc2ff3'
+// 测试私钥自签未兑换码,公钥派生注入页面(唯一源 testKey.ts,经 read-test-key.mjs 读取)
+const { TEST_PRIVATE_KEY_HEX } = await import('./read-test-key.mjs')
 const TEST_PUBLIC_KEY_HEX = Buffer.from(ed25519.getPublicKey(TEST_PRIVATE_KEY_HEX)).toString('hex')
 const sign = (payload) => {
   const msg = Buffer.from(JSON.stringify(payload), 'utf8')
