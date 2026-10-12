@@ -25,6 +25,15 @@ uniform float uFoilColorB;
 uniform float uCrackleDensity;   // 碎冰:碎纹频率 15..60,默认 38
 uniform float uStreakDensity;    // 拉丝:竖丝密度 5..40,默认 14
 uniform float uSparkleDensity;   // 珠光:闪点密度 0.5..3,默认 1
+/* ---- 彩箔覆盖门槛(参数化:缺省值=旧硬编码常量,显式传默认=逐字节旧输出)。
+   ⚠ GLSL uniform 缺省是 0 ≠ 产品缺省——产品缺省由 renderImage.buildRenderParams
+   与 cardHtml 按注册表 default 注入;直连 shader 的工具(回归测试/样张页)必须
+   显式传全量,漏传即变脸(smoothstep(0,..) 全图吃彩)。 ---- */
+uniform float uMaskLo;      // 彩箔下限 0..0.6,默认 0.32:亮度+轮廓得分低于此且平坦=无彩
+uniform float uMaskHi;      // 满彩上限 0.4..1,默认 0.85:得分越过此值=满强度彩虹
+uniform float uLumaWeight;  // 亮度权重 0..1.5,默认 0.75:0=纯轮廓驱动
+uniform float uEdgeWeight;  // 轮廓权重 0..8,默认 4:0=纯亮度驱动
+uniform float uMaskInvert;  // 翻转 0/1,默认 0:反相覆盖区域(暗平区吃彩,亮部金属底)
 /* ---- 选择性加箔 + 转卡(缺省值即旧码行为,GLSL uniform 默认 0) ---- */
 uniform float uScope;          // 0 全图 / 1 边缘 / 2 分区(select「应用范围」)
 uniform float uEdgeThreshold;  // 0.1..0.9 默认 0.5(样张有效区间 0.35..0.65)
@@ -172,9 +181,12 @@ void main() {
 
   vec3 spectrum = hsv2rgb(vec3(fract(band * 0.35), sat, 1.0));
 
-  // 箔面出现的地方:亮部 + 轮廓边缘(暗平区保持金属底)
-  float edge = length(grad) * 4.0;
-  float mask = smoothstep(0.32, 0.85, lC * 0.75 + edge) * (0.55 + 0.45 * grain);
+  // 箔面出现的地方:亮部 + 轮廓边缘(暗平区保持金属底)。门槛参数化,
+  // hi 强制 > lo+0.05——smoothstep 的 edge0>=edge1 是未定义行为
+  float edge = length(grad) * uEdgeWeight;
+  float mask = smoothstep(uMaskLo, max(uMaskLo + 0.05, uMaskHi), lC * uLumaWeight + edge) * (0.55 + 0.45 * grain);
+  // 翻转:反相覆盖区域,碎冰质感(grain 调制)保留,闪点随 mask 搬到暗区
+  mask = mix(mask, 1.0 - mask, uMaskInvert);
 
   // 金属底:原图压暗保形,混入底色(近黑时箔面嵌入感最强)
   vec3 foilBase = mix(vec3(luma(base)), base, 0.35);

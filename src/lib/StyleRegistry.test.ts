@@ -83,21 +83,23 @@ describe('glassdistort', () => {
 })
 
 describe('holofoil / prism (第二批新风格, tickets/04 规格)', () => {
-  it('holofoil 默认参数 = 规格票定稿值(碎冰镭射 + 强度 100% + 样张基准;应用范围暂撤恒全图)', () => {
+  it('holofoil 默认参数 = 规格票定稿值(碎冰镭射 + 强度 100% + 样张基准;彩箔门槛缺省=旧硬编码常量;应用范围暂撤恒全图)', () => {
     expect(defaultParams('holofoil')).toEqual({
       uTexture: 0, uStrength: 1, uBandDensity: 1, uBandAngle: 22,
       uCrackleDensity: 38, uStreakDensity: 14, uSparkleDensity: 1,
+      uMaskLo: 0.32, uMaskHi: 0.85, uLumaWeight: 0.75, uEdgeWeight: 4, uMaskInvert: 0,
     })
   })
 
-  it('holofoil visibleWhen 分组:各质感只显示本组参数,公共参数恒显(应用范围暂撤:面板无 uScope 系)', () => {
+  it('holofoil visibleWhen 分组:各质感只显示本组参数,公共参数恒显(彩箔门槛 5 参数无 visibleWhen 恒显;应用范围暂撤:面板无 uScope 系)', () => {
     const def = styles.find(s => s.id === 'holofoil')!
     const visibleAt = (over: Record<string, number>) =>
       def.params.filter(p => !p.visibleWhen || p.visibleWhen({ ...defaultParams('holofoil'), ...over })).map(p => p.uniform)
     const common = ['uTexture', 'uStrength', 'uBandDensity', 'uBandAngle', 'uFoilColor']
-    expect(visibleAt({ uTexture: 0 })).toEqual([...common, 'uCrackleDensity'])
-    expect(visibleAt({ uTexture: 1 })).toEqual([...common, 'uStreakDensity'])
-    expect(visibleAt({ uTexture: 2 })).toEqual([...common, 'uSparkleDensity'])
+    const gate = ['uMaskLo', 'uMaskHi', 'uLumaWeight', 'uEdgeWeight', 'uMaskInvert']
+    expect(visibleAt({ uTexture: 0 })).toEqual([...common, 'uCrackleDensity', ...gate])
+    expect(visibleAt({ uTexture: 1 })).toEqual([...common, 'uStreakDensity', ...gate])
+    expect(visibleAt({ uTexture: 2 })).toEqual([...common, 'uSparkleDensity', ...gate])
     // 应用范围(全图/边缘/分区)暂撤:参数表不再注册 uScope/边缘滑杆/uZoneBoost,
     // shader 的 zone/edge 逻辑保留(uScope 恒缺省 0=全图等价),恢复注册即回
   })

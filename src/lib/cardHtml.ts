@@ -24,6 +24,11 @@ export interface CardHtmlParams {
   uEdgeSoftBand: number
   uEdgeHysteresis: number
   uZoneBoost: number
+  uMaskLo: number
+  uMaskHi: number
+  uLumaWeight: number
+  uEdgeWeight: number
+  uMaskInvert: number
 }
 
 export interface CardHtmlInput {
@@ -79,7 +84,7 @@ function num(n: number): string {
 
 export function buildCardHtml(input: CardHtmlInput): string {
   const p = input.params
-  const P = `uTexture:${num(p.uTexture)},uStrength:${num(p.uStrength)},uBandDensity:${num(p.uBandDensity)},uBandAngle:${num(p.uBandAngle)},uFoilColorR:${num(p.uFoilColorR)},uFoilColorG:${num(p.uFoilColorG)},uFoilColorB:${num(p.uFoilColorB)},uCrackleDensity:${num(p.uCrackleDensity)},uStreakDensity:${num(p.uStreakDensity)},uSparkleDensity:${num(p.uSparkleDensity)},uScope:${num(p.uScope)},uEdgeThreshold:${num(p.uEdgeThreshold)},uEdgeWidth:${num(p.uEdgeWidth)},uEdgeSoftBand:${num(p.uEdgeSoftBand)},uEdgeHysteresis:${num(p.uEdgeHysteresis)},uZoneBoost:${num(p.uZoneBoost)}`
+  const P = `uTexture:${num(p.uTexture)},uStrength:${num(p.uStrength)},uBandDensity:${num(p.uBandDensity)},uBandAngle:${num(p.uBandAngle)},uFoilColorR:${num(p.uFoilColorR)},uFoilColorG:${num(p.uFoilColorG)},uFoilColorB:${num(p.uFoilColorB)},uCrackleDensity:${num(p.uCrackleDensity)},uStreakDensity:${num(p.uStreakDensity)},uSparkleDensity:${num(p.uSparkleDensity)},uScope:${num(p.uScope)},uEdgeThreshold:${num(p.uEdgeThreshold)},uEdgeWidth:${num(p.uEdgeWidth)},uEdgeSoftBand:${num(p.uEdgeSoftBand)},uEdgeHysteresis:${num(p.uEdgeHysteresis)},uZoneBoost:${num(p.uZoneBoost)},uMaskLo:${num(p.uMaskLo)},uMaskHi:${num(p.uMaskHi)},uLumaWeight:${num(p.uLumaWeight)},uEdgeWeight:${num(p.uEdgeWeight)},uMaskInvert:${num(p.uMaskInvert)}`
   const aspect = num(input.aspect)
   const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
   // prettier-ignore
@@ -177,7 +182,8 @@ try {
   ['uImage','uResolution','uTexture','uStrength','uBandDensity','uBandAngle',
    'uFoilColorR','uFoilColorG','uFoilColorB','uCrackleDensity','uStreakDensity',
    'uSparkleDensity','uScope','uEdgeThreshold','uEdgeWidth','uEdgeSoftBand',
-   'uEdgeHysteresis','uZoneBoost','uTexSize','uTiltX','uTiltY'].forEach(function (n) {
+   'uEdgeHysteresis','uZoneBoost','uMaskLo','uMaskHi','uLumaWeight','uEdgeWeight',
+   'uMaskInvert','uTexSize','uTiltX','uTiltY'].forEach(function (n) {
     uni[n] = gl.getUniformLocation(prog, n);
   });
   tex = gl.createTexture();

@@ -16,6 +16,7 @@ const baseInput = () => ({
     uCrackleDensity: 38, uStreakDensity: 14, uSparkleDensity: 1,
     uScope: 0, uEdgeThreshold: 0.5, uEdgeWidth: 2, uEdgeSoftBand: 1.5, uEdgeHysteresis: 0.15,
     uZoneBoost: 0,
+    uMaskLo: 0.32, uMaskHi: 0.85, uLumaWeight: 0.75, uEdgeWeight: 4, uMaskInvert: 0,
   },
   title: '全息箔 · 闪卡 HTML',
   ui: { hint: '移动鼠标或手指转卡', gyroButton: '开启陀螺仪转卡', fallbackNote: '已显示静态效果' },
@@ -29,10 +30,11 @@ describe('buildCardHtml(单文件模板,票06 规格)', () => {
     expect(html).toContain('uTiltX')
   })
 
-  it('冻结参数字面量注入(含选择性加箔与倾角 uniform 名单)', () => {
+  it('冻结参数字面量注入(含选择性加箔、彩箔门槛与倾角 uniform 名单)', () => {
     const html = buildCardHtml(baseInput())
     expect(html).toContain('uScope:0,uEdgeThreshold:0.5,uEdgeWidth:2')
     expect(html).toContain('uEdgeSoftBand:1.5,uEdgeHysteresis:0.15,uZoneBoost:0')
+    expect(html).toContain('uMaskLo:0.32,uMaskHi:0.85,uLumaWeight:0.75,uEdgeWeight:4,uMaskInvert:0')
     // 浮点收敛:1/3 档位值 round 到 4 位小数
     const p2 = baseInput()
     p2.params.uStrength = 1 / 3

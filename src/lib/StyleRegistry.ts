@@ -375,6 +375,14 @@ export const styles: StyleDefinition[] = [
       { name: 'style.holofoil.crackleDensity', uniform: 'uCrackleDensity', min: 15, max: 60, step: 0.5, default: 38, description: 'style.holofoil.crackleDensityDesc', visibleWhen: (v) => v.uTexture === 0 },
       { name: 'style.holofoil.streakDensity',  uniform: 'uStreakDensity',  min: 5,  max: 40, step: 0.5, default: 14, description: 'style.holofoil.streakDensityDesc',  visibleWhen: (v) => v.uTexture === 1 },
       { name: 'style.holofoil.sparkleDensity', uniform: 'uSparkleDensity', min: 0.5, max: 3, step: 0.01, default: 1, description: 'style.holofoil.sparkleDensityDesc', visibleWhen: (v) => v.uTexture === 2 },
+      // 彩箔覆盖门槛参数化(2026-10-12):缺省=旧硬编码常量,显式传默认=逐字节
+      // 旧输出。缺省值非 0——GLSL uniform 默认 0 会变脸,渲染侧依赖
+      // buildRenderParams/cardHtml 的注册表 default 注入(见 holofoil.frag 头注)
+      { name: 'style.holofoil.maskLo',     uniform: 'uMaskLo',     min: 0, max: 0.6, step: 0.01, default: 0.32, description: 'style.holofoil.maskLoDesc' },
+      { name: 'style.holofoil.maskHi',     uniform: 'uMaskHi',     min: 0.4, max: 1, step: 0.01, default: 0.85, description: 'style.holofoil.maskHiDesc' },
+      { name: 'style.holofoil.lumaWeight', uniform: 'uLumaWeight', min: 0, max: 1.5, step: 0.01, default: 0.75, description: 'style.holofoil.lumaWeightDesc' },
+      { name: 'style.holofoil.edgeWeight', uniform: 'uEdgeWeight', min: 0, max: 8, step: 0.1, default: 4, description: 'style.holofoil.edgeWeightDesc' },
+      { name: 'style.holofoil.maskInvert', uniform: 'uMaskInvert', type: 'toggle' as const, default: 0, description: 'style.holofoil.maskInvertDesc' },
       // 选择性加箔(票06 uScope/边缘滑杆/uZoneBoost)暂撤:效果不达预期恒全图。
       // shader 的 zone/edge 逻辑保留(uScope 恒缺省 0=全图,renderImage/cardHtml
       // 均有 ?? 0 兜底),恢复本注册块即可回滚;v2 未发布,旧 v2 码失效可接受

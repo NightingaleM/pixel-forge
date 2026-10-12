@@ -19,6 +19,15 @@ export function buildRenderParams(
   brightest: BrightestPoint | null,
 ): Record<string, number> {
   const merged = { ...params }
+  // 数值参数缺省兜底:holofoil 彩箔门槛四参数的缺省值非 0,而 GLSL uniform
+  // 缺省恒 0(漏传=smoothstep(0,..) 全图吃彩变脸)。按注册表 default 只补
+  // undefined 字段——显式值(含用户滑到 0)不覆盖。正常 UI/种子码路径 state
+  // 已全量,此循环零命中,不改变其他风格行为
+  for (const p of styleDef.params) {
+    if ((p.type === undefined || p.type === 'number') && merged[p.uniform] === undefined) {
+      merged[p.uniform] = p.default
+    }
+  }
   for (const p of styleDef.params) {
     if (p.type !== 'color') continue
     const [r, g, b] = hexToRgb(textParams[p.uniform] ?? p.default)

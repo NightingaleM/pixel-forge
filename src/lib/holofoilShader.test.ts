@@ -47,12 +47,26 @@ const baseUniforms = (overrides: Partial<Uniforms>): Uniforms => ({
   uCrackleDensity: 38,
   uStreakDensity: 14,
   uSparkleDensity: 1,
+  // 彩箔门槛缺省(=旧硬编码常量)。直连 shader 的工具必须显式传全量:
+  // GLSL uniform 默认 0 ≠ 产品缺省,漏传即 smoothstep(0,..) 全图吃彩
+  uMaskLo: 0.32,
+  uMaskHi: 0.85,
+  uLumaWeight: 0.75,
+  uEdgeWeight: 4,
   ...overrides,
 })
 
 async function renderMetrics(
   browser: Browser,
   overrides: Partial<Uniforms> = {},
+): Promise<Metrics> {
+  return renderWithUniforms(browser, baseUniforms(overrides))
+}
+
+/** 直连全量 uniforms(不经 baseUniforms 补齐)——测「漏传」路径用。 */
+async function renderWithUniforms(
+  browser: Browser,
+  uniforms: Uniforms,
 ): Promise<Metrics> {
   const page = await browser.newPage()
   try {
@@ -170,7 +184,7 @@ async function renderMetrics(
         activeHueBins: hueBins.size,
         thumb,
       }
-    }, holofoilShader, baseUniforms(overrides))
+    }, holofoilShader, uniforms)
   } finally {
     await page.close()
   }
@@ -257,5 +271,51 @@ describe('Holographic foil spectrum mapping', () => {
     // 缺省路径(uTilt 未设,GLSL 默认 0)与显式 0 一致——旧码等价性
     const explicit = await renderMetrics(browser, { uTiltX: 0, uTiltY: 0 })
     expect(thumbMaxDiff(neutral.thumb, explicit.thumb)).toBe(0)
+  }, 30_000)
+
+  // ---- 彩箔覆盖门槛参数化(2026-10-12:maskLo/maskHi/lumaWeight/edgeWeight/invert)----
+
+  it('门槛显式缺省 = 参数化前渲染;漏传四参(GLSL 默认 0)变脸——兜底必要性的锁定', async () => {
+    // 显式传旧硬编码常量:与历史基准锚(上方各断言的 baseUniforms 路径)一致
+    const explicitDefaults = await renderMetrics(browser, {
+      uMaskLo: 0.32, uMaskHi: 0.85, uLumaWeight: 0.75, uEdgeWeight: 4,
+    })
+    const base = await renderMetrics(browser, {})
+    expect(thumbMaxDiff(explicitDefaults.thumb, base.thumb)).toBe(0)
+    // 真漏传(键不存在 → GLSL 默认 0):maskLo=0/权重 0 → 输出漂移;
+    // 产品路径的缺省由 renderImage.buildRenderParams/cardHtml 按注册表注入
+    const bare: Record<string, number | [number, number]> = { ...baseUniforms({}) }
+    delete bare.uMaskLo
+    delete bare.uMaskHi
+    delete bare.uLumaWeight
+    delete bare.uEdgeWeight
+    const leaked = await renderWithUniforms(browser, bare as Uniforms)
+    expect(thumbMaxDiff(base.thumb, leaked.thumb)).toBeGreaterThan(10)
+  }, 30_000)
+
+  it('翻转(uMaskInvert=1)反相覆盖区域:与默认渲染截然不同', async () => {
+    const normal = await renderMetrics(browser, {})
+    const inverted = await renderMetrics(browser, { uMaskInvert: 1 })
+    expect(thumbMaxDiff(normal.thumb, inverted.thumb)).toBeGreaterThan(20)
+  }, 30_000)
+
+  it('maskLo 调低让暗部吃彩:平均饱和度显著上升', async () => {
+    const standard = await renderMetrics(browser, {})
+    const opened = await renderMetrics(browser, { uMaskLo: 0.05 })
+    expect(opened.meanSaturation).toBeGreaterThan(standard.meanSaturation + 0.05)
+  }, 30_000)
+
+  it('maskHi ≤ maskLo 时钳制到 lo+0.05(smoothstep 未定义行为防御),渲染无 NaN', async () => {
+    const clamped = await renderMetrics(browser, { uMaskLo: 0.5, uMaskHi: 0.1 })
+    // hi=0.55 窗口极窄 → 阈上区域快速满彩,渲染必须有限值(无黑屏/NaN 传播)
+    expect(clamped.thumb.every((v) => Number.isFinite(v) && v >= 0 && v <= 255)).toBe(true)
+    const standard = await renderMetrics(browser, {})
+    expect(thumbMaxDiff(clamped.thumb, standard.thumb)).toBeGreaterThan(10)
+  }, 30_000)
+
+  it('lumaWeight=0 纯轮廓驱动:灰源波纹梯度平缓,光谱大幅退潮', async () => {
+    const contourOnly = await renderMetrics(browser, { uLumaWeight: 0 })
+    const standard = await renderMetrics(browser, {})
+    expect(contourOnly.meanSaturation).toBeLessThan(standard.meanSaturation * 0.6)
   }, 30_000)
 })
