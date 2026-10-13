@@ -19,6 +19,8 @@ const baseInput = () => ({
     uMaskLo: 0.32, uMaskHi: 0.85, uLumaWeight: 0.75, uEdgeWeight: 4, uMaskInvert: 0,
   },
   title: '全息箔 · 闪卡 HTML',
+  radius: 16,
+  darkBg: true,
   ui: { hint: '移动鼠标或手指转卡', gyroButton: '开启陀螺仪转卡', fallbackNote: '已显示静态效果' },
 })
 
@@ -69,6 +71,16 @@ describe('buildCardHtml(单文件模板,票06 规格)', () => {
   it('转卡手感常量:幅度 12/自摆开/阴影开(查看者不可调,参数冻结)', () => {
     const html = buildCardHtml(baseInput())
     expect(html).toContain('var AMP = 12, FLOW = true, IDLE = true, LIGHT = true')
+  })
+
+  it('转卡外观两值:圆角注入 .card;黑底开关切换 body 背景(默认渐变=票06 定稿)', () => {
+    const dark = buildCardHtml(baseInput())
+    expect(dark).toContain('border-radius: 16px')
+    expect(dark).toContain('body { background: #000;')
+    const light = buildCardHtml({ ...baseInput(), radius: 0, darkBg: false })
+    expect(light).toContain('border-radius: 0px')
+    expect(light).toContain('body { background: radial-gradient(1200px 700px at 62% 38%, #191b28, #0e0f16);')
+    expect(light).not.toContain('body { background: #000;')
   })
 
   it('标题与 UI 文案经 HTML 转义注入', () => {

@@ -39,6 +39,10 @@ export interface CardHtmlInput {
   /** 源图宽高比(纹理 naturalWidth/naturalHeight,卡片 aspect-ratio) */
   aspect: number
   params: CardHtmlParams
+  /** 卡面圆角 px(CardTiltFeel.radius,所见即所得注入 .card border-radius) */
+  radius: number
+  /** 黑底舞台(CardTiltFeel.darkBg):true=body 纯黑,false=深色渐变(转卡票06 定稿) */
+  darkBg: boolean
   /** 页面 <title> 与卡面角标 */
   title: string
   /** 界面文案(i18n 注入,查看者不可调) */
@@ -86,6 +90,7 @@ export function buildCardHtml(input: CardHtmlInput): string {
   const p = input.params
   const P = `uTexture:${num(p.uTexture)},uStrength:${num(p.uStrength)},uBandDensity:${num(p.uBandDensity)},uBandAngle:${num(p.uBandAngle)},uFoilColorR:${num(p.uFoilColorR)},uFoilColorG:${num(p.uFoilColorG)},uFoilColorB:${num(p.uFoilColorB)},uCrackleDensity:${num(p.uCrackleDensity)},uStreakDensity:${num(p.uStreakDensity)},uSparkleDensity:${num(p.uSparkleDensity)},uScope:${num(p.uScope)},uEdgeThreshold:${num(p.uEdgeThreshold)},uEdgeWidth:${num(p.uEdgeWidth)},uEdgeSoftBand:${num(p.uEdgeSoftBand)},uEdgeHysteresis:${num(p.uEdgeHysteresis)},uZoneBoost:${num(p.uZoneBoost)},uMaskLo:${num(p.uMaskLo)},uMaskHi:${num(p.uMaskHi)},uLumaWeight:${num(p.uLumaWeight)},uEdgeWeight:${num(p.uEdgeWeight)},uMaskInvert:${num(p.uMaskInvert)}`
   const aspect = num(input.aspect)
+  const bodyBg = input.darkBg ? '#000' : 'radial-gradient(1200px 700px at 62% 38%, #191b28, #0e0f16)'
   const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
   // prettier-ignore
   return `<!doctype html>
@@ -97,7 +102,7 @@ export function buildCardHtml(input: CardHtmlInput): string {
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; }
-body { background: radial-gradient(1200px 700px at 62% 38%, #191b28, #0e0f16);
+body { background: ${bodyBg};
   font: 14px/1.6 system-ui, "Segoe UI", "Microsoft YaHei", sans-serif; color: #e8eaf2;
   display: flex; align-items: center; justify-content: center; overflow: hidden; }
 .stage { position: relative; width: 100%; height: 100%; perspective: 1100px;
@@ -106,7 +111,7 @@ body { background: radial-gradient(1200px 700px at 62% 38%, #191b28, #0e0f16);
 .stage .hint { position: absolute; left: 14px; top: 12px; color: #9aa0b4;
   font-size: 12px; pointer-events: none; }
 .card { position: relative; width: min(86vw, 86vh * ${aspect}); aspect-ratio: ${aspect};
-  border-radius: 16px; transform-style: preserve-3d; background: #000;
+  border-radius: ${num(input.radius)}px; transform-style: preserve-3d; background: #000;
   box-shadow: 0 18px 44px rgba(5,7,14,0.55); will-change: transform; overflow: hidden;
   outline: 1px solid rgba(255,255,255,0.06); }
 .card canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }

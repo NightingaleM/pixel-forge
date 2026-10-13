@@ -25,6 +25,10 @@ interface CompareSliderProps {
   tiltRef?: RefObject<HTMLDivElement | null>
   /** 转卡手感悬浮窗入口(齿轮,cardMode 时出现) */
   onOpenCardSettings?: () => void
+  /** 卡面圆角 px(CardTiltFeel.radius,cardMode 时套在 3D 容器上) */
+  cardRadius?: number
+  /** 转卡舞台纯黑背景(CardTiltFeel.darkBg) */
+  cardDarkBg?: boolean
 }
 
 function CompareSlider({
@@ -42,6 +46,8 @@ function CompareSlider({
   onZonePick,
   tiltRef,
   onOpenCardSettings,
+  cardRadius,
+  cardDarkBg,
 }: CompareSliderProps) {
   const { t } = useTranslation()
   const [sliderPosition, setSliderPosition] = useState(0.5)
@@ -230,7 +236,12 @@ function CompareSlider({
         onPointerLeave={cardMode ? onCardPointerLeave : undefined}
         onTouchStart={compareMode ? handleCompareTouchStart : undefined}
         onDoubleClick={compareMode || cardMode ? undefined : reset}
-        style={{ cursor }}
+        style={{
+          cursor,
+          // 黑底舞台(转卡外观参数):开档且开关开时舞台纯黑,关档 React 摘除
+          // inline 还原工作区原背景
+          ...(cardMode && cardDarkBg ? { backgroundColor: '#000' } : null),
+        }}
       >
         <div
           className="canvas-scaler"
@@ -247,7 +258,17 @@ function CompareSlider({
         >
           {/* 转卡 3D 容器:恒挂载(canvas 的 WebGL 上下文绑定在元素上,重挂载即重建
               上下文),非转卡时无 transform 无样式副作用。引擎每帧写 transform。 */}
-          <div className={`card-tilt${cardMode ? ' card-tilt--on' : ''}`} ref={tiltRef}>
+          <div
+            className={`card-tilt${cardMode ? ' card-tilt--on' : ''}`}
+            ref={tiltRef}
+            style={
+              cardMode
+                ? // 圆角+裁切(与导出闪卡 .card 同款:preserve-3d + overflow hidden
+                  // + 圆角,该组合导出模板已实测可行);关档 React 摘除,恒挂载期无副作用
+                  { borderRadius: `${cardRadius ?? 0}px`, overflow: 'hidden' }
+                : undefined
+            }
+          >
             {/* 拦截右键/拖拽:预览画布永不落水印(水印只在导出副本),右键「图片另存为」
                 「复制图片」或拖拽到桌面都会存出无水印 PNG,绕过导出 gating 的额度与
                 水印。无差别拦截(不分会员态),避免会员态切换的漏网窗口 */}

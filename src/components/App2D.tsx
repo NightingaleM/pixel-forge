@@ -1444,6 +1444,9 @@ function App2D() {
         uMaskInvert: params['uMaskInvert'] ?? 0,
       },
       title: `${t(currentStyle?.label ?? '')} · ${t('export.cardHtml')}`,
+      // 转卡外观两值(圆角/黑底)所见即所得:读引擎真值(悬浮窗改动即写 engine.feel)
+      radius: cardEngine.feel.radius,
+      darkBg: cardEngine.feel.darkBg,
       ui: { hint: t('card.hint'), gyroButton: t('card.gyro'), fallbackNote: t('card.fallbackNote') },
     })
     downloadBlob(new Blob([html], { type: 'text/html' }), 'html')
@@ -1866,6 +1869,8 @@ function App2D() {
           onZonePick={isHolofoilZone ? handleZonePick : undefined}
           tiltRef={tiltRef}
           onOpenCardSettings={() => setShowCardSettings((v) => !v)}
+          cardRadius={cardFeelView.radius}
+          cardDarkBg={cardFeelView.darkBg}
           images={images}
           seedViews={rowsSeedView}
           selectedIndex={selectedIndex}
@@ -1941,6 +1946,8 @@ function App2D() {
             onZonePick={isHolofoilZone ? handleZonePick : undefined}
             tiltRef={tiltRef}
             onOpenCardSettings={() => setShowCardSettings((v) => !v)}
+            cardRadius={cardFeelView.radius}
+            cardDarkBg={cardFeelView.darkBg}
           />
         ) : (
           <ImageUploader onImagesLoad={handleImagesLoad} />

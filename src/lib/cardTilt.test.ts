@@ -94,4 +94,13 @@ describe('CardTiltEngine(钳位/回正/手感)', () => {
     expect(e.feel.idle).toBe(true)
     expect(e.feel.light).toBe(true)
   })
+
+  it('默认手感含外观两值:圆角 16(与导出闪卡定稿一致)/黑底舞台开', () => {
+    const e = new CardTiltEngine()
+    expect(e.feel.radius).toBe(16)
+    expect(e.feel.darkBg).toBe(true)
+    e.setFeel({ radius: 0, darkBg: false })
+    expect(e.feel.radius).toBe(0)
+    expect(e.feel.darkBg).toBe(false)
+  })
 })

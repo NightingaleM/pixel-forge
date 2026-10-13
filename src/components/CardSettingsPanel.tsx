@@ -19,10 +19,11 @@ function CardSettingsPanel({ feel, onChange, onClose }: CardSettingsPanelProps) 
     'pixel-forge.panelPos.cardTilt',
   )
 
-  const toggles: { key: 'flow' | 'idle' | 'light'; label: string; desc: string }[] = [
+  const toggles: { key: 'flow' | 'idle' | 'light' | 'darkBg'; label: string; desc: string }[] = [
     { key: 'flow', label: t('card.flow'), desc: t('card.flowDesc') },
     { key: 'idle', label: t('card.idle'), desc: t('card.idleDesc') },
     { key: 'light', label: t('card.shine'), desc: t('card.shineDesc') },
+    { key: 'darkBg', label: t('card.darkBg'), desc: t('card.darkBgDesc') },
   ]
 
   return (
@@ -49,6 +50,21 @@ function CardSettingsPanel({ feel, onChange, onClose }: CardSettingsPanelProps) 
             step={0.5}
             value={feel.amp}
             onInput={(e) => onChange({ amp: parseFloat((e.target as HTMLInputElement).value) })}
+          />
+        </div>
+        <div className="param-row">
+          <div className="param-header">
+            <span className="param-label">{t('card.radius')}</span>
+            <span className="param-value">{Math.round(feel.radius)}px</span>
+          </div>
+          <input
+            type="range"
+            className="param-slider"
+            min={0}
+            max={48}
+            step={1}
+            value={feel.radius}
+            onInput={(e) => onChange({ radius: parseFloat((e.target as HTMLInputElement).value) })}
           />
         </div>
         {toggles.map((tg) => (

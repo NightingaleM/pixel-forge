@@ -65,6 +65,8 @@ export interface MobileShell2DProps {
   onZonePick?: (u: number, v: number) => void
   tiltRef?: RefObject<HTMLDivElement | null>
   onOpenCardSettings?: () => void
+  cardRadius?: number
+  cardDarkBg?: boolean
   /** 上传页回调(ImageUploader):App2D handleImagesLoad 直通 */
   onImagesLoad: (images: HTMLImageElement[], names: string[]) => void
   // 图片条(类型直接取自 ImageStrip 的 Props)
@@ -150,6 +152,8 @@ function MobileShell2D(props: MobileShell2DProps) {
             onZonePick={props.onZonePick}
             tiltRef={props.tiltRef}
             onOpenCardSettings={props.onOpenCardSettings}
+            cardRadius={props.cardRadius}
+            cardDarkBg={props.cardDarkBg}
           />
         ) : (
           <ImageUploader onImagesLoad={props.onImagesLoad} />

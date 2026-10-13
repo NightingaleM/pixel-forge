@@ -4,6 +4,8 @@
 // onFrame 回调交调用方闭包执行(引擎只管数学与节奏)。
 // 手感四值=产品常量不入种子码:幅度默认 12°(悬浮窗 5-20 可调,会话态)、
 // 自摆/阴影微动默认开(悬浮窗可关)、流动增益 2.6 封死在 shader 内。
+// 外观两值(圆角/黑底舞台)同为会话态,引擎数学不消费——由 React 侧与导出
+// 模板读 CardTiltFeel 渲染。
 export const CARD_TILT_IDLE_DELAY = 2500
 export const CARD_TILT_DAMPING = 0.10
 export const CARD_TILT_SWING = 0.42
@@ -20,9 +22,15 @@ export interface CardTiltFeel {
   idle: boolean
   /** 阴影/高光微动 */
   light: boolean
+  /** 卡面圆角 px 0..48,默认 16(与导出闪卡 HTML 定稿值一致) */
+  radius: number
+  /** 转卡舞台纯黑背景 */
+  darkBg: boolean
 }
 
-export const DEFAULT_CARD_TILT_FEEL: CardTiltFeel = { amp: 12, flow: true, idle: true, light: true }
+export const DEFAULT_CARD_TILT_FEEL: CardTiltFeel = {
+  amp: 12, flow: true, idle: true, light: true, radius: 16, darkBg: true,
+}
 
 export interface CardTiltFrame {
   /** 平滑后倾角 -1..1 */
