@@ -148,7 +148,66 @@ export async function renderImage(opts: RenderImageOpts): Promise<void> {
 
   const shaderSources = await Promise.all(styleDef.shaderImports.map((fn) => fn()))
 
-  if (styleDef.isMultiPass && shaderSources.length > 1) {
+  // tiltshift 专属链: renderMultiPass 的双 FBO ping-pong 表达不了「变尺寸
+  // 金字塔 + 深层上下两份独立加轮 + 六纹理合成」,故手排 pass 链
+  // (ShaderRenderer.renderToFBO 变尺寸 + renderToCanvas 多纹理上屏)。
+  // 中间纹理逐张登记 finally 删除——滑杆拖动逐帧重渲,漏删即显存泄漏。
+  if (styleDef.id === 'tiltshift' && renderer && shaderSources.length >= 2) {
+    const [dsSrc, compSrc] = shaderSources
+    const gl = renderer.getGl()
+    const srcTex0 = renderer.getSourceTexture()
+    if (srcTex0) {
+      const W = canvas.width
+      const H = canvas.height
+      const temps: WebGLTexture[] = []
+      try {
+        // 金字塔 L0..L3 = 1/2..1/16(tent 降采样链,uSrcRes 按输入纹理实际尺寸传)
+        const dims = [
+          [Math.max(1, W >> 1), Math.max(1, H >> 1)],
+          [Math.max(1, W >> 2), Math.max(1, H >> 2)],
+          [Math.max(1, W >> 3), Math.max(1, H >> 3)],
+          [Math.max(1, W >> 4), Math.max(1, H >> 4)],
+        ] as const
+        const pyr: WebGLTexture[] = []
+        let srcTex = srcTex0
+        let srcW = W
+        let srcH = H
+        for (const [w, h] of dims) {
+          const t = renderer.renderToFBO(dsSrc, srcTex, { uSrcRes: [srcW, srcH] }, w, h)
+          pyr.push(t)
+          temps.push(t)
+          srcTex = t
+          srcW = w
+          srcH = h
+        }
+        // 深层上/下两份独立加轮: 本侧满糊 R% 每 4% 一轮(1-6),两侧解耦
+        const deepRounds = (r: number) => Math.max(1, Math.min(6, Math.round(r / 4)))
+        const buildDeep = (rounds: number) => {
+          const [dw, dh] = dims[3]
+          let cur = renderer!.renderToFBO(dsSrc, pyr[3], { uSrcRes: [dw, dh] }, dw, dh)
+          temps.push(cur)
+          for (let i = 1; i < rounds; i++) {
+            const nxt = renderer!.renderToFBO(dsSrc, cur, { uSrcRes: [dw, dh] }, dw, dh)
+            temps.push(nxt)
+            cur = nxt
+          }
+          return cur
+        }
+        const deepTop = buildDeep(deepRounds(mergedParams['uMaxBlurTop'] ?? 6))
+        const deepBot = buildDeep(deepRounds(mergedParams['uMaxBlurBottom'] ?? 5))
+        renderer.renderToCanvas(compSrc, [
+          { sampler: 'uOriginal', texture: srcTex0, unit: 0 },
+          { sampler: 'uL0', texture: pyr[0], unit: 1 },
+          { sampler: 'uL1', texture: pyr[1], unit: 2 },
+          { sampler: 'uL2', texture: pyr[2], unit: 3 },
+          { sampler: 'uL3Top', texture: deepTop, unit: 4 },
+          { sampler: 'uL3Bot', texture: deepBot, unit: 5 },
+        ], mergedParams)
+      } finally {
+        for (const t of temps) gl.deleteTexture(t)
+      }
+    }
+  } else if (styleDef.isMultiPass && shaderSources.length > 1) {
     renderer.renderMultiPass(shaderSources.map((src) => ({ fragSource: src, uniforms: { ...mergedParams } })))
   } else {
     renderer.useShader(shaderSources[0])

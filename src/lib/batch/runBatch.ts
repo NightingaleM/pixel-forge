@@ -6,8 +6,9 @@ import type { StyleId } from '../../types'
 import { ShaderRenderer } from '../ShaderRenderer'
 import { AsciiCanvasRenderer } from '../AsciiCanvasRenderer'
 import { findBrightestPoint } from '../brightPoint'
+import { estimateFocusBand } from '../tiltshiftBand'
 import { renderImage, exportCanvasBlob, compositeOnBlack } from '../renderImage'
-import { getStyle } from '../StyleRegistry'
+import { getStyle, defaultParams } from '../StyleRegistry'
 import { decodeSeed, encodeSeed } from '../seedCodec'
 import { decideBatchExport } from '../license/gating'
 import { exportWatermarked, injectSvgWatermark } from '../license/watermark'
@@ -148,6 +149,31 @@ export function createCanvasRenderTask(baseline: ProcessingBaseline): RenderTask
     } catch { /* 跨域等失败回落默认光源 */ }
 
     try {
+      // tiltshift 智能焦带:与单图「估计只赢默认位」同口径——行种子带定焦带
+      // (≠注册默认)则尊重种子(roundtrip 可复现);仍是默认带的行(用户没动)
+      // 逐图估计 y/tilt,width 恒定稿值不采纳(票04 修订)。估计值随渲染入码,
+      // 导出水印种子可复现本张产出。
+      let rowParams = t.params
+      if (t.styleId === 'tiltshift') {
+        const d = defaultParams('tiltshift')
+        if (rowParams['uBandY'] === d['uBandY'] && rowParams['uBandTilt'] === d['uBandTilt']) {
+          try {
+            const THUMB = 64
+            const nw = t.image.naturalWidth || t.image.width
+            const nh = t.image.naturalHeight || t.image.height
+            const s = Math.min(1, THUMB / Math.max(nw, nh))
+            const c = document.createElement('canvas')
+            c.width = Math.max(1, Math.round(nw * s))
+            c.height = Math.max(1, Math.round(nh * s))
+            const ctx = c.getContext('2d', { willReadFrequently: true })
+            if (ctx) {
+              ctx.drawImage(t.image, 0, 0, c.width, c.height)
+              const est = estimateFocusBand(ctx.getImageData(0, 0, c.width, c.height).data, c.width, c.height)
+              if (est.confident) rowParams = { ...rowParams, 'uBandY': est.y, 'uBandTilt': est.tilt }
+            }
+          } catch { /* 跨域等失败:回退默认带 */ }
+        }
+      }
       await renderImage({
         canvas: canvas ?? document.createElement('canvas'),
         asciiCanvas: asciiCanvas ?? document.createElement('canvas'),
@@ -155,7 +181,7 @@ export function createCanvasRenderTask(baseline: ProcessingBaseline): RenderTask
         asciiRenderer,
         image: t.image,
         styleDef: def,
-        params: t.params,
+        params: rowParams,
         textParams: t.textParams,
         fontParams: baseline.fontParams,
         brightest,
@@ -164,7 +190,7 @@ export function createCanvasRenderTask(baseline: ProcessingBaseline): RenderTask
       // 批量水印决策:每张导出瞬间现查(会员 none/免费 tiled;批量不消耗单图额度)。
       // 种子码由渲染状态现编码(与行 seed roundtrip 等价,RenderTask 无需携带 seed)
       const wm = decideBatchExport().mode
-      const seedText = encodeSeed(t.styleId, t.params, def, t.textParams)
+      const seedText = encodeSeed(t.styleId, rowParams, def, t.textParams)
       if (t.format === 'svg') {
         const family = baseline.fontParams['uFont']?.family ?? 'monospace'
         const svg = asciiRenderer.exportSvg(family)

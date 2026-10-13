@@ -59,8 +59,8 @@ describe('defaultParams / defaultTextParams', () => {
 })
 
 describe('glassdistort', () => {
-  it('追加序不变:末三位 = glassdistort → holofoil → prism(种子码按序号入码,插入中间会废掉旧码)', () => {
-    expect(styles.slice(-3).map(s => s.id)).toEqual(['glassdistort', 'holofoil', 'prism'])
+  it('追加序不变:末三位 = holofoil → prism → tiltshift(种子码按序号入码,插入中间会废掉旧码)', () => {
+    expect(styles.slice(-3).map(s => s.id)).toEqual(['holofoil', 'prism', 'tiltshift'])
   })
 
   it('默认参数 = 试验台定稿值(玻璃类型大波浪 + 强度 100% + 三组气质默认)', () => {

@@ -1,4 +1,4 @@
-export type StyleId = 'halftone' | 'diffusion' | 'popart' | 'lightshadow' | 'sketch' | 'pointillism' | 'kaleidoscope' | 'crosshatch' | 'animelight' | 'textraster' | 'ascii' | 'glassdistort' | 'holofoil' | 'prism'
+export type StyleId = 'halftone' | 'diffusion' | 'popart' | 'lightshadow' | 'sketch' | 'pointillism' | 'kaleidoscope' | 'crosshatch' | 'animelight' | 'textraster' | 'ascii' | 'glassdistort' | 'holofoil' | 'prism' | 'tiltshift'
 
 export interface NumberParamDef {
   type?: 'number'

@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>移轴微缩 · 实验室样张</title>
+<style>
+  :root { --bg:#101218; --panel:#181b23; --line:#262a35; --text:#d7dae2; --dim:#8a8f9c; --accent:#6ea8fe; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--text); font:13px/1.6 system-ui,"Segoe UI","Microsoft YaHei",sans-serif; display:flex; min-height:100vh; }
+  #side { width:320px; flex:none; background:var(--panel); border-right:1px solid var(--line); padding:14px 16px; overflow-y:auto; height:100vh; }
+  #main { flex:1; padding:18px 22px; overflow-y:auto; height:100vh; }
+  h1 { font-size:16px; margin-bottom:2px; }
+  .sub { color:var(--dim); font-size:12px; margin-bottom:12px; }
+  h3 { font-size:12px; color:var(--dim); font-weight:600; margin:14px 0 6px; border-top:1px solid var(--line); padding-top:10px; }
+  .row { display:flex; align-items:center; gap:6px; margin-bottom:5px; }
+  .row label { width:104px; flex:none; font-size:12px; }
+  .row input[type=range] { flex:1; min-width:0; }
+  .row .val { width:52px; flex:none; text-align:right; font:11px/1.2 ui-monospace,Consolas,monospace; color:var(--accent); }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; }
+  .chip { border:1px solid var(--line); border-radius:14px; padding:3px 10px; font-size:12px; cursor:pointer; color:var(--dim); }
+  .chip.on { border-color:var(--accent); color:var(--accent); }
+  select { background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:3px 6px; font-size:12px; }
+  button { background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:12px; cursor:pointer; }
+  button:hover { border-color:var(--accent); }
+  #status { font:11px/1.5 ui-monospace,Consolas,monospace; color:var(--dim); margin-top:8px; white-space:pre-wrap; }
+  #err { display:none; background:#3a1d24; color:#ff9aa8; border:1px solid #6e2a38; border-radius:8px; padding:10px 12px; margin-bottom:12px; white-space:pre-wrap; font:11px/1.5 ui-monospace,Consolas,monospace; }
+  #liveWrap { background:#000; border:1px solid var(--line); border-radius:8px; overflow:hidden; margin-bottom:14px; max-width:100%; display:inline-block; }
+  #live { display:block; max-width:100%; cursor:zoom-in; }
+  .thumbs { display:flex; gap:10px; flex-wrap:wrap; }
+  .thumbs figure { flex:1; min-width:180px; }
+  .thumbs figcaption { color:var(--dim); font-size:11px; margin-bottom:3px; }
+  .thumbs canvas { width:100%; display:block; border:1px solid var(--line); border-radius:6px; background:#000; cursor:pointer; }
+  .thumbs canvas.cur { border-color:var(--accent); }
+  .bar { display:flex; gap:8px; align-items:center; margin:6px 0 10px; flex-wrap:wrap; }
+  #overlay { position:fixed; inset:0; background:rgba(0,0,0,.82); display:none; align-items:center; justify-content:center; z-index:9; cursor:zoom-out; }
+  #overlay img { max-width:96vw; max-height:96vh; }
+</style>
+</head>
+<body>
+<div id="side">
+  <h1>移轴微缩 · 实验室</h1>
+  <div class="sub">A 金字塔混合 / B 全分螺旋 disc（质感上界）/ C 半分 disc+重糊。半径与带宽均按<b>画幅短边%</b>归一。</div>
+  <div id="err"></div>
+  <h3>判定图</h3>
+  <div class="chips" id="imgChips"></div>
+  <h3>路线</h3>
+  <div class="chips" id="routeChips"></div>
+  <h3>焦带（智能估计可用）</h3>
+  <div class="bar"><button id="btnSmart">智能估焦带</button><span id="smartOut" style="font-size:11px;color:var(--dim)"></span></div>
+  <div class="row"><label>焦带中心 y</label><input type="range" id="p_bandY" min="0.05" max="0.95" step="0.01"><span class="val"></span></div>
+  <div class="row"><label>焦带宽度</label><input type="range" id="p_bandW" min="0.02" max="0.34" step="0.01"><span class="val"></span></div>
+  <div class="row"><label>焦带倾角 °</label><input type="range" id="p_bandTilt" min="-90" max="90" step="1"><span class="val"></span></div>
+  <div class="row"><label>上缘(远)满糊 R%</label><input type="range" id="p_maxBlurTop" min="1" max="25" step="0.5"><span class="val"></span></div>
+  <div class="row"><label>下缘(近)满糊 R%</label><input type="range" id="p_maxBlurBottom" min="1" max="25" step="0.5"><span class="val"></span></div>
+  <div class="row"><label>过渡带半宽</label><input type="range" id="p_feather" min="0.03" max="0.70" step="0.01"><span class="val"></span></div>
+  <h3>虚化质感</h3>
+  <div class="row"><label>光圈形状</label><select id="p_aperture"><option value="0">圆</option><option value="1">六角</option><option value="2">椭圆</option></select></div>
+  <div class="row"><label>高光盘感</label><input type="range" id="p_hiGlow" min="0" max="1" step="0.01"><span class="val"></span></div>
+  <div class="row"><label>B 采样数</label><input type="range" id="p_samples" min="24" max="96" step="8"><span class="val"></span></div>
+  <h3>色彩链</h3>
+  <div class="row"><label>饱和</label><input type="range" id="p_sat" min="1" max="2" step="0.01"><span class="val"></span></div>
+  <div class="row"><label>对比</label><input type="range" id="p_con" min="0.8" max="1.8" step="0.01"><span class="val"></span></div>
+  <div class="row"><label>带内加锐</label><input type="range" id="p_clar" min="0" max="1" step="0.01"><span class="val"></span></div>
+  <div class="row"><label>暗角</label><input type="range" id="p_vig" min="0" max="0.5" step="0.01"><span class="val"></span></div>
+  <div class="row"><label>微暖</label><input type="range" id="p_warm" min="0" max="1" step="0.01"><span class="val"></span></div>
+  <div class="row"><label>抖动</label><input type="range" id="p_dith" min="0" max="0.012" step="0.001"><span class="val"></span></div>
+  <div class="bar"><button id="btnReset">还原图默认</button><button id="btnCopy">复制 URL</button></div>
+  <div id="status"></div>
+</div>
+<div id="main">
+  <div id="liveWrap"><canvas id="live"></canvas></div>
+  <div class="thumbs" id="thumbs"></div>
+</div>
+<div id="overlay"><img id="overlayImg" alt=""></div>
+<script>
+'use strict';
+/* ============ 状态 ============ */
+const IMGS = [
+  { file:'../testimg/image.png',   name:'纽约街道车流' },
+  { file:'../testimg/image-1.png', name:'黄昏海滩人群' },
+  { file:'../testimg/image-2.png', name:'印度集市(竖)' },
+  { file:'../testimg/image-3.png', name:'河内路口硬光' },
+];
+/* 用户终判默认 (2026-10-13, 纽约图实调定稿): 全图统一 */
+const BASE = { bandY:.5, bandW:.02, bandTilt:0, maxBlurTop:6, maxBlurBottom:5, feather:.34, aperture:0, hiGlow:.5, samples:64,
+               sat:1.5, con:1.3, clar:.5, vig:.25, warm:.5, dith:.006 };
+const ROUTES = [ {id:'orig',name:'原图'}, {id:'A',name:'A 金字塔混合'}, {id:'B',name:'B 全分螺旋disc'}, {id:'C',name:'C 半分disc+重糊'} ];
+const P = Object.assign({}, BASE);
+let curImg = 0, curRoute = 'A';
+
+function fail(m){ const e=document.getElementById('err'); e.style.display='block'; e.textContent=m; window.__err=m; console.error(m); }
+
+/* ============ WebGL ============ */
+const canvas = document.getElementById('live');
+const gl = canvas.getContext('webgl', { preserveDrawingBuffer:true, antialias:false });
+if (!gl) fail('WebGL 不可用');
+const VS = 'attribute vec2 aPos; varying vec2 vUv; void main(){ vUv=aPos*0.5+0.5; gl_Position=vec4(aPos,0.,1.); }';
+
+/* 公共: 短边归一几何 + 半径曲线 + 光圈形状 + 螺旋 gather + 色彩链 */
+const COMMON = `
+uniform vec2 uRes;
+uniform sampler2D uOrigTex;
+uniform float uBandY, uBandTilt, uBandW, uMaxBlurTop, uMaxBlurBottom, uFeather;
+uniform float uAperture, uHiGlow, uSat, uCon, uClar, uVig, uWarm, uDith, uSamples;
+float luma(vec3 c){ return dot(c, vec3(0.299,0.587,0.114)); }
+float hash12(vec2 p){ p=fract(p*vec2(123.34,456.21)); p+=dot(p,p+45.32); return fract(p.x*p.y); }
+float shortSide(){ return min(uRes.x, uRes.y); }
+/* 带符号带距(短边比例): >0 = 画面上方(远端) */
+float bandSigned(vec2 uv){
+  float mn = shortSide();
+  float ax = uRes.x/mn, ay = uRes.y/mn;
+  float t = radians(uBandTilt);
+  return (uv.x-0.5)*ax*sin(t) + (uv.y-uBandY)*ay*cos(t);
+}
+/* 半径曲线: pow1.5 单调渐增(离焦带越远越糊); 上/下满糊半径独立可调 */
+float radiusMaxAt(vec2 uv){
+  float s = bandSigned(uv);
+  return s>0.0 ? uMaxBlurTop : uMaxBlurBottom;
+}
+float radiusAt(vec2 uv){
+  float s = bandSigned(uv);
+  float d = max(abs(s)-0.5*uBandW, 0.0);
+  return radiusMaxAt(uv) * pow(smoothstep(0.0, uFeather, d), 1.5);
+}
+/* 方向(单位向量,短边比例域) -> UV 偏移 */
+vec2 dirToUV(vec2 dirN, float rShort){
+  float mn = shortSide();
+  return vec2(dirN.x*uRes.x, dirN.y*uRes.y) * (rShort/mn);
+}
+float apMask(vec2 p, float e){
+  float d;
+  if (uAperture > 1.5)      { p*=vec2(1.0,2.0); d = length(p)*0.75; }
+  else if (uAperture > 0.5) { const vec2 k = vec2(-0.866025404,0.5); p=abs(p); d = max(dot(p,k), p.x); }
+  else                        d = length(p);
+  return smoothstep(1.0+e, 1.0-e, d);
+}
+/* 费马螺旋 disc gather(精确 sqrt 填充): r=短边比例半径; 返回 rgb + 高光占比 */
+vec4 discGather(sampler2D tex, vec2 uv, float r, float nSamp){
+  float rotA = hash12(uv*uRes)*6.2831853;
+  float wsum = 0.0, hi = 0.0; vec3 col = vec3(0.0);
+  for (int i=0;i<96;i++){
+    if (float(i) >= nSamp) break;
+    float fi = float(i)+0.5;
+    float fr = sqrt(fi/nSamp);                 /* 等面积填充 */
+    vec2 dir = vec2(cos(rotA+fi*2.39996323), sin(rotA+fi*2.39996323));
+    vec3 s3 = texture2D(tex, uv + dirToUV(dir, fr*r)).rgb;
+    float w = apMask(dir*fr, 0.12);
+    float lum = luma(s3);
+    w *= 1.0 + uHiGlow*1.6*smoothstep(0.72,0.95,lum);
+    col += s3*w; wsum += w;
+    hi += w*smoothstep(0.72,0.95,lum);
+  }
+  return vec4(col/max(wsum,1e-4), clamp(hi/max(wsum,1e-4)-0.35,0.0,1.0));
+}
+/* 色彩链: col=模糊结果, orig=原图采样, wBlur=模糊权重 */
+vec3 colorChain(vec3 col, vec3 orig, float wBlur, vec2 uv){
+  vec2 texel = 1.0/uRes;
+  vec3 nb = ( texture2D(uOrigTex, uv+vec2(texel.x,0.)).rgb + texture2D(uOrigTex, uv-vec2(texel.x,0.)).rgb
+            + texture2D(uOrigTex, uv+vec2(0.,texel.y)).rgb + texture2D(uOrigTex, uv-vec2(0.,texel.y)).rgb )*0.25;
+  vec3 us = orig + (orig-nb)*uClar*(1.0-wBlur);
+  col = mix(us, col, wBlur);
+  float l = luma(col);
+  col = mix(vec3(l), col, uSat*(1.08-0.18*wBlur));
+  col = (col-0.5)*uCon + 0.5;
+  float a = uRes.x/uRes.y;
+  col *= 1.0 - uVig*smoothstep(0.5, 1.15, length((uv-0.5)*vec2(a,1.0)));
+  col *= mix(vec3(1.0), vec3(1.03,1.0,0.97), uWarm);
+  col += (hash12(uv*uRes)-0.5)*uDith;
+  return col;
+}
+`;
+
+const FRAG = {};
+FRAG.pass = `precision highp float; varying vec2 vUv; uniform sampler2D uTex;
+void main(){ gl_FragColor = texture2D(uTex, vUv); }`;
+/* tent 降采样: 4 双线性 tap 覆盖 2x2 源 texel */
+FRAG.ds = `precision highp float; varying vec2 vUv; uniform sampler2D uTex; uniform vec2 uSrcRes;
+void main(){
+  vec2 t = 1.0/uSrcRes;
+  vec3 c = texture2D(uTex, vUv+vec2(-t.x,-t.y)).rgb + texture2D(uTex, vUv+vec2(t.x,-t.y)).rgb
+         + texture2D(uTex, vUv+vec2(-t.x, t.y)).rgb + texture2D(uTex, vUv+vec2(t.x, t.y)).rgb;
+  gl_FragColor = vec4(c*0.25, 1.0);
+}`;
+/* A 合成: orig + L0(1/2)..L3(1/16), 权重按「本侧满糊值」归一(上下完全解耦) + 深层上下两份 + 形状高光层 */
+FRAG.compA = `precision highp float; varying vec2 vUv;
+uniform sampler2D uL0, uL1, uL2, uL3Top, uL3Bot;
+${COMMON}
+void main(){
+  float rm = radiusMaxAt(vUv);
+  float r = radiusAt(vUv);
+  float t = clamp(r/max(rm,1e-5), 0.0, 1.05);
+  float T0=0.117, T1=0.25, T2=0.517, T3=1.0;
+  vec3 orig = texture2D(uOrigTex, vUv).rgb;
+  float w0 = max(0.0, 1.0-abs(t-T0)/(T1-T0));
+  float w1 = max(0.0, 1.0-abs(t-T1)/(T2-T1));
+  float w2 = max(0.0, 1.0-abs(t-T2)/(T3-T2));
+  float w3 = smoothstep(T2, T3, t);
+  float wS = 1.0-smoothstep(0.0, T0, t);
+  vec3 c3;
+  if (bandSigned(vUv) > 0.0) c3 = texture2D(uL3Top, vUv).rgb; else c3 = texture2D(uL3Bot, vUv).rgb;
+  vec3 c0 = texture2D(uL0, vUv).rgb, c1 = texture2D(uL1, vUv).rgb, c2 = texture2D(uL2, vUv).rgb;
+  vec3 tower = (orig*wS + c0*w0 + c1*w1 + c2*w2 + c3*w3)/(wS+w0+w1+w2+w3+1e-5);
+  vec4 d = discGather(uOrigTex, vUv, max(r,0.004), min(uSamples,32.0));
+  float hiMask = smoothstep(0.66, 0.92, luma(tower));
+  tower = mix(tower, d.rgb*(1.0+0.5*uHiGlow*d.a), uHiGlow*hiMask*smoothstep(0.004,0.02,r));
+  gl_FragColor = vec4(colorChain(tower, orig, 1.0-wS, vUv), 1.0);
+}`;
+/* B 单 pass 全分螺旋 disc(质感上界) */
+FRAG.compB = `precision highp float; varying vec2 vUv;
+${COMMON}
+void main(){
+  float r = radiusAt(vUv);
+  vec3 orig = texture2D(uOrigTex, vUv).rgb;
+  if (r < 0.0015){ gl_FragColor = vec4(colorChain(orig, orig, 0.0, vUv), 1.0); return; }
+  vec4 d = discGather(uOrigTex, vUv, r, uSamples);
+  vec3 col = d.rgb*(1.0+0.5*uHiGlow*d.a);
+  gl_FragColor = vec4(colorChain(col, orig, smoothstep(0.0,0.02,r), vUv), 1.0);
+}`;
+/* C disc pass(1/2 分辨率): 半径上限 capD; uRes 仍=全尺寸(几何一致) */
+FRAG.discC = `precision highp float; varying vec2 vUv; uniform sampler2D uTex;
+${COMMON}
+void main(){
+  float r = min(radiusAt(vUv), 0.062);
+  if (r < 0.0015){ gl_FragColor = texture2D(uTex, vUv); return; }
+  vec4 d = discGather(uTex, vUv, r, min(uSamples,32.0));
+  gl_FragColor = vec4(d.rgb*(1.0+0.5*uHiGlow*d.a), 1.0);
+}`;
+/* C 合成: orig + disc(1/2) + heavy(1/4)上下两份 交叉 */
+FRAG.compC = `precision highp float; varying vec2 vUv;
+uniform sampler2D uDisc, uHeavyTop, uHeavyBot;
+${COMMON}
+void main(){
+  float r = radiusAt(vUv);
+  vec3 orig = texture2D(uOrigTex, vUv).rgb;
+  vec3 hv;
+  if (bandSigned(vUv) > 0.0) hv = texture2D(uHeavyTop, vUv).rgb; else hv = texture2D(uHeavyBot, vUv).rgb;
+  vec3 blur = mix(texture2D(uDisc, vUv).rgb, hv, smoothstep(0.06, 0.08, r));
+  gl_FragColor = vec4(colorChain(blur, orig, smoothstep(0.0,0.02,r), vUv), 1.0);
+}`;
+
+/* ---- harness ---- */
+function compile(type, src){
+  const s = gl.createShader(type); gl.shaderSource(s,src); gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error('shader: '+gl.getShaderInfoLog(s)+'\n'+src.slice(0,200));
+  return s;
+}
+function program(fs){
+  const p = gl.createProgram();
+  gl.attachShader(p, compile(gl.VERTEX_SHADER, VS));
+  gl.attachShader(p, compile(gl.FRAGMENT_SHADER, fs));
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error('link: '+gl.getProgramInfoLog(p));
+  return p;
+}
+const quad = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+function drawQuad(prog){
+  gl.useProgram(prog);
+  const loc = gl.getAttribLocation(prog, 'aPos');
+  gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+  gl.enableVertexAttribArray(loc);
+  gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+}
+function makeFBO(w, h){
+  const tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  const fb = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  return { tex, fb, w, h };
+}
+function bindTex(prog, name, tex, unit){
+  gl.activeTexture(gl.TEXTURE0+unit);
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.uniform1i(gl.getUniformLocation(prog, name), unit);
+}
+const FLOAT_UNIFORMS = { uBandY:'bandY', uBandTilt:'bandTilt', uBandW:'bandW', uMaxBlurTop:'maxBlurTop', uMaxBlurBottom:'maxBlurBottom', uFeather:'feather',
+  uAperture:'aperture', uHiGlow:'hiGlow', uSat:'sat', uCon:'con', uClar:'clar', uVig:'vig', uWarm:'warm', uDith:'dith', uSamples:'samples' };
+function setUniforms(prog){
+  gl.uniform2f(gl.getUniformLocation(prog,'uRes'), canvas.width, canvas.height);
+  for (const [u,k] of Object.entries(FLOAT_UNIFORMS)){
+    const v = (k==='maxBlurTop'||k==='maxBlurBottom') ? P[k]/100 : P[k];
+    gl.uniform1f(gl.getUniformLocation(prog,u), v);
+  }
+}
+function passTo(progName, target, binds, srcRes){
+  const prog = progs[progName];
+  gl.useProgram(prog);                          /* uniform 必须在程序绑定后设置 */
+  gl.bindFramebuffer(gl.FRAMEBUFFER, target ? target.fb : null);
+  gl.viewport(0, 0, target ? target.w : canvas.width, target ? target.h : canvas.height);
+  for (const [name, tex, unit] of binds) bindTex(prog, name, tex, unit);
+  if (srcRes) gl.uniform2f(gl.getUniformLocation(prog,'uSrcRes'), srcRes[0], srcRes[1]);
+  drawQuad(prog);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+}
+const progs = {};
+let texSrc = null;
+let F = null;                                  /* 按画布尺寸缓存的 FBO 组 */
+function ensureFbos(){
+  const W = canvas.width, H = canvas.height;
+  if (F && F.W===W && F.H===H) return F;
+  F = { W, H,
+    pyr: [ makeFBO(W>>1,H>>1), makeFBO(W>>2,H>>2), makeFBO(W>>3,H>>3), makeFBO(W>>4,H>>4) ],
+    scratch: [ makeFBO(W>>4,H>>4), makeFBO(W>>4,H>>4), makeFBO(W>>4,H>>4), makeFBO(W>>4,H>>4) ],
+    half: makeFBO(W>>1,H>>1), disc: makeFBO(W>>1,H>>1),
+    heavy: makeFBO(W>>2,H>>2), qtmp: makeFBO(W>>2,H>>2), heavy2: makeFBO(W>>2,H>>2), qtmp2: makeFBO(W>>2,H>>2) };
+  return F;
+}
+function renderRoute(route){
+  const W = canvas.width, H = canvas.height;
+  ensureFbos();
+  if (route === 'orig'){
+    passTo('pass', null, [['uTex', texSrc, 0]]);
+    return;
+  }
+  if (route === 'A'){
+    let src = { tex:texSrc, w:W, h:H };
+    for (let i=0;i<4;i++){
+      passTo('ds', F.pyr[i], [['uTex', src.tex, 0]], [src.w, src.h]);
+      src = F.pyr[i];
+    }
+    /* 深层动态加糊(上下两份独立): 本侧满糊 R% 每 4% 一轮(1-6) → 两侧互不影响 */
+    const deepRounds = R => Math.max(1, Math.min(6, Math.round(R/4)));
+    const buildDeep = (a, b, rounds) => {
+      let cur = a;
+      passTo('ds', cur, [['uTex', F.pyr[3].tex, 0]], [F.pyr[3].w, F.pyr[3].h]);
+      for (let i=1;i<rounds;i++){
+        const dst = (cur===a) ? b : a;
+        passTo('ds', dst, [['uTex', cur.tex, 0]], [cur.w, cur.h]);
+        cur = dst;
+      }
+      return cur;
+    };
+    const deepTop = buildDeep(F.scratch[0], F.scratch[1], deepRounds(P.maxBlurTop));
+    const deepBot = buildDeep(F.scratch[2], F.scratch[3], deepRounds(P.maxBlurBottom));
+    const prog = progs.compA;
+    gl.useProgram(prog);
+    bindTex(prog, 'uOrigTex', texSrc, 0);
+    bindTex(prog, 'uL0', F.pyr[0].tex, 1);
+    bindTex(prog, 'uL1', F.pyr[1].tex, 2);
+    bindTex(prog, 'uL2', F.pyr[2].tex, 3);
+    bindTex(prog, 'uL3Top', deepTop.tex, 4);
+    bindTex(prog, 'uL3Bot', deepBot.tex, 5);
+    setUniforms(prog);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0,0,W,H);
+    drawQuad(prog);
+    return;
+  }
+  if (route === 'B'){
+    const prog = progs.compB;
+    gl.useProgram(prog);
+    bindTex(prog, 'uOrigTex', texSrc, 0);
+    setUniforms(prog);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0,0,W,H);
+    drawQuad(prog);
+    return;
+  }
+  if (route === 'C'){
+    const hw=F.half.w, hh=F.half.h, qw=F.heavy.w, qh=F.heavy.h;
+    passTo('ds', F.half, [['uTex', texSrc, 0]], [W,H]);
+    { const prog = progs.discC;
+      gl.useProgram(prog);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, F.disc.fb);
+      gl.viewport(0,0,F.disc.w,F.disc.h);
+      bindTex(prog, 'uTex', F.half.tex, 0);
+      setUniforms(prog);
+      drawQuad(prog);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null); }
+    /* 重糊层动态加轮(上下两份独立, 同 A 公式) */
+    const heavyRounds = R => Math.max(1, Math.min(6, Math.round(R/4)));
+    const buildHeavy = (dst1, tmp, rounds) => {
+      passTo('ds', dst1, [['uTex', F.half.tex, 0]], [hw,hh]);
+      for (let i=0;i<rounds;i++){
+        passTo('ds', tmp, [['uTex', dst1.tex, 0]], [qw,qh]);
+        passTo('ds', dst1, [['uTex', tmp.tex, 0]], [qw,qh]);
+      }
+      return dst1;
+    };
+    buildHeavy(F.heavy, F.qtmp, heavyRounds(P.maxBlurTop));
+    buildHeavy(F.heavy2, F.qtmp2, heavyRounds(P.maxBlurBottom));
+    const prog = progs.compC;
+    gl.useProgram(prog);
+    bindTex(prog, 'uOrigTex', texSrc, 0);
+    bindTex(prog, 'uDisc', F.disc.tex, 1);
+    bindTex(prog, 'uHeavyTop', F.heavy.tex, 2);
+    bindTex(prog, 'uHeavyBot', F.heavy2.tex, 3);
+    setUniforms(prog);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0,0,W,H);
+    drawQuad(prog);
+    return;
+  }
+}
+
+/* ============ 智能焦带估计 (缩略图 CPU, 研究票 §4.2: 能量和投影 + 滑窗) ============ */
+function estimateFocusBand(img){
+  const s = 64;                                   /* 64px 短边: 32px 投影量化噪声过大 */
+  const tw = img.width <= img.height ? s : Math.round(s*img.width/img.height);
+  const th = img.height < img.width ? s : Math.round(s*img.height/img.width);
+  const c = document.createElement('canvas'); c.width=tw; c.height=th;
+  const x = c.getContext('2d', { willReadFrequently:true });
+  x.drawImage(img, 0, 0, tw, th);
+  let data;
+  try { data = x.getImageData(0,0,tw,th).data; } catch(e){ return null; }
+  const L = new Float32Array(tw*th), C = new Float32Array(tw*th);
+  for (let p=0;p<tw*th;p++){
+    const r=data[p*4], g=data[p*4+1], b=data[p*4+2];
+    L[p] = 0.299*r+0.587*g+0.114*b;
+    C[p] = (Math.max(r,g,b)-Math.min(r,g,b))/255;   /* 彩色度: 主体(人群/彩棚/车流)高饱和 */
+  }
+  const G = new Float32Array(tw*th);
+  let gsum = 0;
+  for (let j=0;j<th-1;j++) for (let i=0;i<tw-1;i++){
+    const g = Math.abs(L[j*tw+i+1]-L[j*tw+i]) + Math.abs(L[(j+1)*tw+i]-L[j*tw+i]);
+    const w = 0.4 + 0.6*(C[j*tw+i]+C[j*tw+i+1]+C[(j+1)*tw+i])/3;
+    G[j*tw+i]=g*w; gsum+=g*w;
+  }
+  if (gsum/(tw*th) < 3.0) return { y: img.height>img.width?0.5:0.45, tilt:0, width:0.12, confident:false, reason:'平坦图' };
+  const cx=(tw-1)/2, asp=tw/th;
+  const widths=[0.08,0.12,0.18,0.24], NB=64, AX=1.4;
+  const bestByDeg = {};
+  for (const deg of [0,8,-8,16,-16]){
+    const t=deg*Math.PI/180, st=Math.sin(t)*asp, ct=Math.cos(t);
+    let prof=new Float64Array(NB);
+    for (let j=0;j<th;j++) for (let i=0;i<tw;i++){
+      const sAxis=((i-cx)*st+j*ct)/th*AX;
+      const bi=Math.min(NB-1,Math.max(0,Math.round(sAxis/AX*NB)));
+      prof[bi]+=G[j*tw+i];
+    }
+    /* 3bin 盒平滑抗量化噪声 */
+    const sm=new Float64Array(NB);
+    for (let b=0;b<NB;b++) sm[b]=(prof[Math.max(0,b-1)]+prof[b]+prof[Math.min(NB-1,b+1)])/3;
+    prof=sm;
+    const total=prof.reduce((a,b)=>a+b,0);
+    let best=null;
+    for (const w of widths) for (let cc=0.15;cc<=0.8501;cc+=0.02){
+      let inE=0;
+      for (let b=0;b<NB;b++){
+        const pos=(b+0.5)/NB*AX;
+        const trap=Math.max(0,Math.min(1,(w/2+0.04-Math.abs(pos-cc))/0.04+1e-9));
+        inE+=prof[b]*trap;
+      }
+      /* 窗外能量按窗宽惩罚 + 中心先验(主体带惯例 0.45-0.60, 防贴到边缘纹理带) */
+      const score=inE-1.0*(total-inE)*w/AX-1.0*total*(cc-0.5)*(cc-0.5);
+      if (!best||score>best.score) best={w,cc,score,ratio:inE/total};
+    }
+    bestByDeg[deg]=best;
+  }
+  let bestDeg=0;
+  for (const deg of [8,-8,16,-16]) if (bestByDeg[deg].score > bestByDeg[0].score*1.25) bestDeg=deg;
+  const b=bestByDeg[bestDeg];
+  return { y:+b.cc.toFixed(2), tilt:bestDeg, width:b.w, confident:b.ratio>=0.55, ratio:+b.ratio.toFixed(3) };
+}
+
+/* ============ UI ============ */
+const $ = id => document.getElementById(id);
+const SLIDERS = ['bandY','bandW','bandTilt','maxBlurTop','maxBlurBottom','feather','hiGlow','samples','sat','con','clar','vig','warm','dith'];
+function fmt(k){ return k==='bandTilt'||k==='samples' ? String(Math.round(P[k])) : (+P[k]).toFixed(2); }
+function reflect(){
+  for (const k of SLIDERS){ $('p_'+k).value = P[k]; $('p_'+k).parentElement.querySelector('.val').textContent = fmt(k); }
+  $('p_aperture').value = P.aperture;
+  document.querySelectorAll('#imgChips .chip').forEach((el,i)=>el.classList.toggle('on', i===curImg));
+  document.querySelectorAll('#routeChips .chip').forEach(el=>el.classList.toggle('on', el.dataset.r===curRoute));
+}
+function readSliders(){
+  for (const k of SLIDERS) P[k] = parseFloat($('p_'+k).value);
+  P.aperture = parseInt($('p_aperture').value,10);
+}
+function urlSync(){
+  const q = new URLSearchParams();
+  q.set('img', curImg); q.set('route', curRoute);
+  for (const k of Object.keys(P)) q.set(k, P[k]);
+  history.replaceState(null, '', '?'+q.toString());
+}
+let timing = {};
+function renderAll(){
+  try {
+    for (const r of ROUTES){
+      if (r.id==='orig') continue;
+      const t0=performance.now();
+      renderRoute(r.id);
+      timing[r.id]=(performance.now()-t0).toFixed(1);
+    }
+  } catch(e){ fail(String(e&&e.stack||e)); return; }
+  renderRoute(curRoute);
+  const th=$('thumbs'); th.innerHTML='';
+  for (const r of ROUTES){
+    if (r.id===curRoute && r.id!=='orig') continue;
+    const fig=document.createElement('figure');
+    const cap=document.createElement('figcaption');
+    cap.textContent=r.name+(r.id===curRoute?' ◀':'')+(timing[r.id]?' · '+timing[r.id]+'ms':'');
+    const c=document.createElement('canvas'); c.width=canvas.width; c.height=canvas.height;
+    renderRoute(r.id);
+    c.getContext('2d').drawImage(canvas,0,0);
+    c.onclick=()=>{ curRoute=r.id; refresh(); };
+    c.classList.toggle('cur', r.id===curRoute);
+    fig.appendChild(cap); fig.appendChild(c); th.appendChild(fig);
+  }
+  renderRoute(curRoute);
+  $('status').textContent = `${IMGS[curImg].name} · ${curRoute} · ${canvas.width}×${canvas.height} · A ${timing.A}ms B ${timing.B}ms C ${timing.C}ms`;
+}
+function refresh(){ readSliders(); reflect(); urlSync(); renderAll(); }
+
+function loadImage(i){
+  curImg=i;
+  Object.assign(P, BASE, IMGS[i].defs||{});
+  const img=new Image();
+  img.onload=()=>{
+    const MAXL=960, sc=Math.min(1, MAXL/Math.max(img.width,img.height));
+    canvas.width=Math.round(img.width*sc); canvas.height=Math.round(img.height*sc);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+    texSrc=gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texSrc);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,img);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+    const est=estimateFocusBand(img);
+    window.__band=est;
+    $('smartOut').textContent = est ? `y=${est.y.toFixed(2)} tilt=${est.tilt}° w=${est.width.toFixed(2)} ${est.confident?'✓置信':'✗低置信'}` : '估计失败';
+    refresh();
+    window.__done=true;
+  };
+  img.onerror=()=>fail('图加载失败: '+IMGS[i].file);
+  img.src=IMGS[i].file;
+}
+IMGS.forEach((m,i)=>{
+  const el=document.createElement('span'); el.className='chip'; el.textContent=m.name;
+  el.onclick=()=>loadImage(i); $('imgChips').appendChild(el);
+});
+ROUTES.forEach(r=>{
+  const el=document.createElement('span'); el.className='chip'; el.dataset.r=r.id; el.textContent=r.name;
+  el.onclick=()=>{ curRoute=r.id; refresh(); }; $('routeChips').appendChild(el);
+});
+for (const k of SLIDERS) $('p_'+k).addEventListener('input', refresh);
+$('p_aperture').addEventListener('change', refresh);
+$('btnSmart').onclick=()=>{
+  const est=window.__band;
+  if (!est){ $('smartOut').textContent='无可用估计'; return; }
+  P.bandY=+est.y.toFixed(2); P.bandTilt=est.tilt; P.bandW=+est.width.toFixed(2);
+  refresh();
+};
+$('btnReset').onclick=()=>{ Object.assign(P, BASE, IMGS[curImg].defs||{}); refresh(); };
+$('btnCopy').onclick=()=>{ navigator.clipboard&&navigator.clipboard.writeText(location.href); };
+canvas.onclick=()=>{ $('overlayImg').src=canvas.toDataURL('image/png'); $('overlay').style.display='flex'; };
+$('overlay').onclick=()=>{ $('overlay').style.display='none'; };
+
+const q0=new URLSearchParams(location.search);
+try {
+  for (const k of Object.keys(P)) if (q0.has(k)) P[k]=parseFloat(q0.get(k));
+  if (q0.has('aperture')) P.aperture=parseInt(q0.get('aperture'),10);
+  if (q0.has('img')) curImg=Math.max(0,Math.min(IMGS.length-1,parseInt(q0.get('img'),10)||0));
+  if (q0.has('route')&&ROUTES.some(r=>r.id===q0.get('route'))) curRoute=q0.get('route');
+}catch(e){}
+try {
+  for (const [k,src] of Object.entries(FRAG)) progs[k]=program(src);
+}catch(e){ fail(String(e&&e.stack||e)); }
+loadImage(curImg);
+window.__P=P; window.__IMGS=IMGS; window.__timing=()=>timing;
+window.__capture=(r)=>{ renderRoute(r); return canvas.toDataURL('image/png'); };
+window.__setP=(o)=>{ Object.assign(P,o); reflect(); };
+</script>
+</body>
+</html>

@@ -6,6 +6,7 @@ import { AsciiCanvasRenderer } from '../lib/AsciiCanvasRenderer'
 import { styles, getStyle, defaultParams, defaultTextParams } from '../lib/StyleRegistry'
 import { encodeSeed, decodeSeed } from '../lib/seedCodec'
 import { findBrightestPoint } from '../lib/brightPoint'
+import { estimateFocusBand } from '../lib/tiltshiftBand'
 import { randomizeParams } from '../lib/randomSeed'
 import { renderImage, exportCanvasBlob, compositeOnBlack } from '../lib/renderImage'
 import { decideSingleExport, decideExportCardHTML } from '../lib/license/gating'
@@ -1062,6 +1063,51 @@ function App2D() {
       setBrightest(null)
     }
   }, [image])
+
+  // ---------------------------------------------------------------------------
+  // Effect: tiltshift 智能焦带(wayfinder/tiltshift-miniature 票04)
+  // 新图或切入 tiltshift 时估焦带 y/tilt。估计只赢「默认位」:焦带两参数仍处
+  // 注册默认(未手调/未随机/种子码未带)才填;上一张图的估计值在换图后允许被
+  // 新估计覆盖(bandEstImgRef 记应用对象)。width 不采纳——定稿窄带 0.02 是
+  // 用户口味,自动加宽反而打架(票04 修订)。
+  // setParams updater 内的 ref 写为幂等副作用(同值重写),strict mode 双调无害。
+  // ---------------------------------------------------------------------------
+  const bandEstImgRef = useRef<HTMLImageElement | null>(null)
+  useEffect(() => {
+    if (!image || activeStyle !== 'tiltshift') return
+    const est = (() => {
+      try {
+        const THUMB = 64
+        const nw = image.naturalWidth || image.width
+        const nh = image.naturalHeight || image.height
+        const s = Math.min(1, THUMB / Math.max(nw, nh))
+        const tw = Math.max(1, Math.round(nw * s))
+        const th = Math.max(1, Math.round(nh * s))
+        const c = document.createElement('canvas')
+        c.width = tw
+        c.height = th
+        const ctx = c.getContext('2d', { willReadFrequently: true })
+        if (!ctx) return null
+        ctx.drawImage(image, 0, 0, tw, th)
+        return estimateFocusBand(ctx.getImageData(0, 0, tw, th).data, tw, th)
+      } catch {
+        // 跨域图片等导致 getImageData 失败:回退默认带(沿用 animelight 先例)
+        return null
+      }
+    })()
+    const d = defaultParams('tiltshift')
+    setParams(prev => {
+      const untouched = prev['uBandY'] === d['uBandY'] && prev['uBandTilt'] === d['uBandTilt']
+      const staleEst = bandEstImgRef.current != null && bandEstImgRef.current !== image
+      if (!untouched && !staleEst) return prev
+      if (!est || !est.confident) {
+        bandEstImgRef.current = null
+        return untouched ? prev : { ...prev, 'uBandY': d['uBandY'], 'uBandTilt': d['uBandTilt'] }
+      }
+      bandEstImgRef.current = image
+      return { ...prev, 'uBandY': est.y, 'uBandTilt': est.tilt }
+    })
+  }, [image, activeStyle])
 
   // ---------------------------------------------------------------------------
   // Style change handler

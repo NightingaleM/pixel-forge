@@ -243,16 +243,19 @@ export class ShaderRenderer {
 
   /**
    * Render a single pass into an FBO texture (off-screen).
-   * Returns the texture that holds the result.
+   * outWidth/outHeight 缺省为画布全尺寸;tiltshift 金字塔链以变尺寸调用
+   * (1/2..1/16 层)。返回纹理由调用方持有,用毕须 deleteTexture。
    */
   renderToFBO(
     fragSource: string,
     inputTexture: WebGLTexture,
-    uniforms: Record<string, number>,
+    uniforms: Record<string, number | number[]>,
+    outWidth?: number,
+    outHeight?: number,
   ): WebGLTexture {
     const gl = this.gl;
-    const width = this.imageWidth;
-    const height = this.imageHeight;
+    const width = outWidth ?? this.imageWidth;
+    const height = outHeight ?? this.imageHeight;
 
     // Create output FBO + texture
     const fbo = gl.createFramebuffer()!;
@@ -454,6 +457,39 @@ export class ShaderRenderer {
     const gl = this.gl
     gl.activeTexture(gl.TEXTURE0 + unit)
     gl.bindTexture(gl.TEXTURE_2D, texture)
+  }
+
+  /** 源图纹理(金字塔链等自定义多 pass 管线的直接输入)。 */
+  getSourceTexture(): WebGLTexture | null {
+    return this.texture
+  }
+
+  /**
+   * 上屏 pass:可绑任意一组「纹理 -> 采样器名/单元」,供 renderMultiPass 的
+   * 双纹理 ping-pong 表达不了的合成 pass 使用(tiltshift 合成读 6 张纹理)。
+   * uResolution 注入画布全尺寸(与 renderMultiPass 同约定),调用方 uniforms
+   * 仍可覆盖。
+   */
+  renderToCanvas(
+    fragSource: string,
+    textures: Array<{ sampler: string; texture: WebGLTexture; unit: number }>,
+    uniforms: Record<string, number | number[]>,
+  ): void {
+    if (!this.texture) {
+      throw new Error('No image loaded. Call loadImage() first.')
+    }
+    const gl = this.gl
+    this.useShader(fragSource)
+    for (const t of textures) {
+      this.bindTexture(t.texture, t.unit)
+      this.setSampler(t.sampler, t.unit)
+    }
+    this.setUniform('uResolution', [this.imageWidth, this.imageHeight])
+    for (const [name, value] of Object.entries(uniforms)) {
+      this.setUniform(name, value)
+    }
+    gl.viewport(0, 0, this.imageWidth, this.imageHeight)
+    gl.drawArrays(gl.TRIANGLES, 0, 6)
   }
 
   /**

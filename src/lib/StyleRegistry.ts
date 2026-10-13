@@ -410,6 +410,42 @@ export const styles: StyleDefinition[] = [
       { name: 'style.prism.edgeThreshold', uniform: 'uEdgeThreshold', min: 0, max: 1, step: 0.01, default: 0.5, description: 'style.prism.edgeThresholdDesc', visibleWhen: (v) => v.uMode === 2 },
     ],
   },
+
+  // ---------------------------------------------------------------------------
+  // Tilt-Shift Miniature (multi-pass: 金字塔 tent 降采样 ×N -> composite)
+  // A 金字塔混合路线,上/下缘满糊半径独立且完全解耦;长度量按画幅短边%归一。
+  // 光圈形状参数已砍(票 03 终判:白昼素材不可见),核固定圆。
+  // 焦带三参数首载由 tiltshiftBand.ts 智能估计填默认位(仅 y/tilt,width 恒定稿值)。
+  // 规格: wayfinder/tiltshift-miniature/tickets/04(2026-10-13 锁定)
+  // ---------------------------------------------------------------------------
+  {
+    id: 'tiltshift',
+    label: 'style.tiltshift.label',
+    description: 'style.tiltshift.desc',
+    shaderImports: [
+      () => import('../shaders/tiltshift_ds.frag?raw').then(m => m.default),
+      () => import('../shaders/tiltshift_composite.frag?raw').then(m => m.default),
+    ],
+    isMultiPass: true,
+    params: [
+      { name: 'style.tiltshift.bandY',          uniform: 'uBandY',          min: 0,    max: 1,    step: 0.01, default: 0.5,  description: 'style.tiltshift.bandYDesc' },
+      { name: 'style.tiltshift.bandW',          uniform: 'uBandW',          min: 0.02, max: 0.34, step: 0.01, default: 0.02, description: 'style.tiltshift.bandWDesc' },
+      { name: 'style.tiltshift.bandTilt',       uniform: 'uBandTilt',       min: -90,  max: 90,   step: 1,    default: 0,   description: 'style.tiltshift.bandTiltDesc' },
+      { name: 'style.tiltshift.maxBlurTop',     uniform: 'uMaxBlurTop',     min: 1,    max: 25,   step: 0.5,  default: 6,   description: 'style.tiltshift.maxBlurTopDesc' },
+      { name: 'style.tiltshift.maxBlurBottom',  uniform: 'uMaxBlurBottom',  min: 1,    max: 25,   step: 0.5,  default: 5,   description: 'style.tiltshift.maxBlurBottomDesc' },
+      // bandY 0-1 / feather 0.03-0.72 为种子码档位安全组合:(max-min)/step
+      // 须精确整数(0.95-0.05、0.70-0.03 的浮点差让 floor/round 各得 89/90,
+      // max 档 round-trip 差一档),范围与票 04 定稿的偏差仅边角
+      { name: 'style.tiltshift.feather',        uniform: 'uFeather',        min: 0.03, max: 0.72, step: 0.01, default: 0.34, description: 'style.tiltshift.featherDesc' },
+      { name: 'style.tiltshift.hiGlow',         uniform: 'uHiGlow',         min: 0,    max: 1,    step: 0.01, default: 0.5,  description: 'style.tiltshift.hiGlowDesc' },
+      { name: 'style.tiltshift.saturation',     uniform: 'uSat',            min: 1.0,  max: 2.0,  step: 0.01, default: 1.5,  description: 'style.tiltshift.saturationDesc' },
+      { name: 'style.tiltshift.contrast',       uniform: 'uCon',            min: 0.8,  max: 1.8,  step: 0.01, default: 1.3,  description: 'style.tiltshift.contrastDesc' },
+      { name: 'style.tiltshift.clarity',        uniform: 'uClar',           min: 0,    max: 1,    step: 0.01, default: 0.5,  description: 'style.tiltshift.clarityDesc' },
+      { name: 'style.tiltshift.vignette',       uniform: 'uVig',            min: 0,    max: 0.5,  step: 0.01, default: 0.25, description: 'style.tiltshift.vignetteDesc' },
+      { name: 'style.tiltshift.warm',           uniform: 'uWarm',           min: 0,    max: 1,    step: 0.01, default: 0.5,  description: 'style.tiltshift.warmDesc' },
+      { name: 'style.tiltshift.dither',         uniform: 'uDith',           min: 0,    max: 0.012, step: 0.001, default: 0.006, description: 'style.tiltshift.ditherDesc' },
+    ],
+  },
 ]
 
 /**
