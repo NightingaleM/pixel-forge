@@ -301,7 +301,7 @@ export class ShaderRenderer {
    * the canvas.
    */
   renderMultiPass(
-    passes: { fragSource: string; uniforms: Record<string, number> }[],
+    passes: { fragSource: string; uniforms: Record<string, number | number[]> }[],
   ): void {
     if (passes.length === 0) return;
     if (!this.texture) {

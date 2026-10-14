@@ -19,6 +19,7 @@ export interface TextParamDef {
   uniform: string
   textDefault: string
   description?: string
+  visibleWhen?: (values: Record<string, number>) => boolean
 }
 
 export interface ToggleParamDef {
@@ -36,6 +37,7 @@ export interface ColorParamDef {
   uniform: string  // base name, creates ${uniform}R/G/B in shader
   default: string  // hex color like '#ffffff'
   description?: string
+  visibleWhen?: (values: Record<string, number>) => boolean
 }
 
 export interface SelectParamDef {
@@ -53,13 +55,15 @@ export interface FontParamDef {
   name: string
   uniform: string
   description?: string
+  visibleWhen?: (values: Record<string, number>) => boolean
 }
 
 export type ParamDef = NumberParamDef | TextParamDef | ToggleParamDef | ColorParamDef | SelectParamDef | FontParamDef
 
 export interface ShaderPass {
   fragSource: string
-  uniforms: Record<string, number>
+  // 渲染期容器:setUniform 支持 vec2/3/4 数组(uResolution/uTexSize 等经此通传)
+  uniforms: Record<string, number | number[]>
 }
 
 export interface BuiltInPresetDefinition {

@@ -142,9 +142,12 @@ export async function renderImage(opts: RenderImageOpts): Promise<void> {
   }
   if (zoneOn) mergedParams['uZoneEnabled'] = 1
   // 检测步进铁律(票03):按纹理实际分辨率通传 uTexSize;其他风格无此 uniform,
-  // setUniform 静默跳过
+  // setUniform 静默跳过。vec2 超出 buildRenderParams 的纯数值语义,经宽类型
+  // 别名通传(与 renderToCanvas/renderMultiPass 的容器类型一致);mergedParams
+  // 保持窄类型,tiltshift 链的数值算术不受数组分支污染
   const [texW, texH] = renderer.getImageSize()
-  if (texW > 0) mergedParams['uTexSize'] = [texW, texH]
+  const renderUniforms: Record<string, number | number[]> = mergedParams
+  if (texW > 0) renderUniforms['uTexSize'] = [texW, texH]
 
   const shaderSources = await Promise.all(styleDef.shaderImports.map((fn) => fn()))
 
@@ -208,7 +211,7 @@ export async function renderImage(opts: RenderImageOpts): Promise<void> {
       }
     }
   } else if (styleDef.isMultiPass && shaderSources.length > 1) {
-    renderer.renderMultiPass(shaderSources.map((src) => ({ fragSource: src, uniforms: { ...mergedParams } })))
+    renderer.renderMultiPass(shaderSources.map((src) => ({ fragSource: src, uniforms: { ...renderUniforms } })))
   } else {
     renderer.useShader(shaderSources[0])
     // 文字图集采样器指向单元 2:sampler 型 uniform 必须用 uniform1i 赋值
@@ -219,7 +222,7 @@ export async function renderImage(opts: RenderImageOpts): Promise<void> {
     if (textTextures.length > 0) renderer.setSampler('uCharAtlas', 2)
     if (zoneOn) renderer.setSampler('uZoneMask', 2)
     renderer.setUniform('uResolution', [canvas.width, canvas.height])
-    for (const [key, val] of Object.entries(mergedParams)) {
+    for (const [key, val] of Object.entries(renderUniforms)) {
       renderer.setUniform(key, val)
     }
     renderer.render()
