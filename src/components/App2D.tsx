@@ -43,6 +43,7 @@ import {
   buildBatchZip, createBatchRunner, createCanvasRenderTask, resolveRowRenderState,
   type ProcessingBaseline, type ProcessingJob, type RenderTaskFn,
 } from '../lib/batch/runBatch'
+import { previewSource } from '../lib/batch/previewSource'
 import ImageUploader from './ImageUploader'
 import ImageStrip from './ImageStrip'
 import StyleSelector from './StyleSelector'
@@ -371,6 +372,10 @@ function App2D() {
   // 让帧),与 drain 互斥:批量运行中退避,drain 收尾 re-kick。签名(rowPreviewSig)
   // 不匹配的行才渲染,拖滑块只刷受影响行;渲染种子与种子条/处理链同源
   // (rowDisplaySeed:选中行=工作副本实时,其余=行码/基线)。
+  // 渲染源走 previewSource 降采样(长边 ≤512):预览只上底部条 82×56 缩略图,
+  // 原图全分辨率(桌面可达 32MP+)一次渲染+PNG 编码即数百毫秒主线程冻结,
+  // 分步调参每步都停稳 >400ms 触发一轮,是「调一下卡一下」的根因;
+  // 「开始处理」出图不受影响,仍走原图全分辨率。
   // ---------------------------------------------------------------------------
   const previewTickRef = useRef(0)
   const previewRunningRef = useRef(false)
@@ -428,7 +433,7 @@ function App2D() {
           )
           const task = renderTaskRef.current
           if (!state || !task) throw new Error('preview task unavailable')
-          const blob = await task({ id: row.id, image: row.image, ...state, format: 'png' })
+          const blob = await task({ id: row.id, image: await previewSource(row.image), ...state, format: 'png' })
           // tick 过期(参数又变/被顶替):丢弃陈旧 blob,不做无效写入
           if (myTick !== previewTickRef.current) { superseded = true; break }
           // 行已被移除/会话终止:建出的 URL 无人 revoke,不写
