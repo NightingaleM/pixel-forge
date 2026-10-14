@@ -9,6 +9,7 @@ import { findBrightestPoint } from '../lib/brightPoint'
 import { estimateFocusBand } from '../lib/tiltshiftBand'
 import { randomizeParams } from '../lib/randomSeed'
 import { renderImage, exportCanvasBlob, compositeOnBlack } from '../lib/renderImage'
+import { renderFullResCanvas } from '../lib/offscreenExport'
 import { decideSingleExport, decideExportCardHTML } from '../lib/license/gating'
 import { getLicenseStatus } from '../lib/license/verify'
 import { hexToRgb } from '../lib/paramValue'
@@ -1350,39 +1351,61 @@ function App2D() {
     return styleDef?.renderMode === 'canvas2d' ? asciiCanvasRef.current : canvasRef.current
   }, [activeStyle])
 
+  // 单图导出源:shader 风格离屏全尺寸重渲——预览画布被 loadImage fit 到容器
+  // 显示尺寸,直接 toBlob 会导出显示分辨率(小窗口/移动端文件随窗口缩水的
+  // 根因);离屏画布无容器 → clamp(原图, 2048),与批量管线同尺寸。参数取当前
+  // 工作副本,与预览渲染 effect 同源(所见即所得);ASCII 导出画布本就按
+  // MAX_PROCESS_SIZE 与窗口无关,返回 null 走原路径。离屏失败(上下文配额
+  // 等)同样回退,不劣于现状。dispose 由调用方在 toBlob 完成后触发。
+  const renderExportSource = useCallback(async () => {
+    const styleDef = getStyle(activeStyle)
+    if (!styleDef || styleDef.renderMode === 'canvas2d' || !image) return null
+    return renderFullResCanvas({ image, styleDef, params, textParams, fontParams, brightest, zoneMask })
+  }, [activeStyle, image, params, textParams, fontParams, brightest, zoneMask])
+
   // 会员 gating:额度内无水印(逐次消耗),超额起单图带角落水印;水印画在导出
   // 副本上,预览画布永不污染。JPG 顺序契约:渲染→黑底→水印→toBlob。
   const handleDownloadPng = useCallback(async () => {
-    const src = getExportCanvas()
+    const full = await renderExportSource()
+    const src = full?.canvas ?? getExportCanvas()
     if (!src) return
     const d = decideSingleExport()
-    if (d.mode === 'none') {
-      const b = await exportCanvasBlob(src, 'image/png')
+    try {
+      if (d.mode === 'none') {
+        const b = await exportCanvasBlob(src, 'image/png')
+        downloadBlob(b, 'png')
+        return
+      }
+      setWmToast(true)
+      const b = await exportWatermarked(src, 'corner', seed, 'image/png')
       downloadBlob(b, 'png')
-      return
+    } finally {
+      full?.dispose()
     }
-    setWmToast(true)
-    const b = await exportWatermarked(src, 'corner', seed, 'image/png')
-    downloadBlob(b, 'png')
-  }, [getExportCanvas, downloadBlob, seed])
+  }, [renderExportSource, getExportCanvas, downloadBlob, seed])
 
   const handleDownloadJpg = useCallback(async () => {
     // JPG has no alpha: composite onto black if background is off.
     const styleDef = getStyle(activeStyle)
     const showBg = params['uShowBg'] ?? 1
-    const src = getExportCanvas()
+    const full = await renderExportSource()
+    const src = full?.canvas ?? getExportCanvas()
     if (!src) return
     const base = styleDef?.renderMode === 'canvas2d' && showBg !== 1 ? compositeOnBlack(src) : src
     const d = decideSingleExport()
-    if (d.mode === 'none') {
-      const b = await exportCanvasBlob(base, 'image/jpeg')
+    try {
+      if (d.mode === 'none') {
+        const b = await exportCanvasBlob(base, 'image/jpeg')
+        downloadBlob(b, 'jpg')
+        return
+      }
+      setWmToast(true)
+      const b = await exportWatermarked(base, 'corner', seed, 'image/jpeg')
       downloadBlob(b, 'jpg')
-      return
+    } finally {
+      full?.dispose()
     }
-    setWmToast(true)
-    const b = await exportWatermarked(base, 'corner', seed, 'image/jpeg')
-    downloadBlob(b, 'jpg')
-  }, [activeStyle, params, getExportCanvas, downloadBlob, seed])
+  }, [activeStyle, params, renderExportSource, getExportCanvas, downloadBlob, seed])
 
   // SVG 导出:水印 gating 不变(先注入再交付);移动端 svg 相册不认,先 canvas
   // 转 PNG(isSvg 标记让 downloadBlob 继续走灯箱——移动端非微信 svg 若走
@@ -1407,7 +1430,8 @@ function App2D() {
 
   // 闪卡 HTML 导出(票06 §4):gating 首个「格式拒绝」型——非会员=开 LicensePanel
   // (转化入口)+ toast,不消耗免费每日额度;会员=放行无水印。单文件=冻结参数 +
-  // 源图 JPEG q85(≤2048)+ 静态烘焙帧(当前预览画布快照 ≤1024,降级链)。
+  // 源图 JPEG q85(≤2048)+ 静态烘焙帧(全尺寸重渲快照 ≤1024 降采样,降级链——
+  // 离屏导出源同单图下载,小窗口下烘焙帧不再随容器缩水)。
   // 交付恒走 anchor(微信内 img 灯箱显示不了 text/html,长按保存无意义——执行期
   // 核对项裁决,三分法口径已含在成功 toast)
   const handleDownloadCardHtml = useCallback(async () => {
@@ -1418,45 +1442,50 @@ function App2D() {
       setCardToast('deny')
       return
     }
-    const src = getExportCanvas()
+    const full = await renderExportSource()
+    const src = full?.canvas ?? getExportCanvas()
     if (!src) return
-    const [r, g, b] = hexToRgb(textParams['uFoilColor'] ?? '#1a1a22')
-    const html = buildCardHtml({
-      imageDataUrl: encodeImageForCard(image).dataUrl,
-      fallbackDataUrl: encodeFallbackForCard(src),
-      aspect: (image.naturalWidth || image.width) / (image.naturalHeight || image.height),
-      params: {
-        uTexture: params['uTexture'] ?? 0,
-        uStrength: params['uStrength'] ?? 1,
-        uBandDensity: params['uBandDensity'] ?? 1,
-        uBandAngle: params['uBandAngle'] ?? 22,
-        uFoilColorR: r,
-        uFoilColorG: g,
-        uFoilColorB: b,
-        uCrackleDensity: params['uCrackleDensity'] ?? 38,
-        uStreakDensity: params['uStreakDensity'] ?? 14,
-        uSparkleDensity: params['uSparkleDensity'] ?? 1,
-        uScope: params['uScope'] ?? 0,
-        uEdgeThreshold: params['uEdgeThreshold'] ?? 0.5,
-        uEdgeWidth: params['uEdgeWidth'] ?? 2,
-        uEdgeSoftBand: params['uEdgeSoftBand'] ?? 1.5,
-        uEdgeHysteresis: params['uEdgeHysteresis'] ?? 0.15,
-        uZoneBoost: params['uZoneBoost'] ?? 0,
-        uMaskLo: params['uMaskLo'] ?? 0.32,
-        uMaskHi: params['uMaskHi'] ?? 0.85,
-        uLumaWeight: params['uLumaWeight'] ?? 0.75,
-        uEdgeWeight: params['uEdgeWeight'] ?? 4,
-        uMaskInvert: params['uMaskInvert'] ?? 0,
-      },
-      title: `${t(currentStyle?.label ?? '')} · ${t('export.cardHtml')}`,
-      // 转卡外观两值(圆角/黑底)所见即所得:读引擎真值(悬浮窗改动即写 engine.feel)
-      radius: cardEngine.feel.radius,
-      darkBg: cardEngine.feel.darkBg,
-      ui: { hint: t('card.hint'), gyroButton: t('card.gyro'), fallbackNote: t('card.fallbackNote') },
-    })
-    downloadBlob(new Blob([html], { type: 'text/html' }), 'html')
-    setCardToast('done')
-  }, [image, params, textParams, getExportCanvas, downloadBlob, t, currentStyle])
+    try {
+      const [r, g, b] = hexToRgb(textParams['uFoilColor'] ?? '#1a1a22')
+      const html = buildCardHtml({
+        imageDataUrl: encodeImageForCard(image).dataUrl,
+        fallbackDataUrl: encodeFallbackForCard(src),
+        aspect: (image.naturalWidth || image.width) / (image.naturalHeight || image.height),
+        params: {
+          uTexture: params['uTexture'] ?? 0,
+          uStrength: params['uStrength'] ?? 1,
+          uBandDensity: params['uBandDensity'] ?? 1,
+          uBandAngle: params['uBandAngle'] ?? 22,
+          uFoilColorR: r,
+          uFoilColorG: g,
+          uFoilColorB: b,
+          uCrackleDensity: params['uCrackleDensity'] ?? 38,
+          uStreakDensity: params['uStreakDensity'] ?? 14,
+          uSparkleDensity: params['uSparkleDensity'] ?? 1,
+          uScope: params['uScope'] ?? 0,
+          uEdgeThreshold: params['uEdgeThreshold'] ?? 0.5,
+          uEdgeWidth: params['uEdgeWidth'] ?? 2,
+          uEdgeSoftBand: params['uEdgeSoftBand'] ?? 1.5,
+          uEdgeHysteresis: params['uEdgeHysteresis'] ?? 0.15,
+          uZoneBoost: params['uZoneBoost'] ?? 0,
+          uMaskLo: params['uMaskLo'] ?? 0.32,
+          uMaskHi: params['uMaskHi'] ?? 0.85,
+          uLumaWeight: params['uLumaWeight'] ?? 0.75,
+          uEdgeWeight: params['uEdgeWeight'] ?? 4,
+          uMaskInvert: params['uMaskInvert'] ?? 0,
+        },
+        title: `${t(currentStyle?.label ?? '')} · ${t('export.cardHtml')}`,
+        // 转卡外观两值(圆角/黑底)所见即所得:读引擎真值(悬浮窗改动即写 engine.feel)
+        radius: cardEngine.feel.radius,
+        darkBg: cardEngine.feel.darkBg,
+        ui: { hint: t('card.hint'), gyroButton: t('card.gyro'), fallbackNote: t('card.fallbackNote') },
+      })
+      downloadBlob(new Blob([html], { type: 'text/html' }), 'html')
+      setCardToast('done')
+    } finally {
+      full?.dispose()
+    }
+  }, [image, params, textParams, renderExportSource, getExportCanvas, downloadBlob, t, currentStyle])
 
   // 测试图点击:ImageStrip 只透传 src,由 App2D 按模式分派——
   // 单图(含上传页)= v1 行为加载为唯一图;批量 = 追加为新行(受 20 上限)
