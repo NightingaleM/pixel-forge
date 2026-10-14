@@ -93,18 +93,28 @@ function testImageName(src: string): string {
   return src.split('/').pop() || 'test-image'
 }
 
-// 存储行 → 内存行(会话恢复方案B):originBlob→objectURL→Image 重建;移动端与
-// 上传同口径降采样(>4096,失败退回原图)。解码失败返回 null,调用方跳过该行。
-// img 解码完成后 revoke objectURL 安全(位图已在内存,后续 drawImage 不依赖 src);
+// 存储行 → 内存行(会话恢复方案B):originBlob→dataURL→Image 重建,与上传路径
+// (readImageFiles)同链路;移动端同口径降采样(>4096,失败退回原图)。读取/解码
+// 失败返回 null,调用方跳过该行。
+// why dataURL 而非 createObjectURL+解码后 revoke:CompareSlider 对比原图与
+// ImageStrip/BatchPanel 缩略图都直接把 image.src 挂 <img> 渲染,blob: URL 一经
+// revoke 立即变死链(恢复后对比/缩略图全裂);dataURL 永不过期,上传路径正是此
+// 行为。drawImage 走内存位图虽不依赖 src,但 Chrome 内存压力下可能丢弃位图,
+// 届时需从 src 重新解码——dataURL 可自愈,revoke 后无从恢复。
 // done 行的结果 blob 单独建 objectUrl(与 updateRow 的结果 URL 管理口径一致)
 async function rowFromStored(r: StoredSessionRow, maxEdge?: number): Promise<BatchImage | null> {
-  const url = URL.createObjectURL(r.originBlob)
   try {
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = () => reject(reader.error ?? new Error('restore read failed'))
+      reader.readAsDataURL(r.originBlob)
+    })
     const img = await new Promise<HTMLImageElement>((resolve, reject) => {
       const el = new Image()
       el.onload = () => resolve(el)
       el.onerror = () => reject(new Error('restore decode failed'))
-      el.src = url
+      el.src = dataUrl
     })
     let image = img
     const w = img.naturalWidth || img.width
@@ -124,8 +134,6 @@ async function rowFromStored(r: StoredSessionRow, maxEdge?: number): Promise<Bat
     }
   } catch {
     return null
-  } finally {
-    URL.revokeObjectURL(url)
   }
 }
 
