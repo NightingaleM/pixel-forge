@@ -22,7 +22,7 @@ export interface CardTiltFeel {
   idle: boolean
   /** 阴影/高光微动 */
   light: boolean
-  /** 卡面圆角 px 0..48,默认 16(与导出闪卡 HTML 定稿值一致) */
+  /** 卡面圆角 px 0..200,默认 16(与导出闪卡 HTML 定稿值一致;超盒半径浏览器自钳) */
   radius: number
   /** 转卡舞台纯黑背景 */
   darkBg: boolean

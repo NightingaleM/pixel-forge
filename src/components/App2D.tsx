@@ -733,7 +733,12 @@ function App2D() {
   // 互斥开关:开转卡退出对比 / 开对比退出转卡
   const handleToggleCard = useCallback(() => {
     setCardMode((v) => {
-      if (!v) setCompareMode(false)
+      if (!v) {
+        setCompareMode(false)
+        // 开档自动弹手感悬浮窗(用户定稿 2026-10-14):每次进转卡都弹,
+        // 手动关窗不记忆——下次开档再弹;关档窗随 cardMode 渲染条件消失
+        setShowCardSettings(true)
+      }
       return !v
     })
   }, [])

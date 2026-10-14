@@ -61,7 +61,7 @@ function CardSettingsPanel({ feel, onChange, onClose }: CardSettingsPanelProps) 
             type="range"
             className="param-slider"
             min={0}
-            max={48}
+            max={200}
             step={1}
             value={feel.radius}
             onInput={(e) => onChange({ radius: parseFloat((e.target as HTMLInputElement).value) })}
