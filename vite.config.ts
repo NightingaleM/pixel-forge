@@ -2,6 +2,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { ed25519 } from '@noble/curves/ed25519'
 import { TEST_PRIVATE_KEY_HEX } from './scripts/read-test-key.mjs'
+import { createLicenseObfuscatorPlugin, licenseManualChunks } from './scripts/obfuscateLicense'
 
 // ── license 验签公钥按环境注入(define=构建期文本替换,dev/test/build 均可靠,
 //    不经 env 文件——本 vite 8 下 env 注入 dev 的 import.meta.env 不可靠)──
@@ -31,5 +32,14 @@ export default defineConfig(({ mode }) => ({
       },
     },
   },
-  plugins: [react()],
+  plugins: [react(), createLicenseObfuscatorPlugin()],
+  // ── license 链路定向混淆(2026-10-14):manualChunks 把 src/lib/license/** 与
+  //    @noble/curves 归入独立 license chunk,generateBundle 钩子只对它上高强度
+  //    混淆(rc4 字符串加密+控制流扁平化+自防护);其余 chunk 走 esbuild 默认压缩
+  //    一字不动。约束与验证锚定在 scripts/obfuscateLicense.test.ts ──
+  build: {
+    rollupOptions: {
+      output: { manualChunks: licenseManualChunks },
+    },
+  },
 }))
