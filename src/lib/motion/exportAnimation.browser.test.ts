@@ -6,10 +6,14 @@
 //  - probeVideoSupport 在真浏览器返回布尔(canEncodeVideo 真链路)
 //
 // 真浏览器测试骨架照 offscreenExport.test.ts:自带 dev server + new Function 动态
-// import 绕 vitest SSR 改写 + taskkill /T 清进程树。端口用 51791:offscreenExport
-// 测试占用 51790,vitest 文件级并行下两个 strictPort 实例会撞车。
+// import 绕 vitest SSR 改写 + taskkill /T 清进程树。端口用 51791 且 cacheDir 独立:
+// 全量套件下 offscreenExport(51790)与本文件并行,两个 vite 实例共享
+// node_modules/.vite 依赖缓存在新依赖冷优化时互相踩踏(实测模块解析失败连带
+// server 崩)。被测模块链(StyleRegistry/motion/*/renderImage/watermark)不含
+// JSX 与 license define,最小内联 config 即可服务,无需 react 插件。
 import { spawn, type ChildProcess } from 'node:child_process'
 import { access, constants } from 'node:fs/promises'
+import { unlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -17,6 +21,7 @@ import puppeteer, { type Browser } from 'puppeteer-core'
 import { parseGIF } from 'gifuct-js'
 
 const PORT = 51791
+const TMP_CONFIG = '.tmp-vite-anim.config.mjs'
 const DEV_URL = `http://localhost:${PORT}`
 
 const chromeCandidates = [
@@ -59,8 +64,16 @@ describe('runAnimationExport 产物真文件抽验(真 shader/真编码器)', ()
   let browser: Browser
 
   beforeAll(async () => {
+    // 最小 config:仅 root + 独立 cacheDir(防并行 vite 缓存踩踏),不带插件
+    await writeFile(
+      TMP_CONFIG,
+      `import { defineConfig } from 'vite'\n` +
+        `export default defineConfig({ root: ${JSON.stringify(path.resolve('.'))}, ` +
+        `cacheDir: 'node_modules/.vite-animtest', server: { port: ${PORT}, strictPort: true } })\n`,
+      'utf-8',
+    )
     const viteBin = path.resolve('node_modules/vite/bin/vite.js')
-    viteProc = spawn(process.execPath, [viteBin, '--port', String(PORT), '--strictPort'], {
+    viteProc = spawn(process.execPath, [viteBin, '--config', TMP_CONFIG], {
       stdio: 'ignore',
     })
     let up = false
@@ -92,6 +105,7 @@ describe('runAnimationExport 产物真文件抽验(真 shader/真编码器)', ()
       // git bash kill 带不走 node 子进程树:taskkill /T 精确清(vite 会再 spawn esbuild)
       spawn('taskkill', ['/F', '/T', '/PID', String(proc.pid)], { stdio: 'ignore' })
     }
+    await unlink(TMP_CONFIG).catch(() => {})
   })
 
   /** 页内执行一次动图导出(format 决定 GIF/MP4),字节以 base64 回传。
