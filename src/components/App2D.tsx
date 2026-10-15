@@ -1347,7 +1347,9 @@ function App2D() {
   const downloadBlob = useCallback((blob: Blob | null, ext: string, opts?: { isSvg?: boolean; fileName?: string }) => {
     if (!blob) return
     const isSvg = !!opts?.isSvg
-    const plan = planDownload({ isSvg, forceLightbox: isMobile && isSvg })
+    // 移动端视频同 svg 惯例走灯箱长按保存(相册不认 a[download] 落盘路径)
+    const isVideo = ext === 'mp4' || ext === 'webm'
+    const plan = planDownload({ isSvg, forceLightbox: isMobile && (isSvg || isVideo) })
     const fileName = opts?.fileName ?? `${activeStyle}_${Date.now()}.${ext}`
     if (plan === 'lightbox') {
       // 函数式 setter:覆盖残留态前先 revoke 旧 objectUrl(防御——正常 UI 走 onClose
@@ -1355,7 +1357,7 @@ function App2D() {
       const objectUrl = URL.createObjectURL(blob)
       setSaveLightbox((prev) => {
         if (prev) URL.revokeObjectURL(prev.objectUrl)
-        return { objectUrl, fileName, seed, ext }
+        return { objectUrl, fileName, seed, ext, kind: isVideo ? 'video' : 'image' }
       })
       return // 灯箱关闭时 revoke(saveLightboxNode 的 onClose)
     }

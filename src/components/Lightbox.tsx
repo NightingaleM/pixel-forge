@@ -6,6 +6,8 @@ export interface LightboxItem {
   fileName: string
   seed: string
   ext: string
+  /** 图片(默认)或视频(微信/移动端视频导出走灯箱长按保存)。 */
+  kind?: 'image' | 'video'
 }
 
 /** 结果灯箱:全屏遮罩大图,←/→ 导航,Esc 关闭。hint=导出分流(Task 7)的
@@ -58,7 +60,9 @@ function Lightbox({ items, index, onClose, onNavigate, hint }: {
         </>
       )}
       <div className="batch-lightbox-stage" onClick={(e) => e.stopPropagation()}>
-        <img src={cur.objectUrl} alt={cur.fileName} />
+        {cur.kind === 'video'
+          ? <video src={cur.objectUrl} controls playsInline loop />
+          : <img src={cur.objectUrl} alt={cur.fileName} />}
         {hint && <div className="batch-lightbox-hint">{hint}</div>}
         <div className="batch-lightbox-info">{cur.fileName} · {cur.seed} · {cur.ext.toUpperCase()}</div>
       </div>

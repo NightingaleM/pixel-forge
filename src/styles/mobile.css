@@ -52,6 +52,7 @@
      的老浏览器保有 vh 原值),并整体收一档给 hint/info 条留位 */
   .batch-lightbox-stage { max-height: 80dvh; }
   .batch-lightbox-stage img { max-height: 72dvh; }
+  .batch-lightbox-stage video { max-height: 72dvh; }
   /* 灯箱关闭键:16px 图标 + 6px padding 仅 28px 命中,触屏撑到 40px;
      下移避让右上角固定语言钮(Task 11 实测:EN z9999 盖住 top:14 的 ✕ 图标) */
   .batch-lightbox-close { padding: 12px; top: calc(env(safe-area-inset-top) + 56px); }
