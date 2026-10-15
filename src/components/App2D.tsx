@@ -49,7 +49,8 @@ import { exportReducer, initialExportState, type ExportFormat } from '../lib/mot
 import { estimateGifBytesPre, estimateVideoBytesPre, runAnimationExport } from '../lib/motion/exportAnimation'
 import { planGifFrames } from '../lib/motion/gifWriter'
 import { alignDriftForGif, sampleMotion } from '../lib/motion/kernel'
-import { ExportCancelledError, planVideoFrames, probeVideoSupport, VIDEO_PRESET } from '../lib/motion/videoWriter'
+import { ExportCancelledError, planVideoFrames } from '../lib/motion/videoWriter'
+import { probeVideoTier, type VideoTier } from '../lib/motion/videoTier'
 import {
   buildMotionTimeline, GIF_DEFAULTS, initialMotionUiState, isMotionActive, MOTION_PARAM_KEYS,
   MOTION_UNIFORMS, type GifSettingsUi, type MotionUiState,
@@ -243,8 +244,8 @@ function App2D() {
   const [motion, setMotion] = useState<MotionUiState>(initialMotionUiState)
   const [gifSettings, setGifSettings] = useState<GifSettingsUi>(GIF_DEFAULTS)
   const [animExport, dispatchAnimExport] = useReducer(exportReducer, undefined, initialExportState)
-  /** null=检测中,false=禁用视频档(canEncodeVideo 会话级记忆化) */
-  const [videoSupported, setVideoSupported] = useState<boolean | null>(null)
+  /** null=检测中,'none'=禁用视频档(两级探测均落空,probeVideoTier 会话级记忆化) */
+  const [videoTier, setVideoTier] = useState<VideoTier | null>(null)
   const animCancelRef = useRef<{ cancelled: boolean } | null>(null)
   /** 导出中禁用参数编辑(spec §3):ref 守卫避免 handler 重建 */
   const animExportBusyRef = useRef(false)
@@ -1400,20 +1401,15 @@ function App2D() {
     raf = requestAnimationFrame(loop)
     return () => cancelAnimationFrame(raf)
   }, [motionActive])
-  // 视频能力检测:面板可见(万花筒+有图)时问一次,probeVideoSupport 会话级记忆化
+  // 视频能力检测:面板可见(万花筒+有图)时问一次,probeVideoTier 会话级记忆化
   useEffect(() => {
-    if (!isKaleido || !image || videoSupported !== null) return
+    if (!isKaleido || !image || videoTier !== null) return
     let alive = true
-    probeVideoSupport({
-      width: VIDEO_PRESET.width,
-      height: VIDEO_PRESET.height,
-      frameRate: VIDEO_PRESET.fps,
-      bitrate: VIDEO_PRESET.bitrate,
-    })
-      .then((ok) => { if (alive) setVideoSupported(ok) })
-      .catch(() => { if (alive) setVideoSupported(false) })
+    probeVideoTier()
+      .then((tier) => { if (alive) setVideoTier(tier) })
+      .catch(() => { if (alive) setVideoTier('none') })
     return () => { alive = false }
-  }, [isKaleido, image, videoSupported])
+  }, [isKaleido, image, videoTier])
   // 切出万花筒自动关动效浮窗(避免切回时窗凭空重现);三行禁用/骰子豁免随开合态解除
   useEffect(() => {
     if (!isKaleido && motionUiOpen) setMotionUiOpen(false)
@@ -1423,7 +1419,7 @@ function App2D() {
     if (!image || !currentStyle || activeStyle !== 'kaleidoscope' || !isMotionActive(motion)) return
     const fmt: ExportFormat = animExport.format
     const isGif = fmt === 'gif'
-    if (!isGif && videoSupported === false) return
+    if (!isGif && videoTier === 'none') return
     const framesTotal = isGif
       ? planGifFrames(motion.duration, gifSettings.fps).frameCount
       : planVideoFrames(motion.duration).frameCount
@@ -1446,6 +1442,7 @@ function App2D() {
         timeline: motionTimeline,
         uniformMap: MOTION_UNIFORMS,
         format: fmt,
+        videoTier: videoTier ?? 'webcodecs-mp4',
         gif: isGif ? { size: gifSettings.size, fps: gifSettings.fps } : undefined,
         watermark: d.mode === 'tiled' ? 'tiled' : 'none',
         seed,
@@ -1470,7 +1467,7 @@ function App2D() {
       animCancelRef.current = null
       animExportBusyRef.current = false
     }
-  }, [image, currentStyle, activeStyle, motion, animExport.format, videoSupported, gifSettings,
+  }, [image, currentStyle, activeStyle, motion, animExport.format, videoTier, gifSettings,
     params, textParams, fontParams, brightest, zoneMask, motionTimeline, seed, downloadBlob, t])
 
   const handleCancelAnimExport = useCallback(() => {
@@ -1505,14 +1502,14 @@ function App2D() {
       estimatedBytes: animExport.estimatedBytes,
       errorMessage: animExport.errorMessage,
       gif: gifSettings,
-      videoSupported,
+      videoTier,
       preEstimateBytes,
       preEstimateFrames: plan.frameCount,
       gifAligned,
-      canExport: motionReady && !isAnimExporting && (isGif || videoSupported === true),
+      canExport: motionReady && !isAnimExporting && (isGif || (videoTier !== null && videoTier !== 'none')),
       motionLocked: isAnimExporting,
     }
-  }, [animExport, motion, gifSettings, videoSupported, isKaleido, image, isAnimExporting])
+  }, [animExport, motion, gifSettings, videoTier, isKaleido, image, isAnimExporting])
 
   // 动效+导出面板节点(仅万花筒渲染;桌面挂独立浮窗 children,移动端挂独立 sheet,
   // 两壳共用同一节点)。静态值滑条直写 uZoom/uCenterX/uCenterY(与参数面板行同通道,

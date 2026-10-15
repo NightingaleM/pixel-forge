@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import type { ExportAction, ExportFormat, ExportPhase } from '../lib/motion/exportState'
 import type { GifSettingsUi, MotionParamUiState, MotionUiState } from '../lib/motion/kaleidoMotion'
 import { GIF_FPS_OPTIONS, GIF_SIZE_OPTIONS, MOTION_PARAM_KEYS } from '../lib/motion/kaleidoMotion'
+import type { VideoTier } from '../lib/motion/videoTier'
 
 /** 三参数范围(与 StyleRegistry kaleidoscope 定义一致)。 */
 const PARAM_RANGE = {
@@ -34,8 +35,8 @@ export interface MotionExportView {
   estimatedBytes: number | null
   errorMessage: string | null
   gif: GifSettingsUi
-  /** null = 检测中,false = 禁用视频档(canEncodeVideo 不过)。 */
-  videoSupported: boolean | null
+  /** null = 检测中,'none' = 禁用视频档(两级探测均落空)。 */
+  videoTier: VideoTier | null
   /** 导出前预估(格式相关);编码中由 estimatedBytes 接管。 */
   preEstimateBytes: number
   preEstimateFrames: number
@@ -238,12 +239,12 @@ export default function MotionExportPanel(props: MotionExportPanelProps) {
                 {view.gif.size}px · {view.gif.fps}fps · {t('animExport.oneLoop')}({motion.duration.toFixed(1)}s)
               </span>
             </label>
-            <label className={`motion-fmt-opt${view.format === 'video' ? ' cur' : ''}${view.videoSupported === false ? ' na' : ''}`}>
+            <label className={`motion-fmt-opt${view.format === 'video' ? ' cur' : ''}${view.videoTier === 'none' ? ' na' : ''}`}>
               <input
                 type="radio"
                 name="anim-format"
                 checked={view.format === 'video'}
-                disabled={exporting || view.videoSupported === false}
+                disabled={exporting || view.videoTier === 'none'}
                 onChange={() => props.onFormatChange('video')}
               />
               <span className="motion-fmt-name">
@@ -255,7 +256,10 @@ export default function MotionExportPanel(props: MotionExportPanelProps) {
                 {t('animExport.format.video')}
               </span>
               <span className="motion-fmt-desc">
-                {view.videoSupported === false ? t('animExport.videoUnsupported') : `720p · 30fps · ${t('animExport.twoLoops')}(${(motion.duration * 2).toFixed(1)}s)`}
+                {view.videoTier === 'none'
+                  ? t('animExport.videoUnsupported')
+                  : `720p · 30fps · ${t('animExport.twoLoops')}(${(motion.duration * 2).toFixed(1)}s)` +
+                    (view.videoTier === 'mediarecorder-mp4' ? ' · MP4' : view.videoTier === 'mediarecorder-webm' ? ' · WebM' : '')}
               </span>
             </label>
           </div>
@@ -325,6 +329,9 @@ export default function MotionExportPanel(props: MotionExportPanelProps) {
                 <span>
                   {view.phase === 'canceling' ? t('animExport.canceling') : t('animExport.exporting')}
                   {' '}{view.framesDone}/{view.framesTotal} · {fmtBytes(view.estimatedBytes ?? view.bytesSoFar)}
+                  {view.videoTier !== null && view.videoTier !== 'webcodecs-mp4' && (
+                    <>{' · '}{t('animExport.videoRecordHint')}</>
+                  )}
                 </span>
                 {view.phase === 'encoding' && (
                   <button type="button" className="motion-cancel" onClick={props.onCancelExport}>

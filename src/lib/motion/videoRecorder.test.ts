@@ -16,7 +16,7 @@ class FakeRecorder {
     this.bitrate = opts.videoBitsPerSecond ?? 0
     FakeRecorder.instances.push(this)
   }
-  start(_timeslice?: number) { this.state = 'recording' }
+  start() { this.state = 'recording' }
   stop() {
     this.state = 'inactive'
     this.ondataavailable?.({ data: new Blob(['frame-bytes']) })

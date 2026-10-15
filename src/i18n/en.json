@@ -679,7 +679,7 @@
     "offHint": "Turn on Motion to export GIF / video",
     "format": {
       "gif": "GIF",
-      "video": "Video MP4"
+      "video": "Video"
     },
     "oneLoop": "1 loop",
     "twoLoops": "2 loops",
@@ -695,7 +695,8 @@
     "reexport": "Export again",
     "doneHint": "Exported — switch format to re-export",
     "canceledHint": "Canceled — ready to re-export",
-    "videoUnsupported": "Video export unsupported in this browser — use GIF",
+    "videoUnsupported": "Video export unavailable in this environment — use GIF",
+    "videoRecordHint": "Recording in real time — keep this page visible",
     "videoFailed": "Video encoding failed — try GIF instead",
     "gifAligned": "Drift speed auto-aligns on GIF export (seamless loop)"
   },

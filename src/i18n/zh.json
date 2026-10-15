@@ -679,7 +679,7 @@
     "offHint": "开启「动效」后可导出 GIF / 视频",
     "format": {
       "gif": "GIF 动图",
-      "video": "视频 MP4"
+      "video": "视频"
     },
     "oneLoop": "1 个循环",
     "twoLoops": "2 个循环",
@@ -695,7 +695,8 @@
     "reexport": "再导一次",
     "doneHint": "已导出，可换格式再导",
     "canceledHint": "已取消，可重新导出",
-    "videoUnsupported": "此浏览器不支持视频导出，请改用 GIF",
+    "videoUnsupported": "当前环境无法导出视频，请改用 GIF",
+    "videoRecordHint": "实时录制中，请保持页面可见",
     "videoFailed": "视频编码失败，请改用 GIF",
     "gifAligned": "GIF 导出时漂移速度将自动对齐（无缝循环）"
   },
