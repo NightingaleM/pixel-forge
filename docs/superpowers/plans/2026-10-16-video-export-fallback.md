@@ -37,7 +37,7 @@
   - `export function extForTier(tier: VideoTier): 'mp4' | 'webm' | null`（`'none'`/null tier → null）
   - `export function resetVideoTierCache(): void`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```ts
 // src/lib/motion/videoTier.test.ts
@@ -109,12 +109,12 @@ describe('recorderMimeFor / extForTier(spec §1 派生)', () => {
 })
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Run: `npx vitest run src/lib/motion/videoTier.test.ts`
 Expected: FAIL（模块不存在）
 
-- [ ] **Step 3: 实现**
+- [x] **Step 3: 实现**
 
 ```ts
 // src/lib/motion/videoTier.ts
@@ -187,12 +187,12 @@ export function extForTier(tier: VideoTier): 'mp4' | 'webm' | null {
 }
 ```
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 Run: `npx vitest run src/lib/motion/videoTier.test.ts`
 Expected: PASS（全部用例）
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/motion/videoTier.ts src/lib/motion/videoTier.test.ts
@@ -215,7 +215,7 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
   - `export async function encodeViaMediaRecorder(opts: { canvas: HTMLCanvasElement; mimeType: string; fps: number; durationSec: number; frameCount: number; drawFrame: (t: number, index: number) => Promise<void> | void; onProgress?: (framesDone: number) => void; isCancelled?: () => boolean; now?: () => number; waitNextFrame?: () => Promise<void> }): Promise<Blob>`
   - 返回 Blob 的 type 为容器 mime（`video/mp4` 或 `video/webm`，取 `mimeType.split(';')[0]`）。
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```ts
 // src/lib/motion/videoRecorder.test.ts
@@ -327,12 +327,12 @@ describe('encodeViaMediaRecorder(spec §2)', () => {
 })
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Run: `npx vitest run src/lib/motion/videoRecorder.test.ts`
 Expected: FAIL（模块不存在）
 
-- [ ] **Step 3: 实现**
+- [x] **Step 3: 实现**
 
 ```ts
 // src/lib/motion/videoRecorder.ts
@@ -407,12 +407,12 @@ export async function encodeViaMediaRecorder(opts: MediaRecorderEncodeOptions): 
 }
 ```
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 Run: `npx vitest run src/lib/motion/videoRecorder.test.ts`
 Expected: PASS（3 例全绿）
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/motion/videoRecorder.ts src/lib/motion/videoRecorder.test.ts
@@ -434,7 +434,7 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 
 说明：分发正确性由 Task 6 浏览器测试在真环境验收（`runAnimationExport` 依赖 WebGL/ShaderRenderer，单测 mock 面过大，不做桩测——与仓库现状一致：该文件单测只测纯函数）。
 
-- [ ] **Step 1: 修改类型与分发**
+- [x] **Step 1: 修改类型与分发**
 
 `exportAnimation.ts` 改动点（精确）：
 
@@ -486,12 +486,12 @@ import { extForTier, recorderMimeFor, type VideoTier } from './videoTier'
     return { blob, ext: extForTier(tier)!, frames: videoPlan.frameCount }
 ```
 
-- [ ] **Step 2: 类型与既有测试回归**
+- [x] **Step 2: 类型与既有测试回归**
 
 Run: `npx vitest run src/lib/motion/exportAnimation.test.ts && npx tsc --noEmit`
 Expected: PASS / 0 错误（lint 基线外不新增——tsc 是主门槛）
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/lib/motion/exportAnimation.ts
@@ -514,7 +514,7 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 
 说明：Lightbox/downloadFlow 无组件级测试基建（仓库现状），本任务验收 = tsc + Task 6 浏览器实测 + 手动目检；`planDownload` 签名不动（复用 `forceLightbox`），`downloadFlow.test.ts` 不需改。
 
-- [ ] **Step 1: Lightbox 支持 video**
+- [x] **Step 1: Lightbox 支持 video**
 
 `LightboxItem` 加字段：
 ```ts
@@ -535,7 +535,7 @@ stage 内渲染替换（原 `<img src={cur.objectUrl}…>` 一行）：
 ```
 （外层样式沿用 `batch-lightbox-stage`；同时在对应样式文件补一条规则保证 video 与 img 同尺寸约束：`.batch-lightbox-stage video { max-width: 100%; max-height: 100%; }`——找到 `.batch-lightbox-stage img` 所在 CSS 文件，紧随其后追加同选择器组。）
 
-- [ ] **Step 2: App2D downloadBlob 视频分流**
+- [x] **Step 2: App2D downloadBlob 视频分流**
 
 `downloadBlob`（1347 行起）两处改动：
 1. 开头取视频标记：
@@ -548,13 +548,13 @@ stage 内渲染替换（原 `<img src={cur.objectUrl}…>` 一行）：
 ```
 3. 灯箱分支 setSaveLightbox 的 item 加 `kind: isVideo ? 'video' : 'image'`。
 
-- [ ] **Step 3: 类型回归 + 目检**
+- [x] **Step 3: 类型回归 + 目检**
 
 Run: `npx tsc --noEmit`
 Expected: 0 错误
 （视觉目检留到 Task 6 后统一做：微信开发者工具/真机。）
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/components/Lightbox.tsx src/components/App2D.tsx
@@ -576,7 +576,7 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 - Consumes: `probeVideoTier`/`VideoTier`（Task 1）、`runAnimationExport` 的 `videoTier` 参数（Task 3）。
 - Produces: `MotionExportView.videoTier: VideoTier | null`（`videoSupported` 字段删除）。
 
-- [ ] **Step 1: i18n 键（zh/en 同步）**
+- [x] **Step 1: i18n 键（zh/en 同步）**
 
 zh.json `animExport` 段：
 - `"format.video": "视频 MP4"` → `"视频"`（可能产 WebM，泛化）
@@ -588,7 +588,7 @@ en.json 对应：
 - `"videoUnsupported": "Video export unavailable in this environment — use GIF"`
 - `"videoRecordHint": "Recording in real time — keep this page visible"`
 
-- [ ] **Step 2: App2D 换 tier**
+- [x] **Step 2: App2D 换 tier**
 
 1. 状态（246-247 行）：
 ```ts
@@ -602,7 +602,7 @@ en.json 对应：
 5. 视图（1506 行）`videoSupported,` → `videoTier,`；`canExport`（1510 行）`(isGif || videoSupported === true)` → `(isGif || (videoTier !== null && videoTier !== 'none'))`。
 6. 两处依赖数组（1471、1513 行）`videoSupported` → `videoTier`。
 
-- [ ] **Step 3: 面板展示**
+- [x] **Step 3: 面板展示**
 
 1. `MotionExportView`（37-38 行）：
 ```ts
@@ -626,12 +626,12 @@ en.json 对应：
 )}
 ```
 
-- [ ] **Step 4: 回归**
+- [x] **Step 4: 回归**
 
 Run: `npx vitest run src/lib/motion src/lib/downloadFlow.test.ts && npx tsc --noEmit && npm run lint`
 Expected: 测试全 PASS；tsc 0 错；lint 仍为基线 11 错（不新增）
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/components/App2D.tsx src/components/MotionExportPanel.tsx src/i18n/zh.json src/i18n/en.json
@@ -651,7 +651,7 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 - Consumes: Task 1-5 全部（真实链路）。
 - Produces: 无（验收型测试）。
 
-- [ ] **Step 1: 扩展浏览器测试**
+- [x] **Step 1: 扩展浏览器测试**
 
 1. imports 追加：
 ```ts
@@ -688,12 +688,12 @@ function lanIpv4(): string | null {
 ```
 （`runInPageAt(url, format, watermark)` = 现有 `runInPage` 参数化 goto URL 版本——把 `p.goto(DEV_URL)` 改为 `p.goto(url)`，其余照旧；原 `runInPage` 变为 `runInPageAt(DEV_URL, …)` 的薄封装。页内调用 `runAnimationExport` 时传 `videoTier: tier`（页内先 `probeVideoTier()` 拿真值）。）
 
-- [ ] **Step 2: 跑浏览器测试**
+- [x] **Step 2: 跑浏览器测试**
 
 Run: `npx vitest run src/lib/motion/exportAnimation.browser.test.ts`
 Expected: 全 PASS（含新非安全上下文用例；swiftshader 渲染较慢，用例超时已放宽 120s）
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/lib/motion/exportAnimation.browser.test.ts
@@ -709,26 +709,26 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 **Files:**
 - 无新改动（验证型任务；发现问题回对应任务修）
 
-- [ ] **Step 1: 全量测试**
+- [x] **Step 1: 全量测试**
 
 Run: `npx vitest run`
 Expected: 全 PASS
 
-- [ ] **Step 2: lint 基线**
+- [x] **Step 2: lint 基线**
 
 Run: `npm run lint`
 Expected: 11 个预先存在错误（3D 文件），无新增
 
-- [ ] **Step 3: build 冒烟**
+- [x] **Step 3: build 冒烟**
 
 Run: `npm run build`
 Expected: 构建成功（产物含 videoTier/videoRecorder 模块）
 
-- [ ] **Step 4: 真机取证清单交付提醒**
+- [x] **Step 4: 真机取证清单交付提醒**
 
 真机项（spec §真机取证清单）不在本计划自动化范围：微信 Android/iOS tier 结果、长按 video 保存菜单、WebM duration 元数据、真机掉帧观察。计划执行完毕后输出该清单给用户按 spec 逐项取证，**长按保存可用性为交付前必判项**。
 
-- [ ] **Step 5: Commit（若有修复性改动才提交）**
+- [x] **Step 5: Commit（若有修复性改动才提交）**
 
 ```bash
 git status --short
