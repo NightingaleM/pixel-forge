@@ -16,6 +16,8 @@ import { applyCanvasWatermark } from '../license/watermark'
 import { alignDriftForGif, sampleMotion, type MotionTimeline } from './kernel'
 import { buildPalette, GifStream, planGifFrames } from './gifWriter'
 import { encodeMp4, ExportCancelledError, planVideoFrames, VIDEO_PRESET } from './videoWriter'
+import { encodeViaMediaRecorder } from './videoRecorder'
+import { extForTier, recorderMimeFor, type VideoTier } from './videoTier'
 
 export type AnimExportFormat = 'gif' | 'video'
 
@@ -65,6 +67,8 @@ export interface RunAnimationExportOptions {
   /** 参数名 → uniform(zoom→uZoom…;风格侧 animatedUniforms 映射)。 */
   uniformMap: Record<string, string>
   format: AnimExportFormat
+  /** 视频编码档(探测层给出);默认 webcodecs-mp4 保持旧行为。 */
+  videoTier?: VideoTier
   gif?: GifExportSettings
   /** 免费用户 'tiled'(逐帧 T6-25),会员 'none'——判定在调用方(decideBatchExport)。 */
   watermark: 'none' | 'tiled'
@@ -75,7 +79,7 @@ export interface RunAnimationExportOptions {
 
 export interface AnimationExportResult {
   blob: Blob
-  ext: 'gif' | 'mp4'
+  ext: 'gif' | 'mp4' | 'webm'
   frames: number
 }
 
@@ -176,18 +180,35 @@ export async function runAnimationExport(opts: RunAnimationExportOptions): Promi
 
     // 视频:时长=动效×2;预估体积按码率×时长一次给定
     const videoEstimate = estimateVideoBytesPre(videoPlan.durationSec)
-    const bytes = await encodeMp4({
+    const tier: VideoTier = opts.videoTier ?? 'webcodecs-mp4'
+    const drawFrame = (t: number, i: number) => drawAt(t, i)
+    if (tier === 'webcodecs-mp4') {
+      const bytes = await encodeMp4({
+        canvas: stage,
+        width: w,
+        height: h,
+        fps: videoPlan.fps,
+        bitrate: VIDEO_PRESET.bitrate,
+        frameCount: videoPlan.frameCount,
+        drawFrame,
+        onProgress: (done) => opts.onProgress?.(done, videoEstimate),
+        isCancelled: opts.isCancelled,
+      })
+      return { blob: new Blob([new Uint8Array(bytes)], { type: 'video/mp4' }), ext: 'mp4', frames: videoPlan.frameCount }
+    }
+    const mime = recorderMimeFor(tier)
+    if (!mime) throw new Error('video-tier-mime-missing')
+    const blob = await encodeViaMediaRecorder({
       canvas: stage,
-      width: w,
-      height: h,
+      mimeType: mime,
       fps: videoPlan.fps,
-      bitrate: VIDEO_PRESET.bitrate,
+      durationSec: videoPlan.durationSec,
       frameCount: videoPlan.frameCount,
-      drawFrame: (t, i) => drawAt(t, i),
+      drawFrame,
       onProgress: (done) => opts.onProgress?.(done, videoEstimate),
       isCancelled: opts.isCancelled,
     })
-    return { blob: new Blob([new Uint8Array(bytes)], { type: 'video/mp4' }), ext: 'mp4', frames: videoPlan.frameCount }
+    return { blob, ext: extForTier(tier)!, frames: videoPlan.frameCount }
   } finally {
     renderer.destroy()
   }
