@@ -84,6 +84,9 @@ const PALETTE_SAMPLES = 8
 
 /** 执行动图导出。取消抛 ExportCancelledError;渲染器即建即毁。 */
 export async function runAnimationExport(opts: RunAnimationExportOptions): Promise<AnimationExportResult> {
+  // 取消检查点覆盖 setup 阶段(WebGL 上下文/shader 装载可达秒级):入口/建器/预热
+  // 三道 + 两 pass 循环逐帧——点取消后最多再走一个子步即抛出(spec ≤100ms 门槛)
+  if (opts.isCancelled?.()) throw new ExportCancelledError()
   const isGif = opts.format === 'gif'
   const gifPlan = isGif ? planGifFrames(opts.timeline.duration, opts.gif?.fps ?? 12) : null
   const videoPlan = isGif ? null : planVideoFrames(opts.timeline.duration)
@@ -110,9 +113,11 @@ export async function runAnimationExport(opts: RunAnimationExportOptions): Promi
   }
 
   try {
+    if (opts.isCancelled?.()) throw new ExportCancelledError()
     renderer.loadImage(opts.image)
     // 预热 shader:useShader 链接一次,后续帧仅覆写 uniform + render
     for (const imp of opts.styleDef.shaderImports) await imp()
+    if (opts.isCancelled?.()) throw new ExportCancelledError()
 
     /** 渲染 t 时刻一帧到 staging(含水印)。frame 0 走 renderImage 拿统一语义。 */
     const drawAt = async (t: number, index: number) => {
