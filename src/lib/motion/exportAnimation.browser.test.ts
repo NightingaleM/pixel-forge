@@ -14,6 +14,7 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { access, constants } from 'node:fs/promises'
 import { unlink, writeFile } from 'node:fs/promises'
+import os from 'node:os'
 import path from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -55,8 +56,8 @@ type PageResult = {
   gifB64?: string
   mp4B64?: string
   mp4Duration?: number
-  probe?: boolean
-  probeAgain?: boolean
+  tier?: string
+  tierAgain?: string
 }
 
 describe('runAnimationExport 产物真文件抽验(真 shader/真编码器)', () => {
@@ -69,7 +70,7 @@ describe('runAnimationExport 产物真文件抽验(真 shader/真编码器)', ()
       TMP_CONFIG,
       `import { defineConfig } from 'vite'\n` +
         `export default defineConfig({ root: ${JSON.stringify(path.resolve('.'))}, ` +
-        `cacheDir: 'node_modules/.vite-animtest', server: { port: ${PORT}, strictPort: true } })\n`,
+        `cacheDir: 'node_modules/.vite-animtest', server: { port: ${PORT}, strictPort: true, host: true } })\n`,
       'utf-8',
     )
     const viteBin = path.resolve('node_modules/vite/bin/vite.js')
@@ -111,11 +112,11 @@ describe('runAnimationExport 产物真文件抽验(真 shader/真编码器)', ()
   /** 页内执行一次动图导出(format 决定 GIF/MP4),字节以 base64 回传。
    *  每次导出用全新 page:swiftshader 渲染偶发 renderer 崩溃会销毁执行上下文
    *  并波及同页后续用例(实测 flaky),隔离后崩溃最多杀掉当次,重跑即过。 */
-  async function runInPage(format: 'gif' | 'video', watermark: 'none' | 'tiled'): Promise<PageResult> {
+  async function runInPageAt(url: string, format: 'gif' | 'video', watermark: 'none' | 'tiled'): Promise<PageResult> {
     const p = await browser.newPage()
     try {
       await p.setViewport({ width: 500, height: 500 })
-      await p.goto(DEV_URL, { waitUntil: 'domcontentloaded' })
+      await p.goto(url, { waitUntil: 'domcontentloaded' })
     } catch {
       await p.close()
       return { ok: false, error: `页面打开失败(${format}/${watermark})` }
@@ -162,8 +163,8 @@ describe('runAnimationExport 产物真文件抽验(真 shader/真编码器)', ()
           const anim = (await imp('/src/lib/motion/exportAnimation.ts')) as {
             runAnimationExport: (o: Record<string, unknown>) => Promise<{ blob: Blob; ext: string; frames: number }>
           }
-          const vw = (await imp('/src/lib/motion/videoWriter.ts')) as {
-            probeVideoSupport: (o: Record<string, number>) => Promise<boolean>
+          const vt = (await imp('/src/lib/motion/videoTier.ts')) as {
+            probeVideoTier: () => Promise<string>
           }
 
           const timeline = {
@@ -176,9 +177,9 @@ describe('runAnimationExport 产物真文件抽验(真 shader/真编码器)', ()
             },
           }
 
-          const probe = await vw.probeVideoSupport({ width: 1280, height: 720, frameRate: 30, bitrate: 8e6 })
-          const probeAgain = await vw.probeVideoSupport({ width: 1280, height: 720, frameRate: 30, bitrate: 8e6 })
-
+          const tier = await vt.probeVideoTier()
+          const tierAgain = await vt.probeVideoTier()
+          // 兼容链:tier 为 mediarecorder 时 runAnimationExport 走 MediaRecorder 兜底
           const res = await anim.runAnimationExport({
             image: img,
             styleDef,
@@ -190,6 +191,7 @@ describe('runAnimationExport 产物真文件抽验(真 shader/真编码器)', ()
             timeline,
             uniformMap: kaleido.MOTION_UNIFORMS,
             format,
+            videoTier: tier as 'webcodecs-mp4' | 'mediarecorder-mp4' | 'mediarecorder-webm' | 'none',
             ...(format === 'gif' ? { gif: { size: 256, fps: 12 } } : {}),
             watermark,
             seed: 'TESTSEED',
@@ -221,8 +223,8 @@ describe('runAnimationExport 产物真文件抽验(真 shader/真编码器)', ()
             gifB64: format === 'gif' ? btoa(b64) : undefined,
             mp4B64: format === 'video' ? btoa(b64) : undefined,
             mp4Duration,
-            probe,
-            probeAgain,
+            tier,
+            tierAgain,
           }
         } catch (e) {
           return { ok: false, error: String(e) }
@@ -241,6 +243,16 @@ describe('runAnimationExport 产物真文件抽验(真 shader/真编码器)', ()
     const out = new Uint8Array(bin.length)
     for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i)
     return out
+  }
+
+  /** 安全上下文薄封装(localhost vite dev)。 */
+  const runInPage = (format: 'gif' | 'video', watermark: 'none' | 'tiled') => runInPageAt(DEV_URL, format, watermark)
+
+  /** 局域网 IPv4(非安全上下文场景用;无则返回 null)。 */
+  function lanIpv4(): string | null {
+    const addrs = Object.values(os.networkInterfaces()).flat().filter(Boolean) as os.NetworkInterfaceInfo[]
+    const hit = addrs.find((a) => a.family === 'IPv4' && !a.internal)
+    return hit?.address ?? null
   }
 
   it('GIF:回读断言 gct/无 lct/NETSCAPE loop=0/帧数/delay,首末帧像素不同(动效真实)', async () => {
@@ -297,15 +309,15 @@ describe('runAnimationExport 产物真文件抽验(真 shader/真编码器)', ()
     expect(markedSize).toBeGreaterThan(plainSize * 1.2)
   }, 180_000)
 
-  it('视频:ftyp 魔数 + 页内 video 元数据 duration ≈ 动效×2;probe 返回布尔', async () => {
+  it('视频:ftyp 魔数 + 页内 video 元数据 duration ≈ 动效×2;tier 会话记忆化', async () => {
     const r = await runInPage('video', 'none')
     expect(r.error).toBeUndefined()
     expect(r.ok).toBe(true)
-    expect(typeof r.probe).toBe('boolean')
-    expect(r.probeAgain).toBe(r.probe) // 会话级记忆化:同参数同结果
+    expect(typeof r.tier).toBe('string')
+    expect(r.tierAgain).toBe(r.tier) // 会话级记忆化:同参数同结果
     expect(r.frames).toBe(60) // planVideoFrames(1) = 1s×2 循环×30fps
 
-    if (r.probe === true) {
+    if (r.tier === 'webcodecs-mp4') {
       const bytes = b64ToBytes(r.mp4B64!)
       // MP4:offset 4 起 'ftyp'
       expect(String.fromCharCode(...bytes.slice(4, 8))).toBe('ftyp')
@@ -314,8 +326,25 @@ describe('runAnimationExport 产物真文件抽验(真 shader/真编码器)', ()
       expect(r.mp4Duration!).toBeGreaterThan(1.8)
       expect(r.mp4Duration!).toBeLessThan(2.2)
     } else {
-      // 该环境不支持硬编:导出应走失败路径(测试环境兜底——真机矩阵见执行票取证)
-      expect(r.ok).toBe(false)
+      // 该环境无 WebCodecs:tier 应已落 MediaRecorder 档(产物由非安全上下文用例断言)
+      expect(r.tier === 'mediarecorder-mp4' || r.tier === 'mediarecorder-webm').toBe(true)
     }
+  }, 180_000)
+
+  it('非安全上下文(http 局域网 IP):tier=mediarecorder-mp4,MediaRecorder 兜底产真 MP4', async () => {
+    const ip = lanIpv4()
+    if (!ip) return // 无局域网 IPv4 的环境跳过(本机必有)
+    const r = await runInPageAt(`http://${ip}:${PORT}/`, 'video', 'none')
+    expect(r.error).toBeUndefined()
+    expect(r.ok).toBe(true)
+    // 非安全上下文无 VideoEncoder(SecureContext 专属)→ 探测必落 MediaRecorder 档
+    expect(r.tier).toBe('mediarecorder-mp4')
+    expect(r.frames).toBe(60)
+    const bytes = b64ToBytes(r.mp4B64!)
+    expect(String.fromCharCode(...bytes.slice(4, 8))).toBe('ftyp')
+    expect(bytes.length).toBeGreaterThan(10_000)
+    // MediaRecorder 时戳精度放宽:目标 2.0s ±0.4
+    expect(r.mp4Duration!).toBeGreaterThan(1.6)
+    expect(r.mp4Duration!).toBeLessThan(2.4)
   }, 180_000)
 })
