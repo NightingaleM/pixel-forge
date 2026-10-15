@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo, useReducer } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ShaderRenderer } from '../lib/ShaderRenderer'
@@ -10,7 +10,7 @@ import { estimateFocusBand } from '../lib/tiltshiftBand'
 import { randomizeParams } from '../lib/randomSeed'
 import { renderImage, exportCanvasBlob, compositeOnBlack } from '../lib/renderImage'
 import { renderFullResCanvas } from '../lib/offscreenExport'
-import { decideSingleExport, decideExportCardHTML } from '../lib/license/gating'
+import { decideSingleExport, decideBatchExport, decideExportCardHTML } from '../lib/license/gating'
 import { getLicenseStatus } from '../lib/license/verify'
 import { hexToRgb } from '../lib/paramValue'
 import { analyzeZones, drawZoneMask, pickZone, type ZoneAnalysis } from '../lib/holofoilZones'
@@ -44,6 +44,16 @@ import {
   type ProcessingBaseline, type ProcessingJob, type RenderTaskFn,
 } from '../lib/batch/runBatch'
 import { previewSource } from '../lib/batch/previewSource'
+// 万花筒动图导出(wayfinder kaleido-motion):内核/写入器/编排 + 面板
+import { exportReducer, initialExportState, type ExportFormat } from '../lib/motion/exportState'
+import { estimateGifBytesPre, estimateVideoBytesPre, runAnimationExport } from '../lib/motion/exportAnimation'
+import { planGifFrames } from '../lib/motion/gifWriter'
+import { alignDriftForGif, sampleMotion } from '../lib/motion/kernel'
+import { ExportCancelledError, planVideoFrames, probeVideoSupport, VIDEO_PRESET } from '../lib/motion/videoWriter'
+import {
+  buildMotionTimeline, GIF_DEFAULTS, initialMotionUiState, isMotionActive, MOTION_PARAM_KEYS,
+  MOTION_UNIFORMS, type GifSettingsUi, type MotionUiState,
+} from '../lib/motion/kaleidoMotion'
 import ImageUploader from './ImageUploader'
 import ImageStrip from './ImageStrip'
 import StyleSelector from './StyleSelector'
@@ -59,6 +69,7 @@ import BatchPanel, { type BatchSeedMode } from './BatchPanel'
 import LicensePanel from './LicensePanel'
 import CardSettingsPanel from './CardSettingsPanel'
 import MobileShell2D, { type MobileParamPanelProps, type MobileStyleItem } from './MobileShell2D'
+import MotionExportPanel, { type MotionExportView } from './MotionExportPanel'
 import Lightbox, { type LightboxItem } from './Lightbox'
 
 function formatFileSize(bytes: number): string {
@@ -218,6 +229,20 @@ function App2D() {
     textParams: Record<string, string>
     fontParams?: Record<string, FontFace | null>
   }>>>({})
+
+  // ---------------------------------------------------------------------------
+  // 万花筒动图导出(wayfinder kaleido-motion):动效 UI 态(会话态,不入种子码——
+  // 动效是编排层非风格参数,v1 布局零变更)+ 导出状态机 + 视频能力检测。
+  // 预览 rAF/导出编排见 downloadBlob 之后的接线块。
+  // ---------------------------------------------------------------------------
+  const [motion, setMotion] = useState<MotionUiState>(initialMotionUiState)
+  const [gifSettings, setGifSettings] = useState<GifSettingsUi>(GIF_DEFAULTS)
+  const [animExport, dispatchAnimExport] = useReducer(exportReducer, undefined, initialExportState)
+  /** null=检测中,false=禁用视频档(canEncodeVideo 会话级记忆化) */
+  const [videoSupported, setVideoSupported] = useState<boolean | null>(null)
+  const animCancelRef = useRef<{ cancelled: boolean } | null>(null)
+  /** 导出中禁用参数编辑(spec §3):ref 守卫避免 handler 重建 */
+  const animExportBusyRef = useRef(false)
 
   // ---------------------------------------------------------------------------
   // Batch v2(模式语义 + 整批基线 + 队列调度,行状态唯一所有者)
@@ -1206,6 +1231,7 @@ function App2D() {
   // 出图还是旧值"的 WYSIWYG 失守,故按任务级共享语义同步 base(spec"整批共享
   // 一份");数值参数由种子携带,仍只写工作副本(懒同步点编回行种子)
   const handleParamChange = useCallback((uniform: string, value: number) => {
+    if (animExportBusyRef.current) return // 动图导出中禁用参数编辑(spec §3)
     const apply = (prev: Record<string, number>) => {
       const next = { ...prev, [uniform]: value }
       // 拖动光源位置 = 用户接管,自动检测让位。判断用 === 1 而非 !== 0:
@@ -1318,6 +1344,166 @@ function App2D() {
     }
     anchorDownload(blob, fileName)
   }, [activeStyle, seed, isMobile])
+
+  // ---------------------------------------------------------------------------
+  // 动图导出接线:派生态 → 预览 rAF 启停 → 视频能力检测 → 导出 handler → 面板视图
+  // ---------------------------------------------------------------------------
+  const isKaleido = activeStyle === 'kaleidoscope'
+  const isAnimExporting = animExport.phase === 'encoding' || animExport.phase === 'canceling'
+  const motionTimeline = useMemo(
+    () => buildMotionTimeline(motion, params),
+    [motion, params],
+  )
+  // 预览 rAF 启停边界(spec §4):万花筒 + 有图 + 任一参数非静止 + 非导出中;
+  // 全静止/切风格/导出即停,回按需渲染
+  const motionActive = isKaleido && !!image && isMotionActive(motion) && !isAnimExporting
+  // rAF 循环读实时态的通道(避免 motion/params 进 effect 依赖导致每次拖动重启相位)
+  const motionLiveRef = useRef({ motion, params })
+  useEffect(() => {
+    motionLiveRef.current = { motion, params }
+  }, [motion, params])
+  useEffect(() => {
+    if (!motionActive) return
+    const start = performance.now()
+    let raf = 0
+    const loop = () => {
+      const r = rendererRef.current
+      if (r) {
+        const live = motionLiveRef.current
+        const tl = buildMotionTimeline(live.motion, live.params)
+        const t = (performance.now() - start) / 1000
+        const vals = sampleMotion(tl, t)
+        for (const key of MOTION_PARAM_KEYS) r.setUniform(MOTION_UNIFORMS[key], vals[key])
+        r.render()
+      }
+      raf = requestAnimationFrame(loop)
+    }
+    raf = requestAnimationFrame(loop)
+    return () => cancelAnimationFrame(raf)
+  }, [motionActive])
+  // 视频能力检测:面板可见(万花筒+有图)时问一次,probeVideoSupport 会话级记忆化
+  useEffect(() => {
+    if (!isKaleido || !image || videoSupported !== null) return
+    let alive = true
+    probeVideoSupport({
+      width: VIDEO_PRESET.width,
+      height: VIDEO_PRESET.height,
+      frameRate: VIDEO_PRESET.fps,
+      bitrate: VIDEO_PRESET.bitrate,
+    })
+      .then((ok) => { if (alive) setVideoSupported(ok) })
+      .catch(() => { if (alive) setVideoSupported(false) })
+    return () => { alive = false }
+  }, [isKaleido, image, videoSupported])
+
+  const handleStartAnimExport = useCallback(async () => {
+    if (!image || !currentStyle || activeStyle !== 'kaleidoscope' || !isMotionActive(motion)) return
+    const fmt: ExportFormat = animExport.format
+    const isGif = fmt === 'gif'
+    if (!isGif && videoSupported === false) return
+    const framesTotal = isGif
+      ? planGifFrames(motion.duration, gifSettings.fps).frameCount
+      : planVideoFrames(motion.duration).frameCount
+    const cancel = { cancelled: false }
+    animCancelRef.current = cancel
+    animExportBusyRef.current = true
+    dispatchAnimExport({ type: 'start', format: fmt, framesTotal })
+    try {
+      // 水印/会员与导出完全同规则(spec §3):免费=逐帧 T6-25 平铺(批量语义的
+      // decideBatchExport),会员=无水印;判定链路复用,不另设额度
+      const d = decideBatchExport()
+      const res = await runAnimationExport({
+        image,
+        styleDef: currentStyle,
+        params,
+        textParams,
+        fontParams,
+        brightest,
+        zoneMask,
+        timeline: motionTimeline,
+        uniformMap: MOTION_UNIFORMS,
+        format: fmt,
+        gif: isGif ? { size: gifSettings.size, fps: gifSettings.fps } : undefined,
+        watermark: d.mode === 'tiled' ? 'tiled' : 'none',
+        seed,
+        onProgress: (framesDone, estimatedBytes) =>
+          dispatchAnimExport({ type: 'progress', framesDone, estimatedBytes }),
+        isCancelled: () => cancel.cancelled,
+      })
+      downloadBlob(res.blob, res.ext)
+      dispatchAnimExport({ type: 'done' })
+      if (d.mode === 'tiled') setWmToast(true)
+    } catch (err) {
+      if (err instanceof ExportCancelledError || (err as Error)?.name === 'ExportCancelledError') {
+        dispatchAnimExport({ type: 'canceled' })
+      } else {
+        // 视频失败(含软编重试后)提示改用 GIF(spec §1);GIF 侧失败显示原因
+        dispatchAnimExport({
+          type: 'error',
+          message: fmt === 'video' ? t('animExport.videoFailed') : String((err as Error)?.message ?? err),
+        })
+      }
+    } finally {
+      animCancelRef.current = null
+      animExportBusyRef.current = false
+    }
+  }, [image, currentStyle, activeStyle, motion, animExport.format, videoSupported, gifSettings,
+    params, textParams, fontParams, brightest, zoneMask, motionTimeline, seed, downloadBlob, t])
+
+  const handleCancelAnimExport = useCallback(() => {
+    dispatchAnimExport({ type: 'requestCancel' })
+    if (animCancelRef.current) animCancelRef.current.cancelled = true
+  }, [])
+
+  // 面板视图:预估体积(导出前启发式/视频码率×时长)、GIF 吸附提示行、可导出条件
+  const animExportView: MotionExportView = useMemo(() => {
+    const isGif = animExport.format === 'gif'
+    const gifPlan = isGif ? planGifFrames(motion.duration, gifSettings.fps) : null
+    const videoPlan = isGif ? null : planVideoFrames(motion.duration)
+    const plan = gifPlan ?? videoPlan!
+    const preEstimateBytes = isGif && gifPlan
+      ? estimateGifBytesPre(gifSettings.size, gifPlan.frameCount)
+      : estimateVideoBytesPre(videoPlan!.durationSec)
+    const gifAligned = isGif && gifPlan && motion.on
+      ? MOTION_PARAM_KEYS
+          .filter((k) => k !== 'zoom' && motion.params[k].type === 'drift')
+          .map((k) => ({
+            axis: k === 'centerX' ? ('X' as const) : ('Y' as const),
+            speed: alignDriftForGif(motion.params[k].speed, gifPlan.actualDurationSec),
+          }))
+      : []
+    const motionReady = isKaleido && !!image && isMotionActive(motion)
+    return {
+      phase: animExport.phase,
+      format: animExport.format,
+      framesDone: animExport.framesDone,
+      framesTotal: animExport.framesTotal,
+      bytesSoFar: animExport.bytesSoFar,
+      estimatedBytes: animExport.estimatedBytes,
+      errorMessage: animExport.errorMessage,
+      gif: gifSettings,
+      videoSupported,
+      preEstimateBytes,
+      preEstimateFrames: plan.frameCount,
+      gifAligned,
+      canExport: motionReady && !isAnimExporting && (isGif || videoSupported === true),
+      motionLocked: isAnimExporting,
+    }
+  }, [animExport, motion, gifSettings, videoSupported, isKaleido, image, isAnimExporting])
+
+  // 动效+导出面板节点(仅万花筒渲染;两壳经 bottom 插槽共用)
+  const motionPanelNode = isKaleido ? (
+    <MotionExportPanel
+      motion={motion}
+      onMotionChange={setMotion}
+      view={animExportView}
+      onFormatChange={(f) => dispatchAnimExport({ type: 'setFormat', format: f })}
+      onGifChange={(patch) => setGifSettings((s) => ({ ...s, ...patch }))}
+      onStartExport={handleStartAnimExport}
+      onCancelExport={handleCancelAnimExport}
+      onResetExport={dispatchAnimExport}
+    />
+  ) : null
 
   // 批量单张下载(Task 8 起走 downloadBlob 分流):与 ZIP 内条目同命名
   // ({styleId}_{原名}_{种子}.{ext});种子/风格读 done 快照——换基线或重骰后,
@@ -1874,6 +2060,7 @@ function App2D() {
       lockedUniforms,
       onToggleLock: handleToggleLock,
       onResetParam: handleResetParam,
+      bottom: motionPanelNode,
       top: (
         <>
           <SeedBar seed={seed} onApply={handleApplySeed} presets={presets} onApplyPreset={handleApplyPreset} />
@@ -2053,6 +2240,7 @@ function App2D() {
           lockedUniforms={lockedUniforms}
           onToggleLock={handleToggleLock}
           onResetParam={handleResetParam}
+          bottom={motionPanelNode}
           top={
             <>
               <SeedBar seed={seed} onApply={handleApplySeed} presets={presets} onApplyPreset={handleApplyPreset} />

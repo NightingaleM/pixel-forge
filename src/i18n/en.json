@@ -654,6 +654,46 @@
     "cardHtml": "Card HTML",
     "cardHtmlDone": "Card exported: open it in a browser on desktop or Android to tilt; on iPhone it needs to be hosted online first"
   },
+  "motion": {
+    "title": "Motion",
+    "enableHint": "Preview loops in real time when on",
+    "type": {
+      "static": "Static",
+      "pingpong": "Ping-pong",
+      "pingpongZoom": "Breathing",
+      "drift": "Drift"
+    },
+    "endB": "End B",
+    "speed": "Drift speed",
+    "duration": "Loop duration",
+    "startAHint": "Start A = left slider value, drag to edit live",
+    "driftHint": "Canvas flows one way · negative = reverse"
+  },
+  "animExport": {
+    "title": "Export animation",
+    "offHint": "Turn on Motion to export GIF / video",
+    "format": {
+      "gif": "GIF",
+      "video": "Video MP4"
+    },
+    "oneLoop": "1 loop",
+    "twoLoops": "2 loops",
+    "custom": "Custom (GIF only)",
+    "size": "Size",
+    "fps": "Frame rate",
+    "estimated": "Estimated size",
+    "framesUnit": "frames",
+    "start": "Start export",
+    "exporting": "Rendering + encoding",
+    "canceling": "Canceling…",
+    "cancel": "Cancel",
+    "reexport": "Export again",
+    "doneHint": "Exported — switch format to re-export",
+    "canceledHint": "Canceled — ready to re-export",
+    "videoUnsupported": "Video export unsupported in this browser — use GIF",
+    "videoFailed": "Video encoding failed — try GIF instead",
+    "gifAligned": "Drift speed auto-aligns on GIF export (seamless loop)"
+  },
   "batch": {
     "title": "Batch",
     "tabConfig": "Setup",

@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import {
-  DRIFT_LOOP_PERIOD,
-  MotionTimeline,
-  alignDriftForGif,
-  hasAnimatedParams,
-  sampleMotion,
-} from './kernel'
+import { DRIFT_LOOP_PERIOD, alignDriftForGif, hasAnimatedParams, sampleMotion } from './kernel'
+import type { MotionTimeline } from './kernel'
 
 /** 三参数混合时间轴: zoom 往返 / centerX 漂移 / centerY 静止, T = 3s。 */
 function mixedTimeline(): MotionTimeline {

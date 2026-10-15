@@ -23,6 +23,8 @@ interface ParamPanelProps {
   storageKey?: string
   children?: ReactNode
   top?: ReactNode
+  /** 参数控件之后的附加区块(万花筒动效+动图导出面板;两壳共用插槽) */
+  bottom?: ReactNode
   defaultCollapsed?: boolean
   /** sheet 内嵌模式：不渲染 .param-panel 拖拽定位壳/关闭钮/折叠头，填满父容器(宽 100%)。
    *  标题/描述/随机由宿主(BottomSheet + m-params-actions)承担；参数控件本体两模式共用。 */
@@ -393,7 +395,7 @@ function renderParam(
   )
 }
 
-function ParamPanel({ title, description, params, values, textValues, onChange, onTextChange, fontValues, onFontChange, onRandom, onClose, defaultPos, storageKey, children, top, defaultCollapsed, embedded, lockedUniforms, onToggleLock, onResetParam }: ParamPanelProps) {
+function ParamPanel({ title, description, params, values, textValues, onChange, onTextChange, fontValues, onFontChange, onRandom, onClose, defaultPos, storageKey, children, top, bottom, defaultCollapsed, embedded, lockedUniforms, onToggleLock, onResetParam }: ParamPanelProps) {
   const { t } = useTranslation()
   // embedded 下禁用拖拽(hook 恒调以满足规则，enabled=false 不绑事件不定位)
   const { ref: panelRef, pos, onHeaderMouseDown } = useDraggable(defaultPos, storageKey, { enabled: !embedded })
@@ -417,6 +419,7 @@ function ParamPanel({ title, description, params, values, textValues, onChange, 
       <div className="param-panel-embedded">
         {top}
         {controls}
+        {bottom}
       </div>
     )
   }
@@ -458,6 +461,7 @@ function ParamPanel({ title, description, params, values, textValues, onChange, 
         <div className="param-panel-body">
           {top}
           {controls}
+          {bottom}
         </div>
       )}
     </div>

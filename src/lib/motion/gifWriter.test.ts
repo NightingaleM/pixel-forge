@@ -76,18 +76,25 @@ describe('GifStream (两遍管线流式编码 + gifuct 回读抽验, spec §2/§
     const bytes = s.finish()
 
     const gif = parseGIF(bytes.buffer as ArrayBuffer)
-    const imgFrames = gif.frames.filter((f) => f.image)
+    // gifuct 的 frames 是 图像帧|应用扩展 联合;按运行时字段收窄(与票 02 验证脚本同判法)
+    type RawBlock = {
+      image?: { descriptor: { localColorTableFlag: boolean } }
+      application?: { id?: string; blocks: number[] }
+      gce?: { delay: number }
+    }
+    const blocks = gif.frames as RawBlock[]
+    const imgFrames = blocks.filter((f) => f.image)
     expect(imgFrames.length).toBe(n)
     expect(gif.lsd.gct.exists).toBe(true)
-    const local = imgFrames.filter((f) => f.image.descriptor.localColorTableFlag).length
+    const local = imgFrames.filter((f) => f.image!.descriptor.localColorTableFlag).length
     expect(local).toBe(0)
     let loop: number | undefined
-    for (const f of gif.frames) {
+    for (const f of blocks) {
       const a = f.application
       if (a && /NETSCAPE/i.test(a.id || '')) loop = a.blocks[1] | (a.blocks[2] << 8)
     }
     expect(loop).toBe(0)
-    for (const f of imgFrames) expect(f.gce.delay).toBe(8) // 80ms = 8 厘秒
+    for (const f of imgFrames) expect(f.gce!.delay).toBe(8) // 80ms = 8 厘秒
   })
 
   it('byteCount 随帧累计增长(预估体积实时刷新的数据源)', () => {

@@ -38,6 +38,8 @@ export interface MobileParamPanelProps {
   onToggleLock?: (uniform: string) => void
   onResetParam?: (uniform: string) => void
   top: ReactNode
+  /** 参数控件之后的附加区块(万花筒动效+动图导出面板;与桌面 bottom 插槽同构) */
+  bottom?: ReactNode
 }
 
 /** 风格 sheet 行:id/label/description 均由 App2D 组装(桌面 StyleSelector 同规则)。 */
@@ -241,6 +243,7 @@ function MobileShell2D(props: MobileShell2DProps) {
             lockedUniforms={p.lockedUniforms}
             onToggleLock={p.onToggleLock}
             onResetParam={p.onResetParam}
+            bottom={p.bottom}
           />
         </BottomSheet>
       )}

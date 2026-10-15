@@ -48,10 +48,11 @@ export class GifStream {
   private enc = GIFEncoder()
   private n = 0
   private bytes = 0
+  private opts: { width: number; height: number; delayMs: number; palette: GifPalette }
 
-  constructor(
-    private opts: { width: number; height: number; delayMs: number; palette: GifPalette },
-  ) {}
+  constructor(opts: { width: number; height: number; delayMs: number; palette: GifPalette }) {
+    this.opts = opts
+  }
 
   /** 喂一帧 RGBA(渲一帧喂一帧,不落整批缓存)。 */
   addFrame(rgba: Uint8ClampedArray): void {

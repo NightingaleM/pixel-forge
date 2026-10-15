@@ -654,6 +654,46 @@
     "cardHtml": "闪卡 HTML",
     "cardHtmlDone": "闪卡已导出：电脑或 Android 浏览器打开即可转卡；iPhone 需上传到线上后再打开"
   },
+  "motion": {
+    "title": "动效",
+    "enableHint": "开启后预览实时循环播放",
+    "type": {
+      "static": "静止",
+      "pingpong": "往返",
+      "pingpongZoom": "往返呼吸",
+      "drift": "单向漂移"
+    },
+    "endB": "终点 B",
+    "speed": "漂移速度",
+    "duration": "整循环时长",
+    "startAHint": "起点 A = 左侧滑杆当前值，拖动即时生效",
+    "driftHint": "画布朝一个方向持续流动 · 负值 = 反方向"
+  },
+  "animExport": {
+    "title": "导出动图",
+    "offHint": "开启「动效」后可导出 GIF / 视频",
+    "format": {
+      "gif": "GIF 动图",
+      "video": "视频 MP4"
+    },
+    "oneLoop": "1 个循环",
+    "twoLoops": "2 个循环",
+    "custom": "高级自定义（仅 GIF）",
+    "size": "尺寸",
+    "fps": "帧率",
+    "estimated": "预估体积",
+    "framesUnit": "帧",
+    "start": "开始导出",
+    "exporting": "渲染 + 编码中",
+    "canceling": "正在取消…",
+    "cancel": "取消",
+    "reexport": "再导一次",
+    "doneHint": "已导出，可换格式再导",
+    "canceledHint": "已取消，可重新导出",
+    "videoUnsupported": "此浏览器不支持视频导出，请改用 GIF",
+    "videoFailed": "视频编码失败，请改用 GIF",
+    "gifAligned": "GIF 导出时漂移速度将自动对齐（无缝循环）"
+  },
   "batch": {
     "title": "批量处理",
     "tabConfig": "配置",

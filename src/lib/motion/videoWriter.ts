@@ -111,7 +111,7 @@ async function runMp4Once(
     await output.finalize()
     const buf = (output.target as BufferTarget).buffer
     if (!buf) throw new Error('mp4-empty-buffer')
-    return buf
+    return new Uint8Array(buf)
   } catch (err) {
     await output.cancel().catch(() => {})
     throw err
