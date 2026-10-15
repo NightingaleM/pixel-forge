@@ -37,9 +37,11 @@ export interface MobileParamPanelProps {
   lockedUniforms?: Set<string>
   onToggleLock?: (uniform: string) => void
   onResetParam?: (uniform: string) => void
+  /** 禁用行集合(动效 sheet 接管三参数时传入;与桌面 ParamPanel 同构) */
+  disabledUniforms?: Set<string>
+  /** 动效 sheet 入口(仅万花筒):m-params-actions 里渲染「动效」按钮 */
+  onOpenMotion?: () => void
   top: ReactNode
-  /** 参数控件之后的附加区块(万花筒动效+动图导出面板;与桌面 bottom 插槽同构) */
-  bottom?: ReactNode
 }
 
 /** 风格 sheet 行:id/label/description 均由 App2D 组装(桌面 StyleSelector 同规则)。 */
@@ -102,6 +104,12 @@ export interface MobileShell2DProps {
   // 参数 sheet 数据(无图时 null,dock「参数」无动作——与桌面 ParamPanel 只在
   // 有图时渲染同语义)
   paramPanel: MobileParamPanelProps | null
+  /** 动效 sheet 内容(App2D 组装的 MotionExportPanel;仅万花筒非 null)。
+   *  开合状态 motionOpen/onMotionOpenChange 也归 App2D——开动效 sheet 时参数
+   *  sheet 里三参数行要禁用+骰子豁免,状态必须上提。 */
+  motionPanel: ReactNode | null
+  motionOpen: boolean
+  onMotionOpenChange: (open: boolean) => void
   // 批量全屏层(Task 8):App2D 组装的 <BatchPanel variant="mobile" />(全套
   // props 都是 App2D 状态,组装留在那边);null/false=不开,开时包进 BottomSheet
   // 从底部展开(用户验收反馈 #1);dismissible=false——关闭走面板内 x(运行中须确认)
@@ -113,15 +121,24 @@ export interface MobileShell2DProps {
 function MobileShell2D(props: MobileShell2DProps) {
   const { t } = useTranslation()
   // sheet 状态机:params(参数)/style(风格)/null(关);开合归本组件,
-  // 数据与回调全由 App2D 透传
+  // 数据与回调全由 App2D 透传。动效 sheet 开合归 App2D(motionOpen),但与
+  // 本地 sheet 互斥:开任一本地 sheet 收动效,开动效收本地 sheet(防双层叠加)
   const [sheet, setSheet] = useState<'params' | 'style' | null>(null)
+  const openSheet = (s: 'params' | 'style') => {
+    setSheet(s)
+    if (props.motionOpen) props.onMotionOpenChange(false)
+  }
+  const openMotion = () => {
+    setSheet(null)
+    props.onMotionOpenChange(true)
+  }
   const p = props.paramPanel
   return (
     <div className="m-app">
       <div className="m-topbar">
         <Link to="/" aria-label={t('common.backToHome')}>←</Link>
         {/* 风格名钮 = 风格 sheet 触发 */}
-        <button type="button" className="m-style-btn" onClick={() => setSheet('style')}>{props.styleLabel}</button>
+        <button type="button" className="m-style-btn" onClick={() => openSheet('style')}>{props.styleLabel}</button>
         <div className="m-topbar-spacer" style={{ flex: 1 }} />
         {/* 对比入口只留画布上 CompareSlider 的浮动按钮(用户反馈:顶栏与画布两处重复) */}
         {/* 顶栏会员小圆标:无文字,未激活灰环,激活点亮 */}
@@ -199,7 +216,7 @@ function MobileShell2D(props: MobileShell2DProps) {
           </>
         )}
         {/* 无图时 paramPanel 为 null:sheet 不置位,否则传图后 p 变非空、参数 sheet 自己弹出 */}
-        <button className="m-dock-btn" onClick={() => { if (p) setSheet('params') }}>
+        <button className="m-dock-btn" onClick={() => { if (p) openSheet('params') }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
             {/* 滑杆图标:两根横线各带圆钮 */}
             <line x1="4" y1="7" x2="20" y2="7" /><circle cx="9" cy="7" r="2.4" fill="#FFF" />
@@ -222,13 +239,18 @@ function MobileShell2D(props: MobileShell2DProps) {
           <span>{t('batch.apply')}</span>
         </button>
       </div>
-      {/* 参数 sheet:重置/随机收进顶部 m-params-actions(与种子/预设同区),
+      {/* 参数 sheet:重置/随机/动效入口收进顶部 m-params-actions(与种子/预设同区),
           top 三件套 + ParamPanel embedded 填满 sheet body */}
       {sheet === 'params' && p && (
         <BottomSheet open onClose={() => setSheet(null)} title={p.title}>
           <div className="m-params-actions">
             <button type="button" className="m-mini-btn" onClick={p.onReset}>{t('common.reset')}</button>
             <button type="button" className="m-mini-btn" onClick={p.onRandom}>{t('common.random')}</button>
+            {p.onOpenMotion && (
+              <button type="button" className="m-mini-btn" onClick={openMotion}>
+                {t('motion.openAction')}
+              </button>
+            )}
           </div>
           {p.top}
           <ParamPanel
@@ -243,8 +265,15 @@ function MobileShell2D(props: MobileShell2DProps) {
             lockedUniforms={p.lockedUniforms}
             onToggleLock={p.onToggleLock}
             onResetParam={p.onResetParam}
-            bottom={p.bottom}
+            disabledUniforms={p.disabledUniforms}
           />
+        </BottomSheet>
+      )}
+      {/* 动效 sheet(仅万花筒):与参数/风格 sheet 互斥,内容 App2D 组装
+          (MotionExportPanel,与桌面动效浮窗共用节点) */}
+      {props.motionOpen && props.motionPanel && (
+        <BottomSheet open onClose={() => props.onMotionOpenChange(false)} title={t('motion.windowTitle')}>
+          {props.motionPanel}
         </BottomSheet>
       )}
       {/* 风格 sheet:行点击 = 切风格 + 关 sheet;当前风格高亮 */}

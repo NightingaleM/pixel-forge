@@ -56,6 +56,10 @@ interface MotionExportPanelProps {
   onStartExport: () => void
   onCancelExport: () => void
   onResetExport: (a: ExportAction) => void
+  /** 三参数静态值(uZoom/uCenterX/uCenterY 当前值):面板迁移到独立浮窗后,
+   *  静态滑条是浮窗开着时这些参数的唯一编辑入口(动效起点 A 同源)。 */
+  staticValues: Record<ParamKey, number>
+  onStaticChange: (key: ParamKey, v: number) => void
 }
 
 function fmtBytes(b: number): string {
@@ -64,7 +68,7 @@ function fmtBytes(b: number): string {
 
 export default function MotionExportPanel(props: MotionExportPanelProps) {
   const { t } = useTranslation()
-  const { motion, view, onMotionChange } = props
+  const { motion, view, onMotionChange, staticValues, onStaticChange } = props
   const locked = view.motionLocked
 
   const setParam = (key: ParamKey, patch: Partial<MotionParamUiState>) => {
@@ -104,71 +108,90 @@ export default function MotionExportPanel(props: MotionExportPanelProps) {
           </button>
         </div>
 
-        {motion.on && (
-          <div className="motion-body">
-            {PARAM_KEYS.map((key) => {
-              const p = motion.params[key]
-              const range = PARAM_RANGE[key]
-              return (
-                <div key={key} className="motion-pblock">
-                  <div className="motion-prow">
-                    <span className="motion-pname">{t(PARAM_LABEL_KEY[key])}</span>
-                    <select
-                      className="motion-select"
-                      value={p.type}
-                      disabled={locked}
-                      onChange={(e) => {
-                        const type = e.target.value as MotionParamUiState['type']
-                        // 缩放无单向漂移(无法无缝循环),select 不提供该项
-                        setParam(key, { type })
-                      }}
-                    >
-                      <option value="static">{t('motion.type.static')}</option>
-                      <option value="pingpong">{key === 'zoom' ? t('motion.type.pingpongZoom') : t('motion.type.pingpong')}</option>
-                      {key !== 'zoom' && <option value="drift">{t('motion.type.drift')}</option>}
-                    </select>
-                  </div>
-                  {p.type === 'pingpong' && (
-                    <div className="motion-pline">
-                      <div className="motion-mini">
-                        <span className="motion-mini-label">{t('motion.endB')}</span>
-                        <input
-                          type="range"
-                          className="param-slider motion-slider"
-                          min={range.min}
-                          max={range.max}
-                          step={range.step}
-                          value={p.b}
-                          disabled={locked}
-                          onInput={(e) => setParam(key, { b: parseFloat((e.target as HTMLInputElement).value) })}
-                        />
-                        <b className="motion-mini-val">{p.b.toFixed(2)}</b>
-                      </div>
-                      <div className="motion-mini-hint">{t('motion.startAHint')}</div>
-                    </div>
-                  )}
-                  {p.type === 'drift' && (
-                    <div className="motion-pline">
-                      <div className="motion-mini">
-                        <span className="motion-mini-label">{t('motion.speed')}</span>
-                        <input
-                          type="range"
-                          className="param-slider motion-slider"
-                          min={SPEED_RANGE.min}
-                          max={SPEED_RANGE.max}
-                          step={SPEED_RANGE.step}
-                          value={p.speed}
-                          disabled={locked}
-                          onInput={(e) => setParam(key, { speed: parseFloat((e.target as HTMLInputElement).value) })}
-                        />
-                        <b className="motion-mini-val">{p.speed >= 0 ? '+' : ''}{p.speed.toFixed(2)}</b>
-                      </div>
-                      <div className="motion-mini-hint">{t('motion.driftHint')}</div>
-                    </div>
-                  )}
+        {/* 三参数静态值滑条常驻(开关关时也在此编辑——浮窗开着时这里是唯一入口);
+         *  类型 select/B 值/速度/时长只在与预览联动时有意义,随开关显隐 */}
+        <div className="motion-body">
+          {PARAM_KEYS.map((key) => {
+            const p = motion.params[key]
+            const range = PARAM_RANGE[key]
+            return (
+              <div key={key} className="motion-pblock">
+                <div className="motion-prow">
+                  <span className="motion-pname">{t(PARAM_LABEL_KEY[key])}</span>
+                  <b className="motion-mini-val">{staticValues[key].toFixed(2)}</b>
                 </div>
-              )
-            })}
+                <input
+                  type="range"
+                  className="param-slider motion-slider motion-static-slider"
+                  min={range.min}
+                  max={range.max}
+                  step={range.step}
+                  value={staticValues[key]}
+                  onInput={(e) => onStaticChange(key, parseFloat((e.target as HTMLInputElement).value))}
+                />
+                {motion.on && (
+                  <div className="motion-pline">
+                    <div className="motion-mini">
+                      <span className="motion-mini-label">{t('motion.typeLabel')}</span>
+                      <select
+                        className="motion-select"
+                        value={p.type}
+                        disabled={locked}
+                        onChange={(e) => {
+                          const type = e.target.value as MotionParamUiState['type']
+                          // 缩放无单向漂移(无法无缝循环),select 不提供该项
+                          setParam(key, { type })
+                        }}
+                      >
+                        <option value="static">{t('motion.type.static')}</option>
+                        <option value="pingpong">{key === 'zoom' ? t('motion.type.pingpongZoom') : t('motion.type.pingpong')}</option>
+                        {key !== 'zoom' && <option value="drift">{t('motion.type.drift')}</option>}
+                      </select>
+                    </div>
+                  </div>
+                )}
+                {motion.on && p.type === 'pingpong' && (
+                  <div className="motion-pline">
+                    <div className="motion-mini">
+                      <span className="motion-mini-label">{t('motion.endB')}</span>
+                      <input
+                        type="range"
+                        className="param-slider motion-slider"
+                        min={range.min}
+                        max={range.max}
+                        step={range.step}
+                        value={p.b}
+                        disabled={locked}
+                        onInput={(e) => setParam(key, { b: parseFloat((e.target as HTMLInputElement).value) })}
+                      />
+                      <b className="motion-mini-val">{p.b.toFixed(2)}</b>
+                    </div>
+                    <div className="motion-mini-hint">{t('motion.startAHint')}</div>
+                  </div>
+                )}
+                {motion.on && p.type === 'drift' && (
+                  <div className="motion-pline">
+                    <div className="motion-mini">
+                      <span className="motion-mini-label">{t('motion.speed')}</span>
+                      <input
+                        type="range"
+                        className="param-slider motion-slider"
+                        min={SPEED_RANGE.min}
+                        max={SPEED_RANGE.max}
+                        step={SPEED_RANGE.step}
+                        value={p.speed}
+                        disabled={locked}
+                        onInput={(e) => setParam(key, { speed: parseFloat((e.target as HTMLInputElement).value) })}
+                      />
+                      <b className="motion-mini-val">{p.speed >= 0 ? '+' : ''}{p.speed.toFixed(2)}</b>
+                    </div>
+                    <div className="motion-mini-hint">{t('motion.driftHint')}</div>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+          {motion.on && (
             <div className="motion-pblock">
               <div className="motion-mini">
                 <span className="motion-mini-label">{t('motion.duration')}</span>
@@ -185,8 +208,8 @@ export default function MotionExportPanel(props: MotionExportPanelProps) {
                 <b className="motion-mini-val">{motion.duration.toFixed(1)} s</b>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </section>
 
       {/* ===== 导出卡 ===== */}

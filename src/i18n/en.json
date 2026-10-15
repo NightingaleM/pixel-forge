@@ -657,6 +657,11 @@
   "motion": {
     "title": "Motion",
     "enableHint": "Preview loops in real time when on",
+    "openAction": "Motion",
+    "windowTitle": "Motion & Export",
+    "windowDesc": "Zoom/center params live here; export GIF / video",
+    "ownedHint": "Managed by the Motion & Export panel — edit it there",
+    "typeLabel": "Motion",
     "type": {
       "static": "Static",
       "pingpong": "Ping-pong",
@@ -666,7 +671,7 @@
     "endB": "End B",
     "speed": "Drift speed",
     "duration": "Loop duration",
-    "startAHint": "Start A = left slider value, drag to edit live",
+    "startAHint": "Start A = slider value above, drag to edit live",
     "driftHint": "Canvas flows one way · negative = reverse"
   },
   "animExport": {

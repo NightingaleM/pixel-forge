@@ -26,6 +26,11 @@ interface ParamPanelProps {
   /** 参数控件之后的附加区块(万花筒动效+动图导出面板;两壳共用插槽) */
   bottom?: ReactNode
   defaultCollapsed?: boolean
+  /** header 自定义动作钮(万花筒动效浮窗开关)：渲染在骰子/折叠/关闭之前 */
+  headerAction?: ReactNode
+  /** 禁用行集合(动效浮窗接管 uZoom/uCenterX/uCenterY 时传入)：整行灰化不可改，
+   *  值仍随 uniform 更新显示。与 lockedUniforms(骰子豁免+锁图标)语义不同：这是 UI 接管。 */
+  disabledUniforms?: Set<string>
   /** sheet 内嵌模式：不渲染 .param-panel 拖拽定位壳/关闭钮/折叠头，填满父容器(宽 100%)。
    *  标题/描述/随机由宿主(BottomSheet + m-params-actions)承担；参数控件本体两模式共用。 */
   embedded?: boolean
@@ -111,14 +116,16 @@ function ParamLabel({ name, description }: { name: string; description?: string 
   )
 }
 
-/** 数字滑条数值标签：点击后内联编辑，Enter/失焦提交（clamp + step 对齐），Esc 取消。 */
-function ParamValueInput({ value, min, max, step, name, onCommit }: {
+/** 数字滑条数值标签：点击后内联编辑，Enter/失焦提交（clamp + step 对齐），Esc 取消。
+ *  disabled(行被动效浮窗接管)时退化为纯展示 span，不进入编辑态。 */
+function ParamValueInput({ value, min, max, step, name, onCommit, disabled }: {
   value: number
   min: number
   max: number
   step: number
   name: string
   onCommit: (v: number) => void
+  disabled?: boolean
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
@@ -135,6 +142,7 @@ function ParamValueInput({ value, min, max, step, name, onCommit }: {
   }, [editing])
 
   if (!editing) {
+    if (disabled) return <span className="param-value">{display}</span>
     return (
       <span
         className="param-value param-value-editable"
@@ -177,12 +185,14 @@ function ParamValueInput({ value, min, max, step, name, onCommit }: {
 /** 行内工具组：锁死(仅可随机类型 number/select/color) + 重置(全类型)。
  *  放属性名后方。SKIP_RANDOM_UNIFORMS(系统级豁免)预置为锁死态且禁用——
  *  视觉语义一致：锁亮=不会被随机；不可点是「本来就如此」。
+ *  disabled(行被动效浮窗接管)：两钮一并禁用——重置也属改值通道。
  *  preventDefault/stopPropagation：toggle 行内点击不触发勾选(与 tooltip ? 同款)。 */
-function ParamTools({ param, locked, onToggleLock, onResetParam }: {
+function ParamTools({ param, locked, onToggleLock, onResetParam, disabled }: {
   param: ParamDef
   locked?: boolean
   onToggleLock?: (uniform: string) => void
   onResetParam?: (uniform: string) => void
+  disabled?: boolean
 }) {
   const { t } = useTranslation()
   const canRandom = param.type !== 'text' && param.type !== 'toggle' && param.type !== 'font'
@@ -195,7 +205,7 @@ function ParamTools({ param, locked, onToggleLock, onResetParam }: {
         <button
           type="button"
           className={`param-tool-btn${isLocked ? ' param-tool-btn--locked' : ''}`}
-          disabled={skip}
+          disabled={skip || disabled}
           aria-pressed={locked === true}
           title={`${param.name} · ${lockTitle}`}
           aria-label={`${param.name} · ${lockTitle}`}
@@ -222,6 +232,7 @@ function ParamTools({ param, locked, onToggleLock, onResetParam }: {
         <button
           type="button"
           className="param-tool-btn"
+          disabled={disabled}
           title={`${param.name} · ${t('common.paramReset')}`}
           aria-label={`${param.name} · ${t('common.paramReset')}`}
           onClick={(e) => {
@@ -248,14 +259,19 @@ function renderParam(
   onTextChange: (u: string, v: string) => void,
   onFontChange: (u: string, f: FontFace | null) => void,
   fontValues: Record<string, FontFace | null | undefined>,
-  tools?: { locked?: Set<string>; onToggleLock?: (uniform: string) => void; onResetParam?: (uniform: string) => void },
+  tools?: { locked?: Set<string>; onToggleLock?: (uniform: string) => void; onResetParam?: (uniform: string) => void; disabled?: boolean; disabledTitle?: string },
 ) {
+  const disabled = tools?.disabled === true
+  // 禁用行灰化 + 悬停说明(值仍显示,改值通道全关)
+  const rowCls = `param-row${disabled ? ' param-row--disabled' : ''}`
+  const rowTitle = disabled ? tools?.disabledTitle : undefined
   const renderTools = tools && (tools.onToggleLock || tools.onResetParam) ? (
     <ParamTools
       param={param}
       locked={tools.locked?.has(param.uniform)}
       onToggleLock={tools.onToggleLock}
       onResetParam={tools.onResetParam}
+      disabled={disabled}
     />
   ) : null
   // 名字+工具组共居 header 左侧(与右端值输入对 space-between)；toggle 行原无
@@ -271,11 +287,12 @@ function renderParam(
 
   if (param.type === 'text') {
     return (
-      <div key={param.uniform} className="param-row">
+      <div key={param.uniform} className={rowCls} title={rowTitle}>
         {headerLeft(<ParamLabel name={param.name} description={param.description} />)}
         <input
           type="text"
           className="param-text-input"
+          disabled={disabled}
           value={textValues[param.uniform] ?? param.textDefault}
           onInput={(e: React.FormEvent<HTMLInputElement>) => {
             onTextChange(param.uniform, (e.target as HTMLInputElement).value)
@@ -287,11 +304,12 @@ function renderParam(
 
   if (param.type === 'toggle') {
     return (
-      <div key={param.uniform} className="param-row">
+      <div key={param.uniform} className={rowCls} title={rowTitle}>
         {headerLeft(
           <label className="param-toggle">
             <input
               type="checkbox"
+              disabled={disabled}
               checked={(values[param.uniform] ?? param.default) === 1}
               onChange={(e) => onChange(param.uniform, e.target.checked ? 1 : 0)}
             />
@@ -304,11 +322,12 @@ function renderParam(
 
   if (param.type === 'color') {
     return (
-      <div key={param.uniform} className="param-row">
+      <div key={param.uniform} className={rowCls} title={rowTitle}>
         {headerLeft(<ParamLabel name={param.name} description={param.description} />)}
         <input
           type="color"
           className="param-color-input"
+          disabled={disabled}
           value={textValues[param.uniform] ?? param.default}
           onInput={(e: React.FormEvent<HTMLInputElement>) => {
             onTextChange(param.uniform, (e.target as HTMLInputElement).value)
@@ -320,10 +339,11 @@ function renderParam(
 
   if (param.type === 'select') {
     return (
-      <div key={param.uniform} className="param-row">
+      <div key={param.uniform} className={rowCls} title={rowTitle}>
         {headerLeft(<ParamLabel name={param.name} description={param.description} />)}
         <select
           className="param-select"
+          disabled={disabled}
           value={values[param.uniform] ?? param.default}
           onChange={(e) => onChange(param.uniform, parseFloat(e.target.value))}
         >
@@ -353,10 +373,10 @@ function renderParam(
       })
     }
     return (
-      <div key={param.uniform} className="param-row">
+      <div key={param.uniform} className={rowCls} title={rowTitle}>
         {headerLeft(<ParamLabel name={param.name} description={param.description} />)}
         <label className="param-font-upload">
-          <input type="file" accept=".ttf,.otf,.woff,.woff2" onChange={handleFile} />
+          <input type="file" accept=".ttf,.otf,.woff,.woff2" disabled={disabled} onChange={handleFile} />
           <span className="param-font-name">{current ? current.family : ''}</span>
         </label>
       </div>
@@ -365,7 +385,7 @@ function renderParam(
 
   // Default: number slider
   return (
-    <div key={param.uniform} className="param-row">
+    <div key={param.uniform} className={rowCls} title={rowTitle}>
       <div className="param-header">
         <div className="param-header-left">
           <ParamLabel name={param.name} description={param.description} />
@@ -377,12 +397,14 @@ function renderParam(
           max={param.max}
           step={param.step}
           name={param.name}
+          disabled={disabled}
           onCommit={(v) => onChange(param.uniform, v)}
         />
       </div>
       <input
         type="range"
         className="param-slider"
+        disabled={disabled}
         min={param.min}
         max={param.max}
         step={param.step}
@@ -395,7 +417,7 @@ function renderParam(
   )
 }
 
-function ParamPanel({ title, description, params, values, textValues, onChange, onTextChange, fontValues, onFontChange, onRandom, onClose, defaultPos, storageKey, children, top, bottom, defaultCollapsed, embedded, lockedUniforms, onToggleLock, onResetParam }: ParamPanelProps) {
+function ParamPanel({ title, description, params, values, textValues, onChange, onTextChange, fontValues, onFontChange, onRandom, onClose, defaultPos, storageKey, children, top, bottom, defaultCollapsed, embedded, lockedUniforms, onToggleLock, onResetParam, headerAction, disabledUniforms }: ParamPanelProps) {
   const { t } = useTranslation()
   // embedded 下禁用拖拽(hook 恒调以满足规则，enabled=false 不绑事件不定位)
   const { ref: panelRef, pos, onHeaderMouseDown } = useDraggable(defaultPos, storageKey, { enabled: !embedded })
@@ -411,7 +433,13 @@ function ParamPanel({ title, description, params, values, textValues, onChange, 
     onTextChange ?? (() => {}),
     onFontChange ?? (() => {}),
     fontValues ?? {},
-    { locked: lockedUniforms, onToggleLock, onResetParam },
+    {
+      locked: lockedUniforms,
+      onToggleLock,
+      onResetParam,
+      disabled: disabledUniforms?.has(p.uniform),
+      disabledTitle: t('motion.ownedHint'),
+    },
   ))
 
   if (embedded) {
@@ -430,6 +458,7 @@ function ParamPanel({ title, description, params, values, textValues, onChange, 
         <div className="param-panel-title-row">
           <div className="param-panel-title">{title}</div>
           <div className="param-panel-actions">
+            {headerAction}
             {onRandom && (
               <button
                 className="param-panel-random"

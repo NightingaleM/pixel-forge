@@ -657,6 +657,11 @@
   "motion": {
     "title": "动效",
     "enableHint": "开启后预览实时循环播放",
+    "openAction": "动效",
+    "windowTitle": "动效与导出",
+    "windowDesc": "缩放与中心参数在此调整，并可导出 GIF / 视频",
+    "ownedHint": "此参数已由「动效与导出」面板接管，请到那边调整",
+    "typeLabel": "动效",
     "type": {
       "static": "静止",
       "pingpong": "往返",
@@ -666,7 +671,7 @@
     "endB": "终点 B",
     "speed": "漂移速度",
     "duration": "整循环时长",
-    "startAHint": "起点 A = 左侧滑杆当前值，拖动即时生效",
+    "startAHint": "起点 A = 上滑杆当前值，拖动即时生效",
     "driftHint": "画布朝一个方向持续流动 · 负值 = 反方向"
   },
   "animExport": {

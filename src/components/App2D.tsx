@@ -72,6 +72,11 @@ import MobileShell2D, { type MobileParamPanelProps, type MobileStyleItem } from 
 import MotionExportPanel, { type MotionExportView } from './MotionExportPanel'
 import Lightbox, { type LightboxItem } from './Lightbox'
 
+/** 动效面板接管的三个 uniform(uZoom/uCenterX/uCenterY,与 MOTION_UNIFORMS 同源):
+ *  动效浮窗/sheet 开着时传给参数面板做禁用行;骰子豁免走 diceLockedUniforms 合并通道。
+ *  模块级常量,运行期不增删(类型留 Set 以匹配 ParamPanel/props 签名)。 */
+const MOTION_OWNED_UNIFORMS = new Set<string>(Object.values(MOTION_UNIFORMS))
+
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return bytes + ' B'
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
@@ -243,6 +248,18 @@ function App2D() {
   const animCancelRef = useRef<{ cancelled: boolean } | null>(null)
   /** 导出中禁用参数编辑(spec §3):ref 守卫避免 handler 重建 */
   const animExportBusyRef = useRef(false)
+  /** 动效独立浮窗/sheet 开合(桌面=第二浮窗,移动端=独立 sheet;开合归 App2D,
+   *  因为开动效面板时参数面板三行要禁用、骰子要豁免)。会话态,不持久化。 */
+  const [motionUiOpen, setMotionUiOpen] = useState(false)
+  // 动效面板开着 = 三静态参数归动效面板管:参数行禁用集合 + 骰子豁免(并入
+  // 锁死集合走同一 randomizeParams 过滤通道,批量「全部随机」同样生效)
+  const motionOwnsParams = activeStyle === 'kaleidoscope' && motionUiOpen
+  const diceLockedUniforms = useMemo(() => {
+    if (!motionOwnsParams) return lockedUniforms
+    const s = new Set(lockedUniforms)
+    for (const u of Object.values(MOTION_UNIFORMS)) s.add(u)
+    return s
+  }, [lockedUniforms, motionOwnsParams])
 
   // ---------------------------------------------------------------------------
   // Batch v2(模式语义 + 整批基线 + 队列调度,行状态唯一所有者)
@@ -615,19 +632,19 @@ function App2D() {
 
   // 全部随机(面板回调):统一=randomizeParams 同步 base+工作副本;
   // 独立=每行以基线为底重骰,选中行同步载入工作副本(主画布/SeedBar 跟上)。
-  // 两分支均传锁死集合(lockedUniforms)
+  // 两分支均传锁死集合(diceLockedUniforms=lockedUniforms+动效接管豁免)
   const handleRandomizeAll = useCallback(() => {
     const def = getStyle(activeStyle)
     if (!def || images.length === 0) return
     if (seedMode === 'unified') {
-      const r = randomizeParams(def, params, textParams, Math.random, lockedUniforms)
+      const r = randomizeParams(def, params, textParams, Math.random, diceLockedUniforms)
       setParams(r.params)
       setTextParams(r.textParams)
       setBaseParams(r.params)
       setBaseTextParams(r.textParams)
       return
     }
-    const next = images.map((row) => randomizeRowSeed(row, def, batchBase, undefined, lockedUniforms))
+    const next = images.map((row) => randomizeRowSeed(row, def, batchBase, undefined, diceLockedUniforms))
     setImages(next)
     const cur = next[selectedIndex]
     if (cur) {
@@ -635,7 +652,7 @@ function App2D() {
       setParams(w.params)
       setTextParams(w.textParams)
     }
-  }, [activeStyle, images, seedMode, params, textParams, batchBase, selectedIndex, lockedUniforms])
+  }, [activeStyle, images, seedMode, params, textParams, batchBase, selectedIndex, diceLockedUniforms])
 
   // 重试:failed 行回 pending 再 drain(循环只认 pending,不 patch 永不再跑)
   const handleRetryRow = useCallback((id: string) => {
@@ -650,7 +667,7 @@ function App2D() {
     const row = images.find((r) => r.id === id)
     if (!def || !row) return
     if (row.objectUrl) URL.revokeObjectURL(row.objectUrl)
-    const next = { ...randomizeRowSeed(row, def, batchBase, undefined, lockedUniforms), status: 'pending' as const, blob: null, objectUrl: null, error: null }
+    const next = { ...randomizeRowSeed(row, def, batchBase, undefined, diceLockedUniforms), status: 'pending' as const, blob: null, objectUrl: null, error: null }
     setImages((prev) => prev.map((r) => (r.id === id ? next : r)))
     if (seedMode === 'perImage' && images[selectedIndex]?.id === id) {
       const w = loadWorking(next, batchBase, def)
@@ -658,7 +675,7 @@ function App2D() {
       setTextParams(w.textParams)
     }
     if (!batchRunningRef.current) void drain()
-  }, [activeStyle, images, batchBase, seedMode, selectedIndex, drain, lockedUniforms])
+  }, [activeStyle, images, batchBase, seedMode, selectedIndex, drain, diceLockedUniforms])
 
   // 单张/ZIP 下载 handler 定义在 downloadBlob 之后(微信/移动分流引用它,且其
   // deps 数组在渲染期求值不能前向引用);命名与种子快照语义见彼处注释
@@ -1300,7 +1317,7 @@ function App2D() {
   const handleRandom = useCallback(() => {
     const styleDef = getStyle(activeStyle)
     if (!styleDef) return
-    const r = randomizeParams(styleDef, params, textParams, Math.random, lockedUniforms)
+    const r = randomizeParams(styleDef, params, textParams, Math.random, diceLockedUniforms)
     setParams(r.params)
     setTextParams(r.textParams)
     // 独立模式骰子 = randomizeParams 写工作副本(切换选中行/开始处理时再同步回行)
@@ -1309,7 +1326,7 @@ function App2D() {
       setBaseParams(r.params)
       setBaseTextParams(r.textParams)
     }
-  }, [activeStyle, params, textParams, seedMode, resetZoneSelection, lockedUniforms])
+  }, [activeStyle, params, textParams, seedMode, resetZoneSelection, diceLockedUniforms])
 
   // 风格定义与当前种子码:导出 handler(水印文本带种子码)与渲染/种子视图共用,
   // 声明在 handler 之前(useCallback 引用不能前向)
@@ -1395,6 +1412,10 @@ function App2D() {
       .catch(() => { if (alive) setVideoSupported(false) })
     return () => { alive = false }
   }, [isKaleido, image, videoSupported])
+  // 切出万花筒自动关动效浮窗(避免切回时窗凭空重现);三行禁用/骰子豁免随开合态解除
+  useEffect(() => {
+    if (!isKaleido && motionUiOpen) setMotionUiOpen(false)
+  }, [isKaleido, motionUiOpen])
 
   const handleStartAnimExport = useCallback(async () => {
     if (!image || !currentStyle || activeStyle !== 'kaleidoscope' || !isMotionActive(motion)) return
@@ -1491,7 +1512,9 @@ function App2D() {
     }
   }, [animExport, motion, gifSettings, videoSupported, isKaleido, image, isAnimExporting])
 
-  // 动效+导出面板节点(仅万花筒渲染;两壳经 bottom 插槽共用)
+  // 动效+导出面板节点(仅万花筒渲染;桌面挂独立浮窗 children,移动端挂独立 sheet,
+  // 两壳共用同一节点)。静态值滑条直写 uZoom/uCenterX/uCenterY(与参数面板行同通道,
+  // 种子码/基线双写语义不变);浮窗开着时参数面板三行禁用,这里是唯一编辑入口。
   const motionPanelNode = isKaleido ? (
     <MotionExportPanel
       motion={motion}
@@ -1502,6 +1525,12 @@ function App2D() {
       onStartExport={handleStartAnimExport}
       onCancelExport={handleCancelAnimExport}
       onResetExport={dispatchAnimExport}
+      staticValues={{
+        zoom: params.uZoom ?? 1,
+        centerX: params.uCenterX ?? 0,
+        centerY: params.uCenterY ?? 0,
+      }}
+      onStaticChange={(key, v) => handleParamChange(MOTION_UNIFORMS[key], v)}
     />
   ) : null
 
@@ -2060,7 +2089,8 @@ function App2D() {
       lockedUniforms,
       onToggleLock: handleToggleLock,
       onResetParam: handleResetParam,
-      bottom: motionPanelNode,
+      disabledUniforms: motionOwnsParams ? MOTION_OWNED_UNIFORMS : undefined,
+      onOpenMotion: isKaleido ? () => setMotionUiOpen(true) : undefined,
       top: (
         <>
           <SeedBar seed={seed} onApply={handleApplySeed} presets={presets} onApplyPreset={handleApplyPreset} />
@@ -2130,6 +2160,9 @@ function App2D() {
           onOpenBatch={handleBatchOpen}
           imageInfo={imageInfo}
           paramPanel={mobileParamPanel}
+          motionPanel={motionPanelNode}
+          motionOpen={motionUiOpen}
+          onMotionOpenChange={setMotionUiOpen}
           batchPanel={batchPanelNode}
           onBatchClose={handleBatchSheetClose}
         />
@@ -2219,6 +2252,23 @@ function App2D() {
           defaultPos={{ x: 282, y: 110 }}
           storageKey="pixel-forge.panelPos.2d.v1"
           description={t(currentStyle.description)}
+          headerAction={isKaleido ? (
+            <button
+              type="button"
+              className={`param-panel-motion${motionUiOpen ? ' param-panel-motion--on' : ''}`}
+              onClick={() => setMotionUiOpen(v => !v)}
+              title={t('motion.windowTitle')}
+              aria-label={t('motion.windowTitle')}
+              aria-pressed={motionUiOpen}
+            >
+              {/* 手绘 SVG:正弦波+循环箭头(与动效卡标题同图形) */}
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M3 15c2.7-6.5 5.3-6.5 8 0s5.3 6.5 8 0" />
+                <path d="M17.5 3.2a8.2 8.2 0 0 1 4.2 4.3" />
+                <path d="M21.7 3.4v4.1h-4.1" />
+              </svg>
+            </button>
+          ) : undefined}
           params={currentStyle.params.map(p => {
             if (p.type === 'select') {
               return {
@@ -2240,7 +2290,7 @@ function App2D() {
           lockedUniforms={lockedUniforms}
           onToggleLock={handleToggleLock}
           onResetParam={handleResetParam}
-          bottom={motionPanelNode}
+          disabledUniforms={motionOwnsParams ? MOTION_OWNED_UNIFORMS : undefined}
           top={
             <>
               <SeedBar seed={seed} onApply={handleApplySeed} presets={presets} onApplyPreset={handleApplyPreset} />
@@ -2259,6 +2309,20 @@ function App2D() {
             </>
           }
         />
+      )}
+      {/* 动效浮窗(万花筒专属,参数浮窗 header 动效钮开合):复用 ParamPanel 拖拽壳,
+          children=MotionExportPanel(与移动端动效 sheet 共用节点)。默认位在参数
+          浮窗右侧(282+260+24),位置持久化独立 storageKey */}
+      {image && currentStyle && isKaleido && motionUiOpen && (
+        <ParamPanel
+          title={t('motion.windowTitle')}
+          description={t('motion.windowDesc')}
+          defaultPos={{ x: 566, y: 110 }}
+          storageKey="pixel-forge.panelPos.2d.motion.v1"
+          onClose={() => setMotionUiOpen(false)}
+        >
+          {motionPanelNode}
+        </ParamPanel>
       )}
       {/* 预设列表弹窗:两壳共用节点(见 presetPanelNode 定义处) */}
       {presetPanelNode}

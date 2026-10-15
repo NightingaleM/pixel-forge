@@ -280,6 +280,37 @@ body {
   color: #000;
 }
 
+/* 动效浮窗开关(万花筒参数浮窗 header,骰子旁):观感同 param-panel-random,
+   开启态反色(白底黑icon)标记浮窗在开 */
+.param-panel-motion {
+  background: none;
+  border: 1px solid #FFF;
+  color: #FFF;
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.param-panel-motion:hover {
+  background: rgba(255,255,255,0.1);
+}
+.param-panel-motion--on,
+.param-panel-motion--on:hover {
+  background: #FFF;
+  color: #000;
+}
+
+/* 动效浮窗接管的参数行:整行灰化(值仍显示,改值通道全关;悬停 title 提示去向) */
+.param-row--disabled {
+  opacity: 0.45;
+}
+.param-row--disabled .param-value {
+  cursor: default;
+}
+
 .param-panel-desc {
   font-size: 11px;
   color: #999;
@@ -2222,15 +2253,11 @@ body {
    插槽与移动端参数 sheet(embedded)共用本节。
    ============================================================ */
 
+/* 动效面板(独立浮窗/sheet 的唯一内容,顶部不再需要与参数区的间隔) */
 .motion-panel {
-  margin-top: 14px;
   display: flex;
   flex-direction: column;
   gap: 12px;
-}
-
-.param-panel-embedded .motion-panel {
-  margin-top: 12px;
 }
 
 .motion-card {
@@ -2323,9 +2350,18 @@ body {
   padding: 8px 10px;
 }
 
+/* 静态值滑条(参数本体迁入):行下留 4px 呼吸,后续动效配置行再隔 8px */
+.motion-static-slider {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+}
+
+/* 静态值行(名字左/数值右,与参数面板行 header 同构) */
 .motion-prow {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
 }
 
