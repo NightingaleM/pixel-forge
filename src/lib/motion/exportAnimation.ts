@@ -119,6 +119,12 @@ export async function runAnimationExport(opts: RunAnimationExportOptions): Promi
   try {
     if (opts.isCancelled?.()) throw new ExportCancelledError()
     renderer.loadImage(opts.image)
+    // loadImage 会把画布重设为图片适配尺寸(离屏无容器 → 原图尺寸,上限 2048),
+    // 踩掉上面的导出尺寸——必须重设回 w×h,否则整条管线变成「按原图尺寸渲染
+    // + staging 只拷左上角」的裁切导出。render()/uResolution 均按画布实时取值,
+    // 重设后 shader 原生落在导出分辨率上,aspect 也按导出档修正。
+    glCanvas.width = w
+    glCanvas.height = h
     // 预热 shader:useShader 链接一次,后续帧仅覆写 uniform + render
     for (const imp of opts.styleDef.shaderImports) await imp()
     if (opts.isCancelled?.()) throw new ExportCancelledError()

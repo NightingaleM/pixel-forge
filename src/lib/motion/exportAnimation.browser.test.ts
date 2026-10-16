@@ -19,7 +19,7 @@ import path from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import puppeteer, { type Browser } from 'puppeteer-core'
-import { parseGIF } from 'gifuct-js'
+import { decompressFrames, parseGIF } from 'gifuct-js'
 
 const PORT = 51791
 const TMP_CONFIG = '.tmp-vite-anim.config.mjs'
@@ -346,5 +346,119 @@ describe('runAnimationExport 产物真文件抽验(真 shader/真编码器)', ()
     // MediaRecorder 时戳精度放宽:目标 2.0s ±0.4
     expect(r.mp4Duration!).toBeGreaterThan(1.6)
     expect(r.mp4Duration!).toBeLessThan(2.4)
+  }, 180_000)
+
+  it('GIF 导出完整性:源图大于导出档时首帧必须是完整渲染,不是原图尺寸的左上裁切', async () => {
+    // 回归:ShaderRenderer.loadImage 会把离屏画布重设为源图尺寸(离屏无容器
+    // fit),编排层不重设回导出尺寸时,staging 只拷到按原图尺寸渲染结果的左上
+    // 角 w×h——源图越大裁切越狠。目镜遮罩(uViewMask=1)把「完整」变成可断言
+    // 的亮度形态:中心亮 + 四角暗;左上裁切区全在遮罩半径外,整帧近黑
+    // (bug 实测整帧/中心/四角全 3.0,修复后 91/139/3,阈值留足余量)。
+    const p = await browser.newPage()
+    try {
+      await p.setViewport({ width: 500, height: 500 })
+      await p.goto(DEV_URL, { waitUntil: 'domcontentloaded' })
+      const r = await p.evaluate(async (): Promise<PageResult & { gifB64?: string }> => {
+        // 合成源图 1536×1024:大于 256 导出档,足以放大踩踏
+        const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+          const c = document.createElement('canvas')
+          c.width = 1536
+          c.height = 1024
+          const ctx = c.getContext('2d')!
+          const g = ctx.createLinearGradient(0, 0, 1536, 1024)
+          g.addColorStop(0, '#ff3366')
+          g.addColorStop(0.5, '#33ff66')
+          g.addColorStop(1, '#3366ff')
+          ctx.fillStyle = g
+          ctx.fillRect(0, 0, 1536, 1024)
+          ctx.strokeStyle = '#000'
+          for (let x = 0; x < 1536; x += 96) {
+            ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 1024); ctx.stroke()
+          }
+          const el = new Image()
+          el.onload = () => resolve(el)
+          el.onerror = () => reject(new Error('源图构造失败'))
+          el.src = c.toDataURL('image/png')
+        })
+        const imp = new Function('u', 'return import(u)') as (u: string) => Promise<Record<string, unknown>>
+        try {
+          const reg = (await imp('/src/lib/StyleRegistry.ts')) as {
+            getStyle: (id: string) => Record<string, unknown>
+            defaultParams: (id: string) => Record<string, number>
+          }
+          const kaleido = (await imp('/src/lib/motion/kaleidoMotion.ts')) as {
+            MOTION_UNIFORMS: Record<string, string>
+          }
+          const anim = (await imp('/src/lib/motion/exportAnimation.ts')) as {
+            runAnimationExport: (o: Record<string, unknown>) => Promise<{ blob: Blob }>
+          }
+          const res = await anim.runAnimationExport({
+            image: img,
+            styleDef: reg.getStyle('kaleidoscope'),
+            params: { ...reg.defaultParams('kaleidoscope'), uViewMask: 1 },
+            textParams: {},
+            fontParams: {},
+            brightest: null,
+            zoneMask: null,
+            timeline: {
+              duration: 1,
+              base: { zoom: 1, centerX: 0, centerY: 0 },
+              params: {
+                zoom: { type: 'static' },
+                centerX: { type: 'static' },
+                centerY: { type: 'static' },
+              },
+            },
+            uniformMap: kaleido.MOTION_UNIFORMS,
+            format: 'gif',
+            gif: { size: 256, fps: 8 },
+            watermark: 'none',
+            seed: 'CROPTEST',
+          })
+          const buf = await res.blob.arrayBuffer()
+          let b64 = ''
+          const bytes = new Uint8Array(buf)
+          for (let i = 0; i < bytes.length; i += 0x8000) {
+            b64 += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
+          }
+          return { ok: true, gifB64: btoa(b64) }
+        } catch (e) {
+          return { ok: false, error: String(e) }
+        }
+      })
+      expect(r.error).toBeUndefined()
+      expect(r.ok).toBe(true)
+
+      const bytes = b64ToBytes(r.gifB64!)
+      const gif = parseGIF(bytes.buffer as ArrayBuffer)
+      const frames = decompressFrames(gif, true)
+      const f0 = frames[0]
+      const { width, height } = f0.dims
+      expect(width).toBe(256)
+      expect(height).toBe(256)
+      const patch = f0.patch as Uint8ClampedArray
+      const mean = (x0: number, y0: number, w: number, h: number) => {
+        let s = 0
+        let n = 0
+        for (let y = y0; y < y0 + h; y++) {
+          for (let x = x0; x < x0 + w; x++) {
+            const i = (y * width + x) * 4
+            s += (patch[i] + patch[i + 1] + patch[i + 2]) / 3
+            n++
+          }
+        }
+        return s / n
+      }
+      // 完整渲染:中心在目镜孔径内必亮;四角在遮罩半径外必暗
+      expect(mean(width / 2 - 24, height / 2 - 24, 48, 48)).toBeGreaterThan(60)
+      expect(mean(0, 0, 24, 24)).toBeLessThan(25)
+      expect(mean(width - 24, 0, 24, 24)).toBeLessThan(25)
+      expect(mean(0, height - 24, 24, 24)).toBeLessThan(25)
+      expect(mean(width - 24, height - 24, 24, 24)).toBeLessThan(25)
+      // 左上裁切(bug 形态)整帧近黑:整帧均值远高于它即可区分
+      expect(mean(0, 0, width, height)).toBeGreaterThan(40)
+    } finally {
+      await p.close()
+    }
   }, 180_000)
 })
