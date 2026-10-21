@@ -1764,14 +1764,20 @@ body {
   color: #999;
 }
 
-/* --- Language Switch --- */
+/* --- Language Switch (下拉 + SVG 地球) --- */
 
 .lang-switch {
   position: fixed;
   top: 12px;
   right: 12px;
   z-index: 9999;
-  padding: 4px 10px;
+  user-select: none;
+}
+.lang-switch-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
   border: 1px solid #333;
   background: #fff;
   cursor: pointer;
@@ -1779,11 +1785,70 @@ body {
   font-size: 13px;
   letter-spacing: 0.5px;
   color: #333;
-  user-select: none;
 }
-.lang-switch:hover {
+.lang-switch-btn:hover {
   background: #333;
   color: #fff;
+}
+.lang-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 118px;
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+  background: #fff;
+  border: 1px solid #333;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+}
+.lang-option {
+  display: block;
+  width: 100%;
+  padding: 7px 14px;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  color: #333;
+  text-align: left;
+}
+.lang-option:hover {
+  background: #eee;
+}
+.lang-option.current {
+  font-weight: 600;
+}
+
+/* --- Root Language Dispatch (dev 环境；prod 为静态 stub) --- */
+
+.lang-dispatch {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+}
+.lang-dispatch-title {
+  font-size: 22px;
+  color: #333;
+  margin: 0;
+}
+.lang-dispatch-list {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 14px;
+  padding: 0;
+  margin: 0;
+}
+.lang-dispatch-list a {
+  color: #333;
+  text-decoration: underline;
+  font-size: 15px;
 }
 
 /* --- Sidebar Home Button --- */

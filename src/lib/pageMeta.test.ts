@@ -1,7 +1,15 @@
 import { describe, it, expect } from 'vitest'
+import { readFileSync, readdirSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import { join } from 'node:path'
 import { PAGE_METAS, resolvePageMeta, NOT_FOUND_META, SITE_URL } from './pageMeta'
-import zh from '../i18n/zh.json'
-import en from '../i18n/en.json'
+import { LANGS } from '../i18n/langs'
+
+const i18nDir = fileURLToPath(new URL('../i18n', import.meta.url))
+
+function loadDict(lang: string): Record<string, unknown> {
+  return JSON.parse(readFileSync(join(i18nDir, `${lang}.json`), 'utf8'))
+}
 
 function getNested(obj: unknown, keyPath: string): string | undefined {
   const val = keyPath.split('.').reduce<unknown>((acc, key) => {
@@ -14,7 +22,7 @@ function getNested(obj: unknown, keyPath: string): string | undefined {
 }
 
 describe('resolvePageMeta', () => {
-  it('精确匹配 8 个常规路由', () => {
+  it('精确匹配 8 个常规路由（语言内路径）', () => {
     expect(resolvePageMeta('/').titleKey).toBe('meta.home.title')
     expect(resolvePageMeta('/2d').titleKey).toBe('meta.p2d.title')
     expect(resolvePageMeta('/3d').titleKey).toBe('meta.p3d.title')
@@ -23,6 +31,17 @@ describe('resolvePageMeta', () => {
     expect(resolvePageMeta('/terms').titleKey).toBe('meta.terms.title')
     expect(resolvePageMeta('/help').titleKey).toBe('meta.help.title')
     expect(resolvePageMeta('/license').titleKey).toBe('meta.license.title')
+  })
+
+  it('语言前缀路径解析到同一条 meta（URL 是语言事实来源）', () => {
+    expect(resolvePageMeta('/zh/')).toEqual(resolvePageMeta('/'))
+    expect(resolvePageMeta('/zh/2d')).toEqual(resolvePageMeta('/2d'))
+    expect(resolvePageMeta('/en/2d')).toEqual(resolvePageMeta('/2d'))
+    expect(resolvePageMeta('/en/about/')).toEqual(resolvePageMeta('/about'))
+  })
+
+  it('非法语言前缀整段按未知路径处理', () => {
+    expect(resolvePageMeta('/fr/2d')).toEqual(NOT_FOUND_META)
   })
 
   it('尾斜杠归一化到同一路由', () => {
@@ -51,14 +70,29 @@ describe('resolvePageMeta', () => {
   })
 })
 
-describe('PAGE_METAS i18n 键完整性', () => {
-  it.each([...PAGE_METAS, NOT_FOUND_META])('$path 的 title/desc 键在 zh 与 en 中均存在且非空', (meta) => {
-    expect(getNested(zh, meta.titleKey)).toBeTruthy()
-    expect(getNested(en, meta.titleKey)).toBeTruthy()
-    if (meta.descKey) {
-      expect(getNested(zh, meta.descKey)).toBeTruthy()
-      expect(getNested(en, meta.descKey)).toBeTruthy()
+describe('字典文件集与 LANGS 同步', () => {
+  it('src/i18n 下的 json 文件 stem 集恰为 LANGS（漏建/漏登记都会红）', () => {
+    const stems = readdirSync(i18nDir)
+      .filter((f) => f.endsWith('.json'))
+      .map((f) => f.replace(/\.json$/, ''))
+      .sort()
+    expect(stems).toEqual([...LANGS].sort())
+  })
+})
+
+describe('PAGE_METAS i18n 键完整性（全部语言）', () => {
+  const dicts = Object.fromEntries(LANGS.map((l) => [l, loadDict(l)]))
+
+  it.each(LANGS)('%s：全部页面 title/desc 键存在且非空', (lang) => {
+    const dict = dicts[lang]
+    for (const meta of [...PAGE_METAS, NOT_FOUND_META]) {
+      expect(getNested(dict, meta.titleKey), `${lang} ${meta.titleKey}`).toBeTruthy()
+      if (meta.descKey) {
+        expect(getNested(dict, meta.descKey), `${lang} ${meta.descKey}`).toBeTruthy()
+      }
     }
+    // 根分发页标题（applyPageMeta 的 ROOT_DISPATCH_META 使用）
+    expect(getNested(dict, 'meta.dispatch.title'), `${lang} meta.dispatch.title`).toBeTruthy()
   })
 })
 

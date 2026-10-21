@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import LangLink from './LangLink'
 import { useTranslation } from 'react-i18next'
 import Footer from './Footer'
 
@@ -12,22 +12,22 @@ export default function Home() {
         <p className="home-subtitle">{t('home.subtitle')}</p>
 
         <div className="home-links">
-          <Link to="/2d" className="home-link">
+          <LangLink to="/2d" className="home-link">
             <div className="home-link-card">
               <div className="home-link-icon">🎨</div>
               <div className="home-link-title">{t('home.style2d')}</div>
               <div className="home-link-desc">{t('home.style2dDesc')}</div>
             </div>
-          </Link>
+          </LangLink>
 
-          <Link to="/3d" className="home-link">
+          <LangLink to="/3d" className="home-link">
             <div className="home-link-card">
               <div className="home-link-icon">🎭</div>
               <div className="home-link-title">{t('home.style3d')}</div>
               <div className="home-link-desc">{t('home.style3dDesc')}</div>
               <span className="home-pc-only">{t('mobile.pcOnly3d')}</span>
             </div>
-          </Link>
+          </LangLink>
         </div>
 
       </div>

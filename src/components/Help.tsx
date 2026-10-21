@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import LangLink from './LangLink'
 import { useTranslation } from 'react-i18next'
 import InfoPage from './InfoPage'
 
@@ -29,7 +29,7 @@ export default function Help() {
       <section>
         <h2>{t('help.memberTitle')}</h2>
         <p>{t('help.memberBody')}</p>
-        <p><Link to="/license" className="info-back-link">{t('help.memberLink')}</Link></p>
+        <p><LangLink to="/license" className="info-back-link">{t('help.memberLink')}</LangLink></p>
       </section>
     </InfoPage>
   )

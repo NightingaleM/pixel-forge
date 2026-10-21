@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import LangLink from './LangLink'
 import { useTranslation } from 'react-i18next'
 import InfoPage from './InfoPage'
 
@@ -55,7 +55,7 @@ export default function LicenseHelp() {
             <li key={n}>{t(`licenseHelp.tip${n}`)}</li>
           ))}
         </ul>
-        <p><Link to="/terms" className="info-back-link">{t('licenseHelp.termsLink')} →</Link></p>
+        <p><LangLink to="/terms" className="info-back-link">{t('licenseHelp.termsLink')} →</LangLink></p>
       </section>
     </InfoPage>
   )

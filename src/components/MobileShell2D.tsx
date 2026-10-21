@@ -10,7 +10,7 @@
 // 全屏层。布局与 safe-area/dvh 基建在 styles/mobile.css;props
 // 全部由 App2D 分流透传,行状态/渲染管线仍归 App2D,本组件纯视图 + sheet 开合状态。
 import { useState, type ReactNode, type RefObject } from 'react'
-import { Link } from 'react-router-dom'
+import LangLink from './LangLink'
 import { useTranslation } from 'react-i18next'
 import { CompareSlider } from './CompareSlider'
 import ImageStrip, { type ImageStripProps } from './ImageStrip'
@@ -136,7 +136,7 @@ function MobileShell2D(props: MobileShell2DProps) {
   return (
     <div className="m-app">
       <div className="m-topbar">
-        <Link to="/" aria-label={t('common.backToHome')}>←</Link>
+        <LangLink to="/" aria-label={t('common.backToHome')}>←</LangLink>
         {/* 风格名钮 = 风格 sheet 触发 */}
         <button type="button" className="m-style-btn" onClick={() => openSheet('style')}>{props.styleLabel}</button>
         <div className="m-topbar-spacer" style={{ flex: 1 }} />

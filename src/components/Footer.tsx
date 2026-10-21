@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import LangLink from './LangLink'
 import { useTranslation } from 'react-i18next'
 
 export default function Footer() {
@@ -7,11 +7,11 @@ export default function Footer() {
   return (
     <footer className="footer">
       <div className="footer-links">
-        <Link to="/about" className="footer-link">{t('footer.about')}</Link>
-        <Link to="/privacy" className="footer-link">{t('footer.privacy')}</Link>
-        <Link to="/terms" className="footer-link">{t('footer.terms')}</Link>
-        <Link to="/help" className="footer-link">{t('footer.help')}</Link>
-        <Link to="/license" className="footer-link">{t('footer.license')}</Link>
+        <LangLink to="/about" className="footer-link">{t('footer.about')}</LangLink>
+        <LangLink to="/privacy" className="footer-link">{t('footer.privacy')}</LangLink>
+        <LangLink to="/terms" className="footer-link">{t('footer.terms')}</LangLink>
+        <LangLink to="/help" className="footer-link">{t('footer.help')}</LangLink>
+        <LangLink to="/license" className="footer-link">{t('footer.license')}</LangLink>
       </div>
       <p className="footer-copyright">{t('footer.copyright')}</p>
     </footer>

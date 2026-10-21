@@ -164,5 +164,6 @@
      目标;按钮默认 content-box 之外的 UA 差异用 border-box 显式钉死,min 尺寸含边距。
      Task 11:top 12px 会让 44px 钮垂到顶栏分隔线之下,视觉成"第二个按钮";改为
      与 m-topbar 同带对齐(top=安全区顶,高 44),m-topbar/批量标题条各自让位见上 */
-  .lang-switch { min-width: 44px; min-height: 44px; box-sizing: border-box; top: env(safe-area-inset-top); right: 10px; height: 44px; }
+  .lang-switch-btn { min-width: 44px; min-height: 44px; box-sizing: border-box; }
+  .lang-switch { top: env(safe-area-inset-top); right: 10px; }
 }

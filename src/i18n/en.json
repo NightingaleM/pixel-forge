@@ -568,7 +568,7 @@
     "title": "About",
     "description": "PixelForge is a web-based real-time image artistic style transfer tool powered by WebGL shaders. It offers both 2D image stylization and 3D particle animation capabilities — all image processing happens locally in your browser, and your files are never uploaded.",
     "featuresTitle": "Core Features",
-    "feature2d": "2D Image Stylization — 10 artistic effects including Halftone, Diffusion, Pop Art, Light & Shadow, Sketch, Pointillism, Kaleidoscope, Crosshatch, Anime Light, and Text Raster.",
+    "feature2d": "2D Image Stylization — Halftone, Diffusion, Pop Art, Light & Shadow, Sketch, Pointillism, Kaleidoscope, Crosshatch, Anime Light, Text Raster and more — 15 artistic effects in all.",
     "feature3d": "3D Particle Animation — Transform GLTF models into particle effects with Explosion, Morph, Vortex, and Density simulations.",
     "techTitle": "Technology",
     "techStack": "Built with React 19, TypeScript, Three.js, WebGL shaders, and Vite.",
@@ -767,19 +767,19 @@
   },
   "meta": {
     "home": {
-      "title": "PixelForge - Image Stylization & 3D Particle Animation",
-      "desc": "PixelForge — a WebGL-based online image art stylization tool. Real-time rendering in 11 art styles including halftone, pop art, sketch and pointillism, plus 3D GLTF particle effects. Free, no sign-up."
+      "title": "Photo to Art — Free Online Art Filters & Effects | PixelForge",
+      "desc": "Turn photos into art online: halftone, pop art, sketch, kaleidoscope, ASCII and 15 art filters in all. Real-time preview, free, no sign-up — images never leave your browser."
     },
     "p2d": {
-      "title": "PixelForge 2D Studio - Halftone, Pop Art, Sketch & More Art Filters",
-      "desc": "Upload an image and preview 11 art styles in real time — halftone, pop art, sketch, pointillism, kaleidoscope, ASCII and more. Adjustable parameters, shareable seeds and local presets. Runs entirely in your browser, free, no sign-up."
+      "title": "Halftone, Pop Art, Sketch & 15 Art Filters Online Free | PixelForge",
+      "desc": "Free online art filter studio: halftone generator, pop art, pencil sketch, pointillism, kaleidoscope and more. Adjustable presets, no watermark, no sign-up, all in your browser."
     },
     "p3d": {
-      "title": "PixelForge 3D Particle Studio - GLTF Particle Effects",
-      "desc": "Turn GLTF/GLB models into GPU particle effects with volumetric sampling and particle/background controls. Rendered locally in your browser, free to use."
+      "title": "3D Particle Effects from GLTF Models — Free Online | PixelForge",
+      "desc": "Turn GLTF/GLB models into GPU 3D particle effects online, free. Volumetric sampling, particle & background controls, rendered locally in your browser."
     },
     "about": {
-      "title": "About PixelForge - Free Online Image Stylization & 3D Particles",
+      "title": "About PixelForge - Free Online Photo to Art & 3D Particles",
       "desc": "Learn about PixelForge's features and tech stack: WebGL shader art filters and three.js 3D particle effects — all image processing happens locally in your browser."
     },
     "privacy": {
@@ -797,6 +797,9 @@
     "license": {
       "title": "Redemption Codes & Membership - PixelForge",
       "desc": "Free tier vs membership, how to activate, extend and sync redemption codes, device binding rules, and an error message reference."
+    },
+    "dispatch": {
+      "title": "PixelForge - Free Online Photo to Art & Effects"
     },
     "notFound": {
       "title": "Page Not Found - PixelForge"
