@@ -1,7 +1,7 @@
 ---
 title: 海外 SEO 与多语种扩展
 labels: [wayfinder:map]
-status: open
+status: closed
 tracker: local-markdown
 ---
 
@@ -33,6 +33,7 @@ tracker: local-markdown
 - [决策票——CDN 与海外分发（含白捡优化）](tickets/08-cdn-decision.md): **白捡优化现在做进 repo**（nginx gzip 显式化 + HTML no-cache，随镜像重部署一并修复线上旧镜像）；**CDN 缓议**——等多语言上线 + GSC 数据再定。DNS 迁海外与 HTTP/2 为用户部署侧动作（票内注记）。
 - [执行票——多语言架构实现](tickets/04-execute-architecture.md): **已交付**——langs.ts/i18n 懒加载/​:lang 路由+15 处内链 LangLink/hreflang+og:locale+JSON-LD/切换器下拉+SVG/prerender 双循环+根 stub+sitemap 脚本生成/nginx 301+gzip。tsc 0 错、lint 基线、测试全绿、16 页冒烟过（详单见票内）。
 - [执行票——翻译与关键词导向 meta](tickets/05-execute-content.md): **已交付**——ja/es/pt 各 746 键逐键对齐+术语表 15/15 锁定+研究骨架 meta 逐字采用；zh/en meta 按体检重写（弃 Image Stylization）；第三处计数漂移（about「10 种」）一并修正。497/498（唯一 fail 为既有 motion 时戳抖动，单跑绿）、prerender **40 页**产物抽查全对。
+- [执行票——统一验收与本地合入](tickets/07-final-acceptance.md): **全关通过，已合入本地 main（67cbcf0，未 push）**——tsc 0 错/lint 基线/497 单测、prerender 40 页深链抽查全对、浏览器实测 13/13（协商/切换/旧路径/noindex/H5）。**图目的地达成。**
 
 ## Not yet specified
 
